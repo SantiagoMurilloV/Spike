@@ -1,33 +1,48 @@
-import { Pool } from 'pg';
+import { Pool, PoolConfig } from 'pg';
 import fs from 'fs';
 import path from 'path';
 
-interface DatabaseConfig {
-  host: string;
-  port: number;
-  database: string;
-  user: string;
-  password: string;
-  max: number;
-}
-
 let pool: Pool | null = null;
 
-function getDatabaseConfig(): DatabaseConfig {
+/**
+ * Build the pg Pool config.
+ *
+ * Two modes, in order of precedence:
+ *
+ *  1. `DATABASE_URL` — connection string (used by Railway, Render, Heroku,
+ *     Neon, Supabase). If the hostname is not localhost we also enable TLS
+ *     with `rejectUnauthorized: false` so self-signed certs from managed
+ *     providers don't break the connection.
+ *  2. Individual `DB_*` vars — classic host / port / user / password /
+ *     database, matching the local dev setup.
+ */
+function buildPoolConfig(): PoolConfig {
+  const max = parseInt(process.env.DB_POOL_SIZE || '20', 10);
+
+  if (process.env.DATABASE_URL) {
+    const connectionString = process.env.DATABASE_URL;
+    // Naive hostname sniff — good enough to decide if SSL is needed.
+    const isRemote = !/localhost|127\.0\.0\.1/.test(connectionString);
+    return {
+      connectionString,
+      max,
+      ssl: isRemote ? { rejectUnauthorized: false } : undefined,
+    };
+  }
+
   return {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432', 10),
     database: process.env.DB_NAME || 'spkcup',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
-    max: parseInt(process.env.DB_POOL_SIZE || '20', 10),
+    max,
   };
 }
 
 export function getPool(): Pool {
   if (!pool) {
-    const config = getDatabaseConfig();
-    pool = new Pool(config);
+    pool = new Pool(buildPoolConfig());
   }
   return pool;
 }

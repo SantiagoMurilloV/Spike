@@ -107,7 +107,11 @@ app.post('/api/upload/logo', upload.single('logo'), (req, res) => {
     res.status(400).json({ message: 'No se proporcionó un archivo válido' });
     return;
   }
-  const url = `/uploads/logos/${req.file.filename}`;
+  // PUBLIC_URL lets Railway expose absolute URLs so the Vercel-hosted
+  // frontend can load images from the backend origin. Falls back to a
+  // relative path in local dev (proxied by Vite).
+  const publicBase = process.env.PUBLIC_URL?.replace(/\/$/, '') ?? '';
+  const url = `${publicBase}/uploads/logos/${req.file.filename}`;
   res.json({ url });
 });
 
@@ -118,15 +122,17 @@ app.use('/api/teams', teamRoutes);
 app.use('/api/matches', matchRoutes);
 app.use('/api/settings', settingsRoutes);
 
+// Error handler — must be last. Registering it up here (outside startServer)
+// ensures it catches errors even if boot-time migration fails.
+app.use(errorHandler);
+
 async function startServer() {
   try {
-    // Verificar conexión a la base de datos
     const connected = await checkConnection();
     if (!connected) {
       console.error('No se pudo conectar a la base de datos. Iniciando sin DB...');
     } else {
       console.log('Conexión a PostgreSQL establecida.');
-      // Ejecutar migraciones pendientes
       await runMigrations();
       console.log('Migraciones ejecutadas correctamente.');
     }
@@ -134,21 +140,13 @@ async function startServer() {
     console.error('Error durante la inicialización de la base de datos:', error);
   }
 
-  // Serve frontend production build
-  const distPath = path.join(__dirname, '../../dist');
-  app.use(express.static(distPath));
-  app.get('*', (_req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
-
-  // Error handler (must be registered after all routes)
-  app.use(errorHandler);
-
   app.listen(PORT, () => {
     console.log(`Servidor SPK-CUP corriendo en puerto ${PORT}`);
   });
 }
 
+// In Vercel / Lambda-like environments we'd skip listen() and export app;
+// Railway runs this as a long-lived process so we always boot.
 startServer();
 
 export default app;
