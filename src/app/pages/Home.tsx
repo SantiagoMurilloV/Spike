@@ -89,28 +89,6 @@ export function Home() {
               </div>
             </motion.div>
 
-            {/* Navigation */}
-            <nav className="hidden md:flex items-center gap-8">
-              <motion.button
-                whileHover={{ y: -2 }}
-                className="text-sm font-medium text-white/70 hover:text-white transition-colors"
-              >
-                Torneos
-              </motion.button>
-              <motion.button
-                whileHover={{ y: -2 }}
-                className="text-sm font-medium text-white/70 hover:text-white transition-colors"
-              >
-                Resultados
-              </motion.button>
-              <motion.button
-                whileHover={{ y: -2 }}
-                className="text-sm font-medium text-white/70 hover:text-white transition-colors"
-              >
-                Equipos
-              </motion.button>
-            </nav>
-
             {/* Admin Access */}
             <motion.button
               onClick={() => navigate('/login')}
