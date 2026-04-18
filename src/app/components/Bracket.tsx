@@ -32,9 +32,48 @@ interface BracketProps {
 const FONT = { fontFamily: 'Barlow Condensed, sans-serif' };
 
 /**
+ * Format a placeholder string from the backend into a human-readable label.
+ *
+ * Placeholders are stored in the DB as `"{position}|{groupName}"` where
+ * `groupName` may itself contain a pipe if the tournament has multiple
+ * categories (e.g. `"1|Sub-14 Masculino|A"`).
+ *
+ * Examples:
+ *   "1|A"                     → "1° A"
+ *   "2|Grupo B"               → "2° Grupo B"
+ *   "1|Sub-14 Masculino|A"    → "1° A"        (single category → drop prefix)
+ *   "3|Sub-16 Femenino|C"     → "3° C (Sub-16 Femenino)" when useCategory=true
+ *
+ * @param raw The raw placeholder from `match.team1Placeholder` or `team2Placeholder`.
+ * @param showCategory Whether to append the category name in parentheses
+ *                     (only relevant when the tournament has multiple categories).
+ */
+export function formatBracketPlaceholder(
+  raw: string | undefined,
+  showCategory = false,
+): string | undefined {
+  if (!raw) return undefined;
+  const firstPipe = raw.indexOf('|');
+  if (firstPipe === -1) return raw;
+  const position = raw.substring(0, firstPipe);
+  const rest = raw.substring(firstPipe + 1);
+  const lastPipe = rest.lastIndexOf('|');
+  const category = lastPipe > -1 ? rest.substring(0, lastPipe) : '';
+  const groupLetter = lastPipe > -1 ? rest.substring(lastPipe + 1) : rest;
+  // Strip a leading "Grupo " so we don't render "Grupo Grupo A"
+  const bareLetter = groupLetter.replace(/^grupo\s+/i, '');
+  const base = `${position}° ${bareLetter}`;
+  return showCategory && category ? `${base} (${category})` : base;
+}
+
+/**
  * Generate seeding labels for bracket first round.
  * For 4 groups A,B,C,D: [[1°A, 4°D], [2°C, 3°B], [1°B, 4°C], [2°D, 3°A], ...]
  * For 2 groups A,B: [[1°A, 2°B], [1°B, 2°A]]
+ *
+ * Used only as a last-resort fallback when the backend didn't persist any
+ * placeholder on a first-round match (shouldn't happen after the admin has
+ * configured the crossings).
  */
 function generateSeedLabels(groups: string[]): [string, string][] {
   const n = groups.length;
@@ -246,11 +285,31 @@ function CategoryBracket({
                   const centerY = headerH + slotH * mIdx + slotH / 2;
                   const y = centerY - MATCH_H / 2;
 
-                  // Generate seeding labels for first round (when teams are null)
+                  // Decide what placeholder labels to show for each slot.
+                  //
+                  // 1. If the team is already resolved → no label needed.
+                  // 2. Else, prefer the backend-stored `team1Placeholder` /
+                  //    `team2Placeholder` (this reflects the crossings the
+                  //    admin actually configured).
+                  // 3. Only when the first round has no persisted placeholders
+                  //    at all do we fall back to auto-generated seed labels.
                   let label1: string | undefined;
                   let label2: string | undefined;
-                  if (rIdx === 0 && !match.team1 && !match.team2) {
-                    // Get actual group count from group matches
+
+                  if (!match.team1 && match.team1Placeholder) {
+                    label1 = formatBracketPlaceholder(match.team1Placeholder);
+                  }
+                  if (!match.team2 && match.team2Placeholder) {
+                    label2 = formatBracketPlaceholder(match.team2Placeholder);
+                  }
+
+                  if (
+                    rIdx === 0 &&
+                    !match.team1 &&
+                    !match.team2 &&
+                    !match.team1Placeholder &&
+                    !match.team2Placeholder
+                  ) {
                     const groupSet = new Set<string>();
                     for (const gm of groupMatches) {
                       const g = gm.group?.includes('|') ? gm.group.split('|').slice(1).join('') : gm.group;
@@ -433,7 +492,11 @@ function ThirdPlaceCard({ match }: { match: BracketMatch }) {
   const t1Won = hasWinner && match.winner?.id === match.team1?.id;
   const t2Won = hasWinner && match.winner?.id === match.team2?.id;
 
-  if (!match.team1 && !match.team2) {
+  const placeholder1 = formatBracketPlaceholder(match.team1Placeholder);
+  const placeholder2 = formatBracketPlaceholder(match.team2Placeholder);
+
+  // Fully empty with no placeholder → show the "Por definir" filler
+  if (!match.team1 && !match.team2 && !placeholder1 && !placeholder2) {
     return (
       <div className="bg-black/5 border-2 border-dashed border-black/15 rounded-sm text-center py-4">
         <span className="text-xs text-black/30 font-bold uppercase" style={FONT}>Por definir</span>
@@ -443,16 +506,32 @@ function ThirdPlaceCard({ match }: { match: BracketMatch }) {
 
   return (
     <div className="bg-white border border-black/10 rounded-sm overflow-hidden">
-      <TeamRowHTML team={match.team1} score={match.score?.team1} isWinner={t1Won} />
+      <TeamRowHTML team={match.team1} score={match.score?.team1} isWinner={t1Won} placeholder={placeholder1} />
       <div className="border-t border-black/10" />
-      <TeamRowHTML team={match.team2} score={match.score?.team2} isWinner={t2Won} />
+      <TeamRowHTML team={match.team2} score={match.score?.team2} isWinner={t2Won} placeholder={placeholder2} />
     </div>
   );
 }
 
-function TeamRowHTML({ team, score, isWinner }: { team?: BracketMatch['team1']; score?: number; isWinner: boolean }) {
+function TeamRowHTML({
+  team,
+  score,
+  isWinner,
+  placeholder,
+}: {
+  team?: BracketMatch['team1'];
+  score?: number;
+  isWinner: boolean;
+  placeholder?: string;
+}) {
   if (!team) {
-    return <div className="px-3 py-2 bg-black/5"><span className="text-xs text-black/30 italic" style={FONT}>Por definir</span></div>;
+    return (
+      <div className="px-3 py-2 bg-black/5">
+        <span className="text-xs text-black/40 font-bold uppercase" style={FONT}>
+          {placeholder || 'Por definir'}
+        </span>
+      </div>
+    );
   }
   return (
     <div className={`flex items-center justify-between px-2 py-1.5 ${isWinner ? 'bg-black/5' : ''}`}>
