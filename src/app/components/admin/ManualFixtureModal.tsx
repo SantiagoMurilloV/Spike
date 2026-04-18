@@ -104,7 +104,7 @@ export function FixtureModeDialog({ open, onClose, onSelectAutomatic, onSelectMa
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-sm shadow-xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <h2
             className="text-xl font-bold"
@@ -123,7 +123,7 @@ export function FixtureModeDialog({ open, onClose, onSelectAutomatic, onSelectMa
         <div className="space-y-3">
           <button
             onClick={() => onSelectAutomatic()}
-            className="w-full p-4 border-2 border-black/10 rounded-lg hover:border-[#003087] hover:bg-[#003087]/5 transition-all text-left"
+            className="w-full p-4 border-2 border-black/10 rounded-sm hover:border-spk-blue hover:bg-spk-blue/5 transition-all text-left"
           >
             <p className="font-bold text-base" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
               AUTOMÁTICO
@@ -134,7 +134,7 @@ export function FixtureModeDialog({ open, onClose, onSelectAutomatic, onSelectMa
           </button>
           <button
             onClick={onSelectManual}
-            className="w-full p-4 border-2 border-black/10 rounded-lg hover:border-[#E31E24] hover:bg-[#E31E24]/5 transition-all text-left"
+            className="w-full p-4 border-2 border-black/10 rounded-sm hover:border-spk-red hover:bg-spk-red/5 transition-all text-left"
           >
             <p className="font-bold text-base" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
               MANUAL
@@ -168,7 +168,7 @@ export function AutomaticScheduleModal({ open, onClose, onGenerate, generating, 
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-sm shadow-xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             CONFIGURACIÓN DE HORARIOS
@@ -186,7 +186,7 @@ export function AutomaticScheduleModal({ open, onClose, onGenerate, generating, 
           <Button
             onClick={() => onGenerate(schedule)}
             disabled={generating}
-            className="bg-[#E31E24] hover:bg-[#B71C1C]"
+            className="bg-spk-red hover:bg-spk-red-dark"
           >
             {generating && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
             Generar
@@ -288,7 +288,7 @@ export function ManualGroupsModal({ open, teams, onClose, onGenerate, generating
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[85vh] flex flex-col"
+        className="bg-white rounded-sm shadow-xl w-full max-w-4xl mx-4 max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -325,7 +325,7 @@ export function ManualGroupsModal({ open, teams, onClose, onGenerate, generating
                 {unassignedTeams.map((team) => (
                   <div
                     key={team.id}
-                    className="flex items-center gap-2 p-2 bg-black/5 rounded-lg"
+                    className="flex items-center gap-2 p-2 bg-black/5 rounded-sm"
                   >
                     <TeamAvatar team={team} size="sm" />
                     <span className="text-sm font-medium truncate flex-1">{team.name}</span>
@@ -354,7 +354,7 @@ export function ManualGroupsModal({ open, teams, onClose, onGenerate, generating
             {/* Group columns */}
             <div className="flex-1 grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {groupNames.map((name) => (
-                <div key={name} className="border border-black/10 rounded-lg p-3">
+                <div key={name} className="border border-black/10 rounded-sm p-3">
                   <h4
                     className="text-lg font-bold text-center mb-3 pb-2 border-b border-black/10"
                     style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
@@ -412,7 +412,7 @@ export function ManualGroupsModal({ open, teams, onClose, onGenerate, generating
             <Button
               onClick={handleGenerate}
               disabled={!canGenerate || generating}
-              className="bg-[#E31E24] hover:bg-[#B71C1C]"
+              className="bg-spk-red hover:bg-spk-red-dark"
             >
               {generating && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               Generar
@@ -467,7 +467,7 @@ export function ManualBracketModal({ open, teams, onClose, onGenerate, generatin
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col"
+        className="bg-white rounded-sm shadow-xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -487,7 +487,7 @@ export function ManualBracketModal({ open, teams, onClose, onGenerate, generatin
           </p>
           <div className="space-y-2">
             {seeds.map((seed) => (
-              <div key={seed.position} className="flex items-center gap-3 p-2 border border-black/10 rounded-lg">
+              <div key={seed.position} className="flex items-center gap-3 p-2 border border-black/10 rounded-sm">
                 <span
                   className="w-8 text-center font-bold text-sm"
                   style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
@@ -529,7 +529,7 @@ export function ManualBracketModal({ open, teams, onClose, onGenerate, generatin
           <Button
             onClick={handleGenerate}
             disabled={!canGenerate || generating}
-            className="bg-[#E31E24] hover:bg-[#B71C1C]"
+            className="bg-spk-red hover:bg-spk-red-dark"
           >
             {generating && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
             Generar
@@ -603,7 +603,7 @@ export function ManualBracketPositionsModal({ open, groups, onClose, onGenerate,
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col"
+        className="bg-white rounded-sm shadow-xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-6 border-b border-black/10">
@@ -638,7 +638,7 @@ export function ManualBracketPositionsModal({ open, groups, onClose, onGenerate,
 
           <div className="space-y-2">
             {seeds.map((seed) => (
-              <div key={seed.position} className="flex items-center gap-3 p-2 border border-black/10 rounded-lg">
+              <div key={seed.position} className="flex items-center gap-3 p-2 border border-black/10 rounded-sm">
                 <span
                   className="w-8 text-center font-bold text-sm"
                   style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
@@ -679,7 +679,7 @@ export function ManualBracketPositionsModal({ open, groups, onClose, onGenerate,
           <Button
             onClick={() => onGenerate(seeds)}
             disabled={!canGenerate || generating}
-            className="bg-[#E31E24] hover:bg-[#B71C1C]"
+            className="bg-spk-red hover:bg-spk-red-dark"
           >
             {generating && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
             Confirmar y Generar
@@ -803,13 +803,13 @@ export function BracketCrossingsModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col"
+        className="bg-white rounded-sm shadow-xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-black/10">
           <div className="flex items-center gap-3">
-            <GitMerge className="w-5 h-5 text-[#003087]" />
+            <GitMerge className="w-5 h-5 text-spk-blue" />
             <h2
               className="text-xl font-bold"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
@@ -825,7 +825,7 @@ export function BracketCrossingsModal({
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Groups summary */}
-          <div className="p-3 bg-black/5 rounded-lg text-sm text-black/70">
+          <div className="p-3 bg-black/5 rounded-sm text-sm text-black/70">
             <span className="font-medium">Grupos detectados: </span>
             {groupNames.map(gn => groupDisplayName(gn)).join(', ')}
           </div>
@@ -944,7 +944,7 @@ export function BracketCrossingsModal({
             <Button
               onClick={handleGenerate}
               disabled={!canGenerate || generating}
-              className="bg-[#003087] hover:bg-[#003087]/90"
+              className="bg-spk-blue hover:bg-spk-blue/90"
             >
               {generating && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               Confirmar y Generar

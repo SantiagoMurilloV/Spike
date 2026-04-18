@@ -1,7 +1,28 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore — canvas-confetti ships no types
+import confetti from 'canvas-confetti';
 import { BracketMatch, Match } from '../types';
 import { Trophy } from 'lucide-react';
 import { TeamAvatar } from './TeamAvatar';
+
+/**
+ * Fires a celebratory confetti burst in brand colors.
+ * Skipped when the user prefers reduced motion.
+ */
+function fireChampionConfetti() {
+  if (typeof window === 'undefined') return;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+
+  const colors = ['#E31E24', '#FFB300', '#FFFFFF', '#003087'];
+  // Double-sided burst from the bottom corners
+  confetti({ particleCount: 120, angle: 60, spread: 70, origin: { x: 0, y: 1 }, colors });
+  confetti({ particleCount: 120, angle: 120, spread: 70, origin: { x: 1, y: 1 }, colors });
+  // Center burst slightly later for emphasis
+  setTimeout(() => {
+    confetti({ particleCount: 180, spread: 100, origin: { x: 0.5, y: 0.6 }, colors });
+  }, 350);
+}
 
 interface BracketProps {
   matches: BracketMatch[];
@@ -63,6 +84,25 @@ export function Bracket({ matches, groupMatches = [] }: BracketProps) {
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [matches]);
+
+  // Fire confetti the first time a final is won — deduped per champion id so
+  // navigating away and back doesn't retrigger the burst.
+  const celebratedChampionsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const [, catMatches] of categories) {
+      const final = catMatches.find(
+        (m) => parseRound(m.round).name.toLowerCase() === 'final',
+      );
+      if (
+        final?.status === 'completed' &&
+        final.winner &&
+        !celebratedChampionsRef.current.has(final.id)
+      ) {
+        celebratedChampionsRef.current.add(final.id);
+        fireChampionConfetti();
+      }
+    }
+  }, [categories]);
 
   // Group group-matches by category (from group name prefix)
   const groupMatchesByCategory = useMemo(() => {
@@ -145,7 +185,7 @@ function CategoryBracket({
   return (
     <div>
       {category && (
-        <h2 className="text-2xl font-bold mb-4 pb-2 border-b-2 border-[#E31E24]" style={FONT}>
+        <h2 className="text-2xl font-bold mb-4 pb-2 border-b-2 border-spk-red" style={FONT}>
           {category.toUpperCase()}
         </h2>
       )}
@@ -422,7 +462,7 @@ function TeamRowHTML({ team, score, isWinner }: { team?: BracketMatch['team1']; 
       </div>
       <div className="flex items-center gap-1">
         {score !== undefined && <span className={`text-sm font-bold ${isWinner ? 'text-black' : 'text-black/30'}`} style={FONT}>{score}</span>}
-        {isWinner && <Trophy className="w-3 h-3 text-[#FFB300]" />}
+        {isWinner && <Trophy className="w-3 h-3 text-spk-gold" />}
       </div>
     </div>
   );

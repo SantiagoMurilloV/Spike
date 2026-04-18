@@ -17,7 +17,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         aria-label="Cargando sesión"
         className="min-h-screen flex items-center justify-center bg-white"
       >
-        <Loader2 className="w-8 h-8 animate-spin text-[#E31E24]" aria-hidden="true" />
+        <Loader2 className="w-8 h-8 animate-spin text-spk-red" aria-hidden="true" />
         <span className="sr-only">Cargando…</span>
       </div>
     );

@@ -76,7 +76,7 @@ export function AdminLayout() {
             <h1 className="text-2xl font-bold text-white tracking-tighter" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
               SPK-CUP
             </h1>
-            <div className="w-16 h-0.5 bg-[#E31E24] mt-1" />
+            <div className="w-16 h-0.5 bg-spk-red mt-1" />
             <p className="text-xs text-white/60 mt-1 uppercase tracking-wider">Admin Panel</p>
           </div>
         </div>
@@ -113,7 +113,7 @@ export function AdminLayout() {
                   {isActive && (
                     <motion.div
                       layoutId="activeNav"
-                      className="absolute left-0 top-0 bottom-0 w-1 bg-[#E31E24]"
+                      className="absolute left-0 top-0 bottom-0 w-1 bg-spk-red"
                       transition={{ type: "spring", stiffness: 300, damping: 30 }}
                     />
                   )}
@@ -148,7 +148,7 @@ export function AdminLayout() {
             onClick={handleLogout}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#E31E24] text-white hover:bg-[#E31E24]/90 rounded-sm transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-spk-red text-white hover:bg-spk-red/90 rounded-sm transition-colors"
           >
             <LogOut className="w-4 h-4" />
             <span className="font-bold uppercase tracking-wider text-sm" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>

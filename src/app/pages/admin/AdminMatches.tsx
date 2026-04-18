@@ -1,4 +1,4 @@
-import { Plus, Search, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Loader2, Radio } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -107,7 +107,7 @@ export function AdminMatches() {
   if (loading.matches && matches.length === 0) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#E31E24]" />
+        <Loader2 className="w-8 h-8 animate-spin text-spk-red" />
       </div>
     );
   }
@@ -118,7 +118,7 @@ export function AdminMatches() {
         <p className="text-red-600 mb-4">{error.matches}</p>
         <button
           onClick={() => refreshMatches()}
-          className="px-4 py-2 bg-[#E31E24] text-white rounded-lg hover:bg-[#B71C1C] transition-colors"
+          className="px-4 py-2 bg-spk-red text-white rounded-sm hover:bg-spk-red-dark transition-colors"
         >
           Reintentar
         </button>
@@ -138,10 +138,10 @@ export function AdminMatches() {
         </div>
         <button
           onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-[#E31E24] text-white hover:bg-[#B71C1C] rounded-lg transition-colors font-medium"
+          className="flex items-center gap-2 px-4 py-2 bg-spk-red text-white hover:bg-spk-red-dark rounded-sm transition-colors font-medium"
         >
           <Plus className="w-4 h-4" />
-          <span>Crear Partido</span>
+          <span style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.05em' }} className="uppercase font-bold">Crear Partido</span>
         </button>
       </div>
 
@@ -149,8 +149,8 @@ export function AdminMatches() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <button
           onClick={() => setFilterStatus('all')}
-          className={`p-4 rounded-xl border-2 transition-all ${
-            filterStatus === 'all' ? 'border-[#E31E24] bg-[#E31E24]/10' : 'border-black/10 hover:border-[#E31E24]/50'
+          className={`p-4 rounded-sm border-2 transition-all ${
+            filterStatus === 'all' ? 'border-spk-red bg-spk-red/10' : 'border-black/10 hover:border-spk-red/50'
           }`}
         >
           <div className="text-2xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>{statusCounts.all}</div>
@@ -158,20 +158,20 @@ export function AdminMatches() {
         </button>
         <button
           onClick={() => setFilterStatus('live')}
-          className={`p-4 rounded-xl border-2 transition-all ${
-            filterStatus === 'live' ? 'border-[#E31E24] bg-[#E31E24]/10' : 'border-black/10 hover:border-[#E31E24]/50'
+          className={`p-4 rounded-sm border-2 transition-all ${
+            filterStatus === 'live' ? 'border-spk-red bg-spk-red/10' : 'border-black/10 hover:border-spk-red/50'
           }`}
         >
           <div className="flex items-center justify-center gap-2 mb-1">
-            <div className="w-2 h-2 bg-[#E31E24] rounded-full animate-pulse"></div>
+            <div className="w-2 h-2 bg-spk-red rounded-full animate-pulse"></div>
             <div className="text-2xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>{statusCounts.live}</div>
           </div>
           <div className="text-sm text-black/60">En Vivo</div>
         </button>
         <button
           onClick={() => setFilterStatus('upcoming')}
-          className={`p-4 rounded-xl border-2 transition-all ${
-            filterStatus === 'upcoming' ? 'border-[#E31E24] bg-[#E31E24]/10' : 'border-black/10 hover:border-[#E31E24]/50'
+          className={`p-4 rounded-sm border-2 transition-all ${
+            filterStatus === 'upcoming' ? 'border-spk-red bg-spk-red/10' : 'border-black/10 hover:border-spk-red/50'
           }`}
         >
           <div className="text-2xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>{statusCounts.upcoming}</div>
@@ -179,8 +179,8 @@ export function AdminMatches() {
         </button>
         <button
           onClick={() => setFilterStatus('completed')}
-          className={`p-4 rounded-xl border-2 transition-all ${
-            filterStatus === 'completed' ? 'border-[#E31E24] bg-[#E31E24]/10' : 'border-black/10 hover:border-[#E31E24]/50'
+          className={`p-4 rounded-sm border-2 transition-all ${
+            filterStatus === 'completed' ? 'border-spk-red bg-spk-red/10' : 'border-black/10 hover:border-spk-red/50'
           }`}
         >
           <div className="text-2xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>{statusCounts.completed}</div>
@@ -197,7 +197,7 @@ export function AdminMatches() {
             placeholder="Buscar partidos..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white border-2 border-black/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+            className="w-full pl-10 pr-4 py-2 bg-white border-2 border-black/10 rounded-sm focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
           />
         </div>
       </div>
@@ -214,10 +214,19 @@ export function AdminMatches() {
             <div className="absolute top-2 right-2 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
               <button
                 type="button"
+                onClick={(e) => { e.stopPropagation(); navigate(`/admin/referee/${match.id}`); }}
+                aria-label={`Puntuar partido ${match.team1.name} vs ${match.team2.name}`}
+                title="Abrir consola de árbitro"
+                className="p-2 bg-spk-red text-white rounded-sm shadow-lg hover:bg-spk-red-dark transition-all"
+              >
+                <Radio className="w-4 h-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
                 onClick={(e) => { e.stopPropagation(); handleEdit(match); }}
                 aria-label={`Editar partido ${match.team1.name} vs ${match.team2.name}`}
                 title="Editar partido"
-                className="p-2 bg-white border-2 border-black/10 hover:border-[#003087] text-[#003087] rounded-lg shadow-lg transition-all"
+                className="p-2 bg-white border-2 border-black/10 hover:border-spk-blue text-spk-blue rounded-sm shadow-lg transition-all"
               >
                 <Edit className="w-4 h-4" aria-hidden="true" />
               </button>
@@ -227,7 +236,7 @@ export function AdminMatches() {
                 disabled={deletingId === match.id}
                 aria-label={`Eliminar partido ${match.team1.name} vs ${match.team2.name}`}
                 title="Eliminar partido"
-                className="p-2 bg-white border-2 border-black/10 hover:border-[#E31E24] text-[#E31E24] rounded-lg shadow-lg transition-all disabled:opacity-50"
+                className="p-2 bg-white border-2 border-black/10 hover:border-spk-red text-spk-red rounded-sm shadow-lg transition-all disabled:opacity-50"
               >
                 {deletingId === match.id ? (
                   <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />

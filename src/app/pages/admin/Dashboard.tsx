@@ -20,28 +20,28 @@ export function AdminDashboard() {
       icon: Trophy,
       label: 'Torneos Activos',
       value: activeTournaments.length,
-      color: 'bg-[#FFB300]',
+      color: 'bg-spk-gold',
       trend: `${tournaments.length} total`,
     },
     {
       icon: Calendar,
       label: 'Partidos Programados',
       value: matches.filter(m => m.status === 'upcoming').length,
-      color: 'bg-[#003087]',
+      color: 'bg-spk-blue',
       trend: `${completedMatches.length} finalizados`,
     },
     {
       icon: Users,
       label: 'Equipos Registrados',
       value: teams.length,
-      color: 'bg-[#00C853]',
+      color: 'bg-spk-win',
       trend: `${matches.length} partidos`,
     },
     {
       icon: Eye,
       label: 'Partidos en Vivo',
       value: liveMatches.length,
-      color: 'bg-[#E31E24]',
+      color: 'bg-spk-red',
       trend: liveMatches.length > 0 ? 'Ahora' : 'Ninguno',
     },
   ];
@@ -56,7 +56,7 @@ export function AdminDashboard() {
               <h1 className="text-5xl md:text-6xl font-bold tracking-tighter mb-3" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
                 DASHBOARD
               </h1>
-              <div className="w-20 h-1 bg-[#E31E24] mb-4" />
+              <div className="w-20 h-1 bg-spk-red mb-4" />
               <p className="text-white/60 text-lg">Vista general del sistema de torneos</p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -76,7 +76,7 @@ export function AdminDashboard() {
                 onClick={() => navigate('/admin/tournaments')}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.98 }}
-                className="flex items-center gap-2 px-6 py-3 bg-[#E31E24] hover:bg-[#E31E24]/90 rounded-sm transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-spk-red hover:bg-spk-red/90 rounded-sm transition-colors"
               >
                 <Plus className="w-5 h-5" />
                 <span className="font-bold uppercase tracking-wider text-sm" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
@@ -139,13 +139,13 @@ export function AdminDashboard() {
               <div>
                 <h2 className="text-3xl font-bold tracking-tighter flex items-center gap-3" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
                   <motion.div
-                    className="w-3 h-3 bg-[#E31E24] rounded-full"
+                    className="w-3 h-3 bg-spk-red rounded-full"
                     animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
                     transition={{ duration: 2, repeat: Infinity }}
                   />
                   PARTIDOS EN VIVO
                 </h2>
-                <div className="w-16 h-1 bg-[#E31E24] mt-2" />
+                <div className="w-16 h-1 bg-spk-red mt-2" />
               </div>
               <motion.button
                 whileHover={{ x: 5 }}
@@ -228,7 +228,7 @@ export function AdminDashboard() {
                     <div className="w-12 h-12 bg-black rounded-sm flex items-center justify-center shadow-sm">
                       <Trophy className="w-6 h-6 text-white" />
                     </div>
-                    <div className="px-3 py-1 bg-[#E31E24] text-white rounded-sm shadow-sm">
+                    <div className="px-3 py-1 bg-spk-red text-white rounded-sm shadow-sm">
                       <span className="text-xs font-bold uppercase tracking-wider" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
                         En Curso
                       </span>
@@ -274,7 +274,7 @@ export function AdminDashboard() {
               className="p-6 border border-white/20 rounded-sm text-left transition-all group"
               style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
             >
-              <Trophy className="w-8 h-8 mb-4 text-[#FFB300]" />
+              <Trophy className="w-8 h-8 mb-4 text-spk-gold" />
               <h3 className="text-xl font-bold mb-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>GESTIONAR TORNEOS</h3>
               <p className="text-sm text-white/60 mb-4">Crea, edita y administra torneos</p>
               <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
@@ -288,7 +288,7 @@ export function AdminDashboard() {
               className="p-6 border border-white/20 rounded-sm text-left transition-all group"
               style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
             >
-              <Calendar className="w-8 h-8 mb-4 text-[#003087]" />
+              <Calendar className="w-8 h-8 mb-4 text-spk-blue" />
               <h3 className="text-xl font-bold mb-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>GESTIONAR PARTIDOS</h3>
               <p className="text-sm text-white/60 mb-4">Programa y actualiza partidos</p>
               <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
@@ -302,7 +302,7 @@ export function AdminDashboard() {
               className="p-6 border border-white/20 rounded-sm text-left transition-all group"
               style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
             >
-              <Users className="w-8 h-8 mb-4 text-[#00C853]" />
+              <Users className="w-8 h-8 mb-4 text-spk-win" />
               <h3 className="text-xl font-bold mb-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>GESTIONAR EQUIPOS</h3>
               <p className="text-sm text-white/60 mb-4">Administra equipos y jugadores</p>
               <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>

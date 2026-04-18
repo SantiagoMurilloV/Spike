@@ -174,7 +174,7 @@ export function StandingsTable({ standings, groupName }: StandingsTableProps) {
             <span className="font-bold">Clasificado</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Trophy className="w-3.5 h-3.5 text-[#FFB300]" aria-hidden="true" />
+            <Trophy className="w-3.5 h-3.5 text-spk-gold" aria-hidden="true" />
             <span className="font-bold">Podio</span>
           </div>
         </div>

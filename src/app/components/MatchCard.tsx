@@ -81,7 +81,7 @@ export function MatchCard({ match, variant = 'default', onClick, tournamentLabel
       {/* ── Header ───────────────────────────────────────────── */}
       <div
         className={`spk-match-header ${
-          isLive ? 'bg-[#E31E24]' : 'bg-[#0F0F14]'
+          isLive ? 'bg-spk-red' : 'bg-spk-black'
         } text-white`}
       >
         <div className="flex items-center gap-2 flex-wrap">
@@ -143,7 +143,7 @@ export function MatchCard({ match, variant = 'default', onClick, tournamentLabel
           {isUpcoming && !match.score ? (
             <div className="text-center">
               <div
-                className="spk-match-mid text-[#E31E24] tabular-nums"
+                className="spk-match-mid text-spk-red tabular-nums"
                 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, lineHeight: 1 }}
               >
                 {match.time}
@@ -233,7 +233,7 @@ export function MatchCard({ match, variant = 'default', onClick, tournamentLabel
               <div
                 key={index}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-bold tabular-nums ${
-                  isLive ? 'bg-[#E31E24]/10 text-[#E31E24]' : 'bg-black/5 text-black/70'
+                  isLive ? 'bg-spk-red/10 text-spk-red' : 'bg-black/5 text-black/70'
                 }`}
                 style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
               >
@@ -287,7 +287,7 @@ export function MatchCard({ match, variant = 'default', onClick, tournamentLabel
       {/* ── Bottom red pulse bar on live cards ───────────────── */}
       {isLive && (
         <div
-          className="absolute left-0 right-0 bottom-0 h-[3px] bg-[#E31E24] spk-live-bar"
+          className="absolute left-0 right-0 bottom-0 h-[3px] bg-spk-red spk-live-bar"
           aria-hidden="true"
         />
       )}

@@ -223,10 +223,10 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
   };
 
   const inputClass = (field: keyof FieldErrors) =>
-    `w-full px-4 py-2 border-2 rounded-lg focus:outline-none ${
+    `w-full px-4 py-2 border-2 rounded-sm focus:outline-none ${
       errors[field]
         ? 'border-red-500 focus:border-red-500'
-        : 'border-black/10 focus:border-[#E31E24]'
+        : 'border-black/10 focus:border-spk-red'
     }`;
 
   if (!isOpen) return null;
@@ -237,7 +237,7 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-white rounded-xl shadow-2xl max-w-3xl w-full my-8"
+        className="bg-white rounded-sm shadow-2xl max-w-3xl w-full my-8"
       >
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-black/10 px-6 py-4 flex items-center justify-between rounded-t-xl">
@@ -246,7 +246,7 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
           </h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-black/5 rounded-lg transition-colors"
+            className="p-2 hover:bg-black/5 rounded-sm transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -256,14 +256,14 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
         <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[calc(90vh-120px)] overflow-y-auto" noValidate>
           {/* Server error */}
           {errors.server && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-sm text-red-700 text-sm">
               {errors.server}
             </div>
           )}
 
           {/* Teams same error */}
           {errors.teams && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-sm text-red-700 text-sm">
               {errors.teams}
             </div>
           )}
@@ -372,7 +372,7 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
                 type="text"
                 value={formData.referee}
                 onChange={(e) => setFormData({ ...formData, referee: e.target.value })}
-                className="w-full px-4 py-2 border-2 border-black/10 rounded-lg focus:outline-none focus:border-[#E31E24]"
+                className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
               />
             </div>
           </div>
@@ -386,7 +386,7 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
               <select
                 value={formData.phase}
                 onChange={(e) => setFormData({ ...formData, phase: e.target.value })}
-                className="w-full px-4 py-2 border-2 border-black/10 rounded-lg focus:outline-none focus:border-[#E31E24]"
+                className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
               >
                 <option value="Fase de Grupos">Fase de Grupos</option>
                 <option value="Octavos de Final">Octavos de Final</option>
@@ -403,7 +403,7 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
                 type="text"
                 value={formData.group}
                 onChange={(e) => setFormData({ ...formData, group: e.target.value })}
-                className="w-full px-4 py-2 border-2 border-black/10 rounded-lg focus:outline-none focus:border-[#E31E24]"
+                className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
                 placeholder="Ej: Grupo A"
               />
             </div>
@@ -417,7 +417,7 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
             <select
               value={formData.status}
               onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-              className="w-full px-4 py-2 border-2 border-black/10 rounded-lg focus:outline-none focus:border-[#E31E24]"
+              className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
             >
               <option value="upcoming">Próximo</option>
               <option value="live">En Vivo</option>
@@ -440,7 +440,7 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
                     max="5"
                     value={formData.scoreTeam1}
                     onChange={(e) => setFormData({ ...formData, scoreTeam1: parseInt(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border-2 border-black/10 rounded-lg focus:outline-none focus:border-[#E31E24]"
+                    className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
                   />
                 </div>
                 <div>
@@ -451,7 +451,7 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
                     max="5"
                     value={formData.scoreTeam2}
                     onChange={(e) => setFormData({ ...formData, scoreTeam2: parseInt(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border-2 border-black/10 rounded-lg focus:outline-none focus:border-[#E31E24]"
+                    className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
                   />
                 </div>
               </div>
@@ -468,7 +468,7 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
                 <button
                   type="button"
                   onClick={addSet}
-                  className="px-3 py-1 bg-[#003087] text-white text-sm rounded-lg hover:bg-[#003087]/90 transition-colors"
+                  className="px-3 py-1 bg-spk-blue text-white text-sm rounded-sm hover:bg-spk-blue/90 transition-colors"
                 >
                   + Agregar Set
                 </button>
@@ -485,7 +485,7 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
                       min="0"
                       value={set.team1}
                       onChange={(e) => updateSet(index, 'team1', parseInt(e.target.value) || 0)}
-                      className="flex-1 px-3 py-2 border-2 border-black/10 rounded-lg focus:outline-none focus:border-[#E31E24]"
+                      className="flex-1 px-3 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
                       placeholder="Puntos E1"
                     />
                     <span className="text-black/40">-</span>
@@ -494,13 +494,13 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
                       min="0"
                       value={set.team2}
                       onChange={(e) => updateSet(index, 'team2', parseInt(e.target.value) || 0)}
-                      className="flex-1 px-3 py-2 border-2 border-black/10 rounded-lg focus:outline-none focus:border-[#E31E24]"
+                      className="flex-1 px-3 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
                       placeholder="Puntos E2"
                     />
                     <button
                       type="button"
                       onClick={() => removeSet(index)}
-                      className="p-2 text-[#E31E24] hover:bg-[#E31E24]/10 rounded-lg transition-colors"
+                      className="p-2 text-spk-red hover:bg-spk-red/10 rounded-sm transition-colors"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -516,7 +516,7 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="flex-1 px-4 py-3 bg-black/5 hover:bg-black/10 font-bold rounded-lg transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-3 bg-black/5 hover:bg-black/10 font-bold rounded-sm transition-colors disabled:opacity-50"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
               Cancelar
@@ -524,7 +524,7 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 px-4 py-3 bg-[#E31E24] text-white hover:bg-[#B71C1C] font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-3 bg-spk-red text-white hover:bg-spk-red-dark font-bold rounded-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}

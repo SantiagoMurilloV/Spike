@@ -63,7 +63,7 @@ export function ConfirmDialog({
 
   const confirmClass =
     variant === 'destructive'
-      ? 'bg-[#E31E24] text-white hover:bg-[#B71C1C] focus:ring-[#E31E24]'
+      ? 'bg-spk-red text-white hover:bg-spk-red-dark focus:ring-[#E31E24]'
       : undefined;
 
   return (

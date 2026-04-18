@@ -1,6 +1,6 @@
 export function MatchCardSkeleton() {
   return (
-    <div className="bg-card rounded-xl p-4 border border-border animate-pulse">
+    <div className="bg-card rounded-sm p-4 border border-border animate-pulse">
       <div className="flex items-start justify-between mb-3">
         <div className="h-6 w-20 bg-secondary rounded-full"></div>
         <div className="h-4 w-24 bg-secondary rounded"></div>
@@ -35,7 +35,7 @@ export function MatchCardSkeleton() {
 
 export function TournamentCardSkeleton() {
   return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden animate-pulse">
+    <div className="bg-card rounded-sm border border-border overflow-hidden animate-pulse">
       <div className="h-32 bg-secondary"></div>
       <div className="p-4">
         <div className="h-6 w-3/4 bg-secondary rounded mb-2"></div>

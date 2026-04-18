@@ -60,8 +60,8 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  ongoing: 'bg-[#00C853]/10 text-[#00C853] border-[#00C853]/20',
-  upcoming: 'bg-[#003087]/10 text-[#003087] border-[#003087]/20',
+  ongoing: 'bg-spk-win/10 text-spk-win border-[#00C853]/20',
+  upcoming: 'bg-spk-blue/10 text-spk-blue border-spk-blue/20',
   completed: 'bg-black/10 text-black/60 border-black/20',
 };
 
@@ -594,7 +594,7 @@ export function AdminTournamentDetail() {
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#E31E24]" />
+        <Loader2 className="w-8 h-8 animate-spin text-spk-red" />
       </div>
     );
   }
@@ -605,7 +605,7 @@ export function AdminTournamentDetail() {
         <p className="text-red-600 mb-4">{error || 'Torneo no encontrado'}</p>
         <button
           onClick={() => navigate('/admin/tournaments')}
-          className="px-4 py-2 bg-[#E31E24] text-white rounded-lg hover:bg-[#B71C1C] transition-colors"
+          className="px-4 py-2 bg-spk-red text-white rounded-sm hover:bg-spk-red-dark transition-colors"
         >
           Volver a Torneos
         </button>
@@ -621,7 +621,7 @@ export function AdminTournamentDetail() {
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate('/admin/tournaments')}
-          className="p-2 hover:bg-black/5 rounded-lg transition-colors"
+          className="p-2 hover:bg-black/5 rounded-sm transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -714,7 +714,7 @@ export function AdminTournamentDetail() {
                           const loc = tournament.courtLocations?.[court];
                           return (
                             <div key={court} className="flex items-start gap-2 text-sm">
-                              <MapPin className="w-4 h-4 text-[#003087] mt-0.5 flex-shrink-0" />
+                              <MapPin className="w-4 h-4 text-spk-blue mt-0.5 flex-shrink-0" />
                               <div>
                                 <span className="font-medium">{court}</span>
                                 {loc && (
@@ -783,7 +783,7 @@ export function AdminTournamentDetail() {
                 <Button
                   onClick={handleEnroll}
                   disabled={!selectedTeamId || enrolling}
-                  className="bg-[#E31E24] hover:bg-[#B71C1C]"
+                  className="bg-spk-red hover:bg-spk-red-dark"
                 >
                   {enrolling ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -820,7 +820,7 @@ export function AdminTournamentDetail() {
                         {teams.map((team) => (
                           <div
                             key={team.id}
-                            className="flex items-center gap-3 p-3 bg-white border border-black/10 rounded-lg"
+                            className="flex items-center gap-3 p-3 bg-white border border-black/10 rounded-sm"
                           >
                             <TeamAvatar team={team} size="md" />
                             <div className="flex-1 min-w-0">
@@ -832,7 +832,7 @@ export function AdminTournamentDetail() {
                             <button
                               onClick={() => handleUnenroll(team.id)}
                               disabled={unenrollingId === team.id}
-                              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                              className="p-1.5 text-red-500 hover:bg-red-50 rounded-sm transition-colors disabled:opacity-50"
                               title="Desinscribir equipo"
                             >
                               {unenrollingId === team.id ? (
@@ -882,7 +882,7 @@ export function AdminTournamentDetail() {
                 <Button
                   onClick={handleGenerateFixtures}
                   disabled={generating || enrolledTeams.length < 2}
-                  className="bg-[#003087] hover:bg-[#003087]/90"
+                  className="bg-spk-blue hover:bg-spk-blue/90"
                 >
                   {generating ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -895,7 +895,7 @@ export function AdminTournamentDetail() {
                   <Button
                     onClick={() => setShowBracketCrossings(true)}
                     disabled={generating}
-                    className="bg-[#00C853] hover:bg-[#00C853]/90 text-white"
+                    className="bg-spk-win hover:bg-spk-win/90 text-white"
                   >
                     {generating ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -910,7 +910,7 @@ export function AdminTournamentDetail() {
                     onClick={() => setShowClearDialog(true)}
                     disabled={clearing}
                     variant="outline"
-                    className="border-[#E31E24] text-[#E31E24] hover:bg-[#E31E24]/10"
+                    className="border-spk-red text-spk-red hover:bg-spk-red/10"
                   >
                     {clearing ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -951,7 +951,7 @@ export function AdminTournamentDetail() {
                             <div key={category || '_default'}>
                               {hasMultipleCategories && category && (
                                 <h3
-                                  className="text-xl font-bold mb-4 pb-2 border-b-2 border-[#E31E24]"
+                                  className="text-xl font-bold mb-4 pb-2 border-b-2 border-spk-red"
                                   style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
                                 >
                                   {category.toUpperCase()}
@@ -987,7 +987,7 @@ export function AdminTournamentDetail() {
                         {groupMatches.map((m) => (
                           <div
                             key={m.id}
-                            className="flex items-center justify-between p-3 bg-white border border-black/10 rounded-lg"
+                            className="flex items-center justify-between p-3 bg-white border border-black/10 rounded-sm"
                           >
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                               <TeamAvatar team={m.team1} size="sm" />
@@ -1047,7 +1047,7 @@ export function AdminTournamentDetail() {
                                   return (
                           <div
                             key={bm.id}
-                            className="p-3 bg-white border border-black/10 rounded-lg"
+                            className="p-3 bg-white border border-black/10 rounded-sm"
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -1144,7 +1144,7 @@ export function AdminTournamentDetail() {
                                   {bracketEditSets.length < 5 && (
                                     <button
                                       onClick={addBracketSet}
-                                      className="flex items-center gap-1 text-xs text-[#003087] hover:text-[#003087]/80 transition-colors"
+                                      className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
                                     >
                                       <Plus className="w-3 h-3" />
                                       Agregar Set
@@ -1166,7 +1166,7 @@ export function AdminTournamentDetail() {
                                     size="sm"
                                     onClick={() => saveBracketScore(bm.id)}
                                     disabled={savingBracketScore}
-                                    className="bg-[#00C853] hover:bg-[#00C853]/90"
+                                    className="bg-spk-win hover:bg-spk-win/90"
                                   >
                                     {savingBracketScore && <Loader2 className="w-3 h-3 animate-spin" />}
                                     Guardar
@@ -1181,7 +1181,7 @@ export function AdminTournamentDetail() {
                                 <div className="flex justify-end mt-2">
                                   <button
                                     onClick={() => startEditBracket(bm)}
-                                    className="flex items-center gap-1 text-xs text-[#003087] hover:text-[#003087]/80 transition-colors"
+                                    className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
                                   >
                                     <Edit className="w-3 h-3" />
                                     Editar
@@ -1218,7 +1218,7 @@ export function AdminTournamentDetail() {
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleRegenerateConfirm}
-                  className="bg-[#E31E24] hover:bg-[#B71C1C]"
+                  className="bg-spk-red hover:bg-spk-red-dark"
                 >
                   Regenerar Cruces
                 </AlertDialogAction>
@@ -1240,7 +1240,7 @@ export function AdminTournamentDetail() {
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleClearFixtures}
-                  className="bg-[#E31E24] hover:bg-[#B71C1C]"
+                  className="bg-spk-red hover:bg-spk-red-dark"
                 >
                   Limpiar Cruces
                 </AlertDialogAction>
@@ -1375,9 +1375,9 @@ export function AdminTournamentDetail() {
                   {filteredMatches.map((m) => (
                     <div
                       key={m.id}
-                      className={`p-4 bg-white border rounded-lg ${
+                      className={`p-4 bg-white border rounded-sm ${
                         m.status === 'live'
-                          ? 'border-[#E31E24] border-2'
+                          ? 'border-spk-red border-2'
                           : 'border-black/10'
                       }`}
                     >
@@ -1507,7 +1507,7 @@ export function AdminTournamentDetail() {
                             {editSets.length < 5 && (
                               <button
                                 onClick={addSet}
-                                className="flex items-center gap-1 text-xs text-[#003087] hover:text-[#003087]/80 transition-colors"
+                                className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
                               >
                                 <Plus className="w-3 h-3" />
                                 Agregar Set
@@ -1530,7 +1530,7 @@ export function AdminTournamentDetail() {
                               size="sm"
                               onClick={() => saveScore(m.id)}
                               disabled={savingScore}
-                              className="bg-[#00C853] hover:bg-[#00C853]/90"
+                              className="bg-spk-win hover:bg-spk-win/90"
                             >
                               {savingScore && <Loader2 className="w-3 h-3 animate-spin" />}
                               Guardar
@@ -1544,7 +1544,7 @@ export function AdminTournamentDetail() {
                         <div className="flex justify-end mt-2">
                           <button
                             onClick={() => startEditScore(m)}
-                            className="flex items-center gap-1 text-xs text-[#003087] hover:text-[#003087]/80 transition-colors"
+                            className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
                           >
                             <Edit className="w-3 h-3" />
                             Editar marcador

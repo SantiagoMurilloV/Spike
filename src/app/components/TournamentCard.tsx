@@ -154,7 +154,7 @@ export function TournamentCard({ tournament, onClick }: TournamentCardProps) {
         {/* Full-width CTA — switches to red on hover */}
         <button
           type="button"
-          className="w-full inline-flex items-center justify-center gap-2 bg-black text-white px-4 py-2.5 rounded-sm font-bold uppercase text-sm transition-colors group-hover:bg-[#E31E24]"
+          className="w-full inline-flex items-center justify-center gap-2 bg-black text-white px-4 py-2.5 rounded-sm font-bold uppercase text-sm transition-colors group-hover:bg-spk-red"
           style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.05em' }}
           aria-label={`Ver torneo ${tournament.name}`}
         >
@@ -165,7 +165,7 @@ export function TournamentCard({ tournament, onClick }: TournamentCardProps) {
 
       {/* Bottom red accent — reveals on hover */}
       <motion.div
-        className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#E31E24]"
+        className="absolute bottom-0 left-0 right-0 h-[3px] bg-spk-red"
         style={{ originX: 0 }}
         initial={{ scaleX: 0 }}
         whileHover={{ scaleX: 1 }}

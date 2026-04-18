@@ -41,6 +41,9 @@ const AdminTournamentDetail = lazy(() =>
     default: m.AdminTournamentDetail,
   })),
 );
+const RefereeScore = lazy(() =>
+  import('./pages/admin/RefereeScore').then((m) => ({ default: m.RefereeScore })),
+);
 
 function RouteFallback() {
   return (
@@ -50,7 +53,7 @@ function RouteFallback() {
       aria-label="Cargando"
       className="min-h-[50vh] flex items-center justify-center"
     >
-      <Loader2 className="w-8 h-8 animate-spin text-[#E31E24]" aria-hidden="true" />
+      <Loader2 className="w-8 h-8 animate-spin text-spk-red" aria-hidden="true" />
       <span className="sr-only">Cargando…</span>
     </div>
   );
@@ -72,6 +75,16 @@ export const router = createBrowserRouter([
       { path: 'team/:id', element: withSuspense(<TeamDetail />) },
       { path: '*', Component: NotFound },
     ],
+  },
+  {
+    // Referee score console is full-bleed (no admin chrome) so it sits
+    // outside AdminLayout but still requires auth.
+    path: '/admin/referee/:matchId',
+    element: (
+      <ProtectedRoute>
+        {withSuspense(<RefereeScore />)}
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/admin',

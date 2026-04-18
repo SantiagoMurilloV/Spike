@@ -101,11 +101,11 @@ export function GroupMatrix({ groupName, matches, standings }: GroupMatrixProps)
                     <td key={colTeam.id} className="px-1 md:px-2 py-1.5 md:py-2 text-center border-b border-r border-black/10">
                       {result ? (
                         <span className="text-xs md:text-sm whitespace-nowrap" style={font}>
-                          <span className={result.rowWon ? 'font-bold text-[#00C853]' : 'text-black/60'}>
+                          <span className={result.rowWon ? 'font-bold text-spk-win' : 'text-black/60'}>
                             {result.row}
                           </span>
                           <span className="text-black/30 mx-0.5">-</span>
-                          <span className={!result.rowWon ? 'font-bold text-[#E31E24]' : 'text-black/60'}>
+                          <span className={!result.rowWon ? 'font-bold text-spk-red' : 'text-black/60'}>
                             {result.col}
                           </span>
                         </span>
@@ -149,7 +149,7 @@ export function GroupMatrix({ groupName, matches, standings }: GroupMatrixProps)
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5 md:gap-2">
                         <span className="font-bold text-sm md:text-base" style={font}>{row.position}</span>
-                        {row.position === 1 && <Trophy className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#FFB300]" />}
+                        {row.position === 1 && <Trophy className="w-3.5 h-3.5 md:w-4 md:h-4 text-spk-gold" />}
                         {row.position === 2 && <Trophy className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#C0C0C0]" />}
                       </div>
                     </td>
@@ -159,8 +159,8 @@ export function GroupMatrix({ groupName, matches, standings }: GroupMatrixProps)
                         <span className="font-medium text-xs md:text-sm truncate max-w-[80px] md:max-w-none">{row.team.name}</span>
                       </div>
                     </td>
-                    <td className="px-1.5 md:px-3 py-2 md:py-3 text-center font-bold text-[#00C853]" style={font}>{row.wins}</td>
-                    <td className="px-1.5 md:px-3 py-2 md:py-3 text-center font-bold text-[#E31E24]" style={font}>{row.losses}</td>
+                    <td className="px-1.5 md:px-3 py-2 md:py-3 text-center font-bold text-spk-win" style={font}>{row.wins}</td>
+                    <td className="px-1.5 md:px-3 py-2 md:py-3 text-center font-bold text-spk-red" style={font}>{row.losses}</td>
                     <td className="px-1.5 md:px-3 py-2 md:py-3 text-center font-bold text-base md:text-lg" style={font}>{row.points}</td>
                     <td className="px-1.5 md:px-3 py-2 md:py-3 text-center text-black/60 hidden sm:table-cell" style={font}>{row.setsFor}</td>
                     <td className="px-1.5 md:px-3 py-2 md:py-3 text-center text-black/60 hidden sm:table-cell" style={font}>{row.setsAgainst}</td>

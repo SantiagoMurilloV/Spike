@@ -191,10 +191,10 @@ export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModal
   };
 
   const inputClass = (field: keyof FieldErrors) =>
-    `w-full px-4 py-2 border-2 rounded-lg focus:outline-none ${
+    `w-full px-4 py-2 border-2 rounded-sm focus:outline-none ${
       errors[field]
         ? 'border-red-500 focus:border-red-500'
-        : 'border-black/10 focus:border-[#E31E24]'
+        : 'border-black/10 focus:border-spk-red'
     }`;
 
   if (!isOpen) return null;
@@ -205,7 +205,7 @@ export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModal
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-white rounded-xl shadow-2xl max-w-lg w-full"
+        className="bg-white rounded-sm shadow-2xl max-w-lg w-full"
       >
         {/* Header */}
         <div className="bg-white border-b border-black/10 px-6 py-4 flex items-center justify-between rounded-t-xl">
@@ -214,7 +214,7 @@ export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModal
           </h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-black/5 rounded-lg transition-colors"
+            className="p-2 hover:bg-black/5 rounded-sm transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -224,7 +224,7 @@ export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModal
         <form onSubmit={handleSubmit} className="p-6 space-y-6" noValidate>
           {/* Server error */}
           {errors.server && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-sm text-red-700 text-sm">
               {errors.server}
             </div>
           )}
@@ -310,7 +310,7 @@ export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModal
                 type="text"
                 value={formData.city}
                 onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                className="w-full px-4 py-2 border-2 border-black/10 rounded-lg focus:outline-none focus:border-[#E31E24]"
+                className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
                 placeholder="Ej: Bogotá"
               />
             </div>
@@ -322,7 +322,7 @@ export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModal
                 type="text"
                 value={formData.department}
                 onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                className="w-full px-4 py-2 border-2 border-black/10 rounded-lg focus:outline-none focus:border-[#E31E24]"
+                className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
                 placeholder="Ej: Cundinamarca"
               />
             </div>
@@ -336,7 +336,7 @@ export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModal
             <select
               value={formData.category}
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              className="w-full px-4 py-2 border-2 border-black/10 rounded-lg focus:outline-none focus:border-[#E31E24] bg-white"
+              className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red bg-white"
             >
               <option value="">Seleccionar categoría...</option>
               <option value="Sub-14 Masculino">Sub-14 Masculino</option>
@@ -366,13 +366,13 @@ export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModal
                   type="color"
                   value={HEX_COLOR_RE.test(formData.primaryColor) ? formData.primaryColor : '#E31E24'}
                   onChange={(e) => { setFormData({ ...formData, primaryColor: e.target.value }); setErrors((prev) => ({ ...prev, primaryColor: undefined, server: undefined })); }}
-                  className="w-16 h-10 rounded-lg border-2 border-black/10 cursor-pointer"
+                  className="w-16 h-10 rounded-sm border-2 border-black/10 cursor-pointer"
                 />
                 <input
                   type="text"
                   value={formData.primaryColor}
                   onChange={(e) => { setFormData({ ...formData, primaryColor: e.target.value }); setErrors((prev) => ({ ...prev, primaryColor: undefined, server: undefined })); }}
-                  className={`flex-1 px-4 py-2 border-2 rounded-lg focus:outline-none ${errors.primaryColor ? 'border-red-500 focus:border-red-500' : 'border-black/10 focus:border-[#E31E24]'}`}
+                  className={`flex-1 px-4 py-2 border-2 rounded-sm focus:outline-none ${errors.primaryColor ? 'border-red-500 focus:border-red-500' : 'border-black/10 focus:border-spk-red'}`}
                   placeholder="#E31E24"
                 />
               </div>
@@ -387,13 +387,13 @@ export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModal
                   type="color"
                   value={HEX_COLOR_RE.test(formData.secondaryColor) ? formData.secondaryColor : '#003087'}
                   onChange={(e) => { setFormData({ ...formData, secondaryColor: e.target.value }); setErrors((prev) => ({ ...prev, secondaryColor: undefined, server: undefined })); }}
-                  className="w-16 h-10 rounded-lg border-2 border-black/10 cursor-pointer"
+                  className="w-16 h-10 rounded-sm border-2 border-black/10 cursor-pointer"
                 />
                 <input
                   type="text"
                   value={formData.secondaryColor}
                   onChange={(e) => { setFormData({ ...formData, secondaryColor: e.target.value }); setErrors((prev) => ({ ...prev, secondaryColor: undefined, server: undefined })); }}
-                  className={`flex-1 px-4 py-2 border-2 rounded-lg focus:outline-none ${errors.secondaryColor ? 'border-red-500 focus:border-red-500' : 'border-black/10 focus:border-[#E31E24]'}`}
+                  className={`flex-1 px-4 py-2 border-2 rounded-sm focus:outline-none ${errors.secondaryColor ? 'border-red-500 focus:border-red-500' : 'border-black/10 focus:border-spk-red'}`}
                   placeholder="#003087"
                 />
               </div>
@@ -407,7 +407,7 @@ export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModal
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="flex-1 px-4 py-3 bg-black/5 hover:bg-black/10 font-bold rounded-lg transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-3 bg-black/5 hover:bg-black/10 font-bold rounded-sm transition-colors disabled:opacity-50"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
               Cancelar
@@ -415,7 +415,7 @@ export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModal
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 px-4 py-3 bg-[#E31E24] text-white hover:bg-[#B71C1C] font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-3 bg-spk-red text-white hover:bg-spk-red-dark font-bold rounded-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}

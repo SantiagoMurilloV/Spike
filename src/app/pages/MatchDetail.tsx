@@ -362,7 +362,7 @@ export function MatchDetail() {
             transition={{ delay: 0.8 }}
             whileHover={{ scale: 1.02, y: -2 }}
             whileTap={{ scale: 0.98 }}
-            className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-[#003087] text-white font-bold hover:bg-[#002266] transition-all shadow-lg hover:shadow-xl"
+            className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-spk-blue text-white font-bold hover:bg-[#002266] transition-all shadow-lg hover:shadow-xl"
           >
             <Share2 className="w-5 h-5" />
             <span className="text-lg tracking-wide" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>

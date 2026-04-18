@@ -39,7 +39,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
       >
         <div className="w-32 h-32 bg-white rounded-3xl flex items-center justify-center shadow-2xl">
           <span 
-            className="text-[#E31E24] font-bold text-6xl"
+            className="text-spk-red font-bold text-6xl"
             style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
           >
             S
@@ -75,7 +75,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
         className="w-64 h-1 bg-white/20 rounded-full overflow-hidden"
       >
         <motion.div
-          className="h-full bg-[#E31E24]"
+          className="h-full bg-spk-red"
           initial={{ width: '0%' }}
           animate={{ width: `${progress}%` }}
           transition={{ duration: 0.1 }}

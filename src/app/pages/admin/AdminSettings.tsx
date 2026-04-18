@@ -73,7 +73,7 @@ export function AdminSettings() {
   if (loadingSettings) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#E31E24]" />
+        <Loader2 className="w-8 h-8 animate-spin text-spk-red" />
       </div>
     );
   }
@@ -91,7 +91,7 @@ export function AdminSettings() {
       </div>
 
       {/* General Settings */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
+      <div className="bg-card border border-border rounded-sm overflow-hidden">
         <div className="bg-secondary px-6 py-4 border-b border-border">
           <h2 className="font-bold flex items-center gap-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             <Globe className="w-5 h-5" />
@@ -105,7 +105,7 @@ export function AdminSettings() {
               type="text"
               value={settings.systemName}
               onChange={(e) => setSettings({ ...settings, systemName: e.target.value })}
-              className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+              className="w-full px-4 py-2 bg-background border border-border rounded-sm focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
             />
           </div>
           <div>
@@ -114,7 +114,7 @@ export function AdminSettings() {
               type="text"
               value={settings.clubName || ''}
               onChange={(e) => setSettings({ ...settings, clubName: e.target.value })}
-              className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+              className="w-full px-4 py-2 bg-background border border-border rounded-sm focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
             />
           </div>
           <div>
@@ -123,7 +123,7 @@ export function AdminSettings() {
               type="text"
               value={settings.location || ''}
               onChange={(e) => setSettings({ ...settings, location: e.target.value })}
-              className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+              className="w-full px-4 py-2 bg-background border border-border rounded-sm focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
             />
           </div>
           <div>
@@ -131,7 +131,7 @@ export function AdminSettings() {
             <select
               value={settings.language}
               onChange={(e) => setSettings({ ...settings, language: e.target.value })}
-              className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+              className="w-full px-4 py-2 bg-background border border-border rounded-sm focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
             >
               <option value="es">Español</option>
               <option value="en">English</option>
@@ -142,7 +142,7 @@ export function AdminSettings() {
       </div>
 
       {/* Security Settings */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
+      <div className="bg-card border border-border rounded-sm overflow-hidden">
         <div className="bg-secondary px-6 py-4 border-b border-border">
           <h2 className="font-bold flex items-center gap-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             <Shield className="w-5 h-5" />
@@ -158,7 +158,7 @@ export function AdminSettings() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Ingresa nueva contraseña"
-                className="w-full px-4 py-2 pr-12 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+                className="w-full px-4 py-2 pr-12 bg-background border border-border rounded-sm focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
               />
               <button
                 type="button"
@@ -175,7 +175,7 @@ export function AdminSettings() {
           <button
             onClick={handleChangePassword}
             disabled={savingPassword || !newPassword}
-            className="flex items-center gap-2 px-4 py-2 bg-[#003087] text-white hover:bg-[#003087]/90 rounded-lg transition-colors font-medium disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-spk-blue text-white hover:bg-spk-blue/90 rounded-sm transition-colors font-medium disabled:opacity-50"
           >
             {savingPassword && <Loader2 className="w-4 h-4 animate-spin" />}
             Cambiar Contraseña
@@ -184,7 +184,7 @@ export function AdminSettings() {
       </div>
 
       {/* Contact Settings */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
+      <div className="bg-card border border-border rounded-sm overflow-hidden">
         <div className="bg-secondary px-6 py-4 border-b border-border">
           <h2 className="font-bold flex items-center gap-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             <Mail className="w-5 h-5" />
@@ -198,7 +198,7 @@ export function AdminSettings() {
               type="email"
               value={settings.contactEmail || ''}
               onChange={(e) => setSettings({ ...settings, contactEmail: e.target.value })}
-              className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+              className="w-full px-4 py-2 bg-background border border-border rounded-sm focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
             />
           </div>
           <div>
@@ -207,7 +207,7 @@ export function AdminSettings() {
               type="url"
               value={settings.website || ''}
               onChange={(e) => setSettings({ ...settings, website: e.target.value })}
-              className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+              className="w-full px-4 py-2 bg-background border border-border rounded-sm focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
             />
           </div>
         </div>
@@ -218,7 +218,7 @@ export function AdminSettings() {
         <button
           onClick={handleSaveSettings}
           disabled={saving}
-          className="flex items-center gap-2 px-6 py-2 bg-[#E31E24] text-white hover:bg-[#B71C1C] rounded-lg transition-colors font-medium disabled:opacity-50"
+          className="flex items-center gap-2 px-6 py-2 bg-spk-red text-white hover:bg-spk-red-dark rounded-sm transition-colors font-medium disabled:opacity-50"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Guardar Cambios

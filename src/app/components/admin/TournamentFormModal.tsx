@@ -211,10 +211,10 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
   };
 
   const inputClass = (field: keyof FieldErrors) =>
-    `w-full px-4 py-2 border-2 rounded-lg focus:outline-none ${
+    `w-full px-4 py-2 border-2 rounded-sm focus:outline-none ${
       errors[field]
         ? 'border-red-500 focus:border-red-500'
-        : 'border-black/10 focus:border-[#E31E24]'
+        : 'border-black/10 focus:border-spk-red'
     }`;
 
   if (!isOpen) return null;
@@ -225,7 +225,7 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-sm shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
       >
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-black/10 px-6 py-4 flex items-center justify-between">
@@ -234,7 +234,7 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
           </h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-black/5 rounded-lg transition-colors"
+            className="p-2 hover:bg-black/5 rounded-sm transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -244,7 +244,7 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
         <form onSubmit={handleSubmit} className="p-6 space-y-6" noValidate>
           {/* Server error */}
           {errors.server && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-sm text-red-700 text-sm">
               {errors.server}
             </div>
           )}
@@ -329,7 +329,7 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
               <select
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                className="w-full px-4 py-2 border-2 border-black/10 rounded-lg focus:outline-none focus:border-[#E31E24]"
+                className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
               >
                 <option value="upcoming">Próximo</option>
                 <option value="ongoing">En Curso</option>
@@ -360,7 +360,7 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
             <select
               value={formData.format}
               onChange={(e) => setFormData({ ...formData, format: e.target.value as any })}
-              className="w-full px-4 py-2 border-2 border-black/10 rounded-lg focus:outline-none focus:border-[#E31E24]"
+              className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
             >
               <option value="groups">Solo Grupos</option>
               <option value="knockout">Solo Eliminatoria</option>
@@ -384,7 +384,7 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
                   });
                   setErrors((prev) => ({ ...prev, courts: undefined, server: undefined }));
                 }}
-                className="flex items-center gap-1 text-sm text-[#003087] hover:text-[#003087]/80 transition-colors"
+                className="flex items-center gap-1 text-sm text-spk-blue hover:text-spk-blue/80 transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Agregar Cancha
@@ -398,7 +398,7 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
               {formData.courts.map((court, idx) => (
                 <div
                   key={idx}
-                  className="flex items-start gap-2 p-3 border-2 border-black/10 rounded-lg bg-black/[0.02]"
+                  className="flex items-start gap-2 p-3 border-2 border-black/10 rounded-sm bg-black/[0.02]"
                 >
                   <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-2">
                     <div className="md:col-span-2">
@@ -415,7 +415,7 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
                           setErrors((prev) => ({ ...prev, courts: undefined, server: undefined }));
                         }}
                         placeholder="Ej: Cancha Principal"
-                        className="w-full px-3 py-1.5 text-sm border border-black/15 rounded focus:outline-none focus:border-[#E31E24]"
+                        className="w-full px-3 py-1.5 text-sm border border-black/15 rounded focus:outline-none focus:border-spk-red"
                       />
                     </div>
                     <div className="md:col-span-3">
@@ -432,7 +432,7 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
                           setFormData({ ...formData, courts: newCourts });
                         }}
                         placeholder="Ej: Calle 123 #45-67, Bogotá"
-                        className="w-full px-3 py-1.5 text-sm border border-black/15 rounded focus:outline-none focus:border-[#E31E24]"
+                        className="w-full px-3 py-1.5 text-sm border border-black/15 rounded focus:outline-none focus:border-spk-red"
                       />
                     </div>
                   </div>
@@ -460,7 +460,7 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="flex-1 px-4 py-3 bg-black/5 hover:bg-black/10 font-bold rounded-lg transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-3 bg-black/5 hover:bg-black/10 font-bold rounded-sm transition-colors disabled:opacity-50"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
               Cancelar
@@ -468,7 +468,7 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 px-4 py-3 bg-[#E31E24] text-white hover:bg-[#B71C1C] font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-3 bg-spk-red text-white hover:bg-spk-red-dark font-bold rounded-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}

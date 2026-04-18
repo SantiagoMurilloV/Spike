@@ -318,10 +318,10 @@ export function TeamDetail() {
             style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', borderColor: 'rgba(0, 0, 0, 0.1)' }}
           >
             <div className="flex items-center justify-between mb-3 md:mb-4">
-              <div className="w-10 h-10 md:w-12 md:h-12 bg-[#003087] rounded-sm flex items-center justify-center">
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-spk-blue rounded-sm flex items-center justify-center">
                 <Calendar className="w-5 h-5 md:w-6 md:h-6 text-white" />
               </div>
-              <TrendingUp className="w-4 h-4 md:w-5 md:h-5 text-[#00C853]" />
+              <TrendingUp className="w-4 h-4 md:w-5 md:h-5 text-spk-win" />
             </div>
             <div className="text-3xl md:text-4xl font-bold mb-1 md:mb-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
               {played}
@@ -340,7 +340,7 @@ export function TeamDetail() {
             style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', borderColor: 'rgba(0, 0, 0, 0.1)' }}
           >
             <div className="flex items-center justify-between mb-3 md:mb-4">
-              <div className="w-10 h-10 md:w-12 md:h-12 bg-[#00C853] rounded-sm flex items-center justify-center">
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-spk-win rounded-sm flex items-center justify-center">
                 <Target className="w-5 h-5 md:w-6 md:h-6 text-white" />
               </div>
             </div>
@@ -361,7 +361,7 @@ export function TeamDetail() {
             style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', borderColor: 'rgba(0, 0, 0, 0.1)' }}
           >
             <div className="flex items-center justify-between mb-3 md:mb-4">
-              <div className={`w-10 h-10 md:w-12 md:h-12 ${setsDiff >= 0 ? 'bg-[#00C853]' : 'bg-[#E31E24]'} rounded-sm flex items-center justify-center`}>
+              <div className={`w-10 h-10 md:w-12 md:h-12 ${setsDiff >= 0 ? 'bg-spk-win' : 'bg-spk-red'} rounded-sm flex items-center justify-center`}>
                 <Zap className="w-5 h-5 md:w-6 md:h-6 text-white" />
               </div>
             </div>
@@ -382,7 +382,7 @@ export function TeamDetail() {
             style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', borderColor: 'rgba(0, 0, 0, 0.1)' }}
           >
             <div className="flex items-center justify-between mb-3 md:mb-4">
-              <div className="w-10 h-10 md:w-12 md:h-12 bg-[#FFB300] rounded-sm flex items-center justify-center">
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-spk-gold rounded-sm flex items-center justify-center">
                 <Trophy className="w-5 h-5 md:w-6 md:h-6 text-white" />
               </div>
             </div>
@@ -414,7 +414,7 @@ export function TeamDetail() {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.5 + index * 0.1 }}
                   className={`w-14 h-14 rounded-sm flex items-center justify-center font-bold text-2xl text-white ${
-                    result === 'W' ? 'bg-[#00C853]' : 'bg-[#E31E24]'
+                    result === 'W' ? 'bg-spk-win' : 'bg-spk-red'
                   }`}
                   style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
                 >
@@ -435,7 +435,7 @@ export function TeamDetail() {
           >
             <div className="flex items-center gap-3 mb-6">
               <motion.div
-                className="w-3 h-3 bg-[#E31E24] rounded-full"
+                className="w-3 h-3 bg-spk-red rounded-full"
                 animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
               />

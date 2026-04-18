@@ -71,7 +71,7 @@ export function Login() {
                 SPK-CUP
               </h1>
             </div>
-            <div className="w-20 h-1 bg-[#E31E24]" />
+            <div className="w-20 h-1 bg-spk-red" />
           </motion.div>
 
           {/* Title */}
@@ -104,12 +104,12 @@ export function Login() {
           >
             {/* Username */}
             <div>
-              <label 
-                htmlFor="username" 
-                className="block text-sm font-bold uppercase tracking-wider mb-3 text-white/80"
-                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+              <label
+                htmlFor="username"
+                className="block text-xs font-bold uppercase mb-3 text-white/80"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.12em' }}
               >
-                Usuario
+                USUARIO
               </label>
               <div className="relative">
                 <User className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
@@ -127,12 +127,12 @@ export function Login() {
 
             {/* Password */}
             <div>
-              <label 
-                htmlFor="password" 
-                className="block text-sm font-bold uppercase tracking-wider mb-3 text-white/80"
-                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+              <label
+                htmlFor="password"
+                className="block text-xs font-bold uppercase mb-3 text-white/80"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.12em' }}
               >
-                Contraseña
+                CONTRASEÑA
               </label>
               <div className="relative">
                 <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
@@ -153,7 +153,7 @@ export function Login() {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="p-4 bg-[#E31E24]/20 border-2 border-[#E31E24] rounded-sm"
+                className="p-4 bg-spk-red/20 border-2 border-spk-red rounded-sm"
               >
                 <p className="text-sm font-medium text-white">{error}</p>
               </motion.div>

@@ -97,7 +97,7 @@ export function AdminTournaments() {
   if (loading.tournaments && tournaments.length === 0) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#E31E24]" />
+        <Loader2 className="w-8 h-8 animate-spin text-spk-red" />
       </div>
     );
   }
@@ -108,7 +108,7 @@ export function AdminTournaments() {
         <p className="text-red-600 mb-4">{error.tournaments}</p>
         <button
           onClick={() => refreshTournaments()}
-          className="px-4 py-2 bg-[#E31E24] text-white rounded-lg hover:bg-[#B71C1C] transition-colors"
+          className="px-4 py-2 bg-spk-red text-white rounded-sm hover:bg-spk-red-dark transition-colors"
         >
           Reintentar
         </button>
@@ -130,10 +130,10 @@ export function AdminTournaments() {
         </div>
         <button
           onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-[#E31E24] text-white hover:bg-[#B71C1C] rounded-lg transition-colors font-medium"
+          className="flex items-center gap-2 px-4 py-2 bg-spk-red text-white hover:bg-spk-red-dark rounded-sm transition-colors font-medium"
         >
           <Plus className="w-4 h-4" />
-          <span>Crear Torneo</span>
+          <span style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.05em' }} className="uppercase font-bold">Crear Torneo</span>
         </button>
       </div>
 
@@ -146,12 +146,12 @@ export function AdminTournaments() {
             placeholder="Buscar torneos..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white border-2 border-black/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+            className="w-full pl-10 pr-4 py-2 bg-white border-2 border-black/10 rounded-sm focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
           />
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-black/5 hover:bg-black/10 rounded-lg transition-colors font-medium">
+        <button className="flex items-center gap-2 px-4 py-2 bg-black/5 hover:bg-black/10 rounded-sm transition-colors font-medium">
           <Filter className="w-4 h-4" />
-          <span>Filtros</span>
+          <span style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.05em' }} className="uppercase font-bold">Filtros</span>
         </button>
       </div>
 
@@ -160,7 +160,7 @@ export function AdminTournaments() {
         {filteredTournaments.map(tournament => (
           <div
             key={tournament.id}
-            className="bg-white border-2 border-black/10 rounded-xl overflow-hidden hover:shadow-lg transition-shadow"
+            className="bg-white border-2 border-black/10 rounded-sm overflow-hidden hover:shadow-lg transition-shadow"
           >
             {/* Tournament Image */}
             <div className="h-40 bg-gradient-to-br from-[#003087] to-[#E31E24] relative">
@@ -211,14 +211,14 @@ export function AdminTournaments() {
               <div className="flex gap-2">
                 <button
                   onClick={() => navigate(`/admin/tournaments/${tournament.id}`)}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-black/5 hover:bg-black/10 rounded-lg transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-black/5 hover:bg-black/10 rounded-sm transition-colors"
                 >
                   <Eye className="w-4 h-4" />
                   <span className="text-sm font-medium">Ver</span>
                 </button>
                 <button
                   onClick={() => handleEdit(tournament)}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[#003087] text-white hover:bg-[#003087]/90 rounded-lg transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-spk-blue text-white hover:bg-spk-blue/90 rounded-sm transition-colors"
                 >
                   <Edit className="w-4 h-4" />
                   <span className="text-sm font-medium">Editar</span>
@@ -229,7 +229,7 @@ export function AdminTournaments() {
                   disabled={deletingId === tournament.id}
                   aria-label={`Eliminar torneo ${tournament.name}`}
                   title="Eliminar torneo"
-                  className="flex items-center justify-center px-3 py-2 bg-[#E31E24]/10 text-[#E31E24] hover:bg-[#E31E24]/20 rounded-lg transition-colors disabled:opacity-50"
+                  className="flex items-center justify-center px-3 py-2 bg-spk-red/10 text-spk-red hover:bg-spk-red/20 rounded-sm transition-colors disabled:opacity-50"
                 >
                   {deletingId === tournament.id ? (
                     <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />

@@ -29,14 +29,14 @@ export function NotFound() {
         <div className="flex gap-3 justify-center">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 px-6 py-3 bg-card border border-border rounded-lg hover:bg-secondary transition-colors"
+            className="flex items-center gap-2 px-6 py-3 bg-card border border-border rounded-sm hover:bg-secondary transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
             Volver
           </button>
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 px-6 py-3 bg-[#E31E24] text-white rounded-lg hover:bg-[#B71C1C] transition-colors"
+            className="flex items-center gap-2 px-6 py-3 bg-spk-red text-white rounded-sm hover:bg-spk-red-dark transition-colors"
           >
             <Home className="w-5 h-5" />
             Ir al Inicio

@@ -81,7 +81,7 @@ export function Home() {
                   SPK-CUP
                 </h1>
                 <motion.div
-                  className="h-0.5 bg-[#E31E24] mt-1"
+                  className="h-0.5 bg-spk-red mt-1"
                   initial={{ width: 0 }}
                   animate={{ width: scrolled ? '0%' : '100%' }}
                   transition={{ duration: 0.3 }}
@@ -171,7 +171,7 @@ export function Home() {
                 className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full mb-8"
               >
                 <motion.div
-                  className="w-2 h-2 bg-[#E31E24] rounded-full"
+                  className="w-2 h-2 bg-spk-red rounded-full"
                   animate={{
                     scale: [1, 1.3, 1],
                     opacity: [1, 0.5, 1],
@@ -199,7 +199,7 @@ export function Home() {
                 <span className="relative inline-block">
                   COMPETENCIA
                   <motion.div
-                    className="absolute bottom-0 left-0 right-0 h-3 md:h-5 bg-[#E31E24]"
+                    className="absolute bottom-0 left-0 right-0 h-3 md:h-5 bg-spk-red"
                     initial={{ scaleX: 0 }}
                     animate={{ scaleX: 1 }}
                     transition={{ delay: 0.8, duration: 0.8, ease: "easeOut" }}
@@ -314,7 +314,7 @@ export function Home() {
             >
               TODOS LOS TORNEOS
             </h2>
-            <div className="w-20 h-1 bg-[#E31E24]" />
+            <div className="w-20 h-1 bg-spk-red" />
           </motion.div>
 
           {/* Search and Filters */}

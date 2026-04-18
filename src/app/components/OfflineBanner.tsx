@@ -53,7 +53,7 @@ export function OfflineBanner() {
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -100, opacity: 0 }}
-            className="fixed top-0 left-0 right-0 z-50 bg-[#FFB300] text-[#0F0F14] px-4 py-3 shadow-lg"
+            className="fixed top-0 left-0 right-0 z-50 bg-spk-gold text-spk-black px-4 py-3 shadow-lg"
           >
             <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -80,9 +80,9 @@ export function OfflineBanner() {
             exit={{ y: 100, opacity: 0 }}
             className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:max-w-sm"
           >
-            <div className="bg-[#0F0F14] text-white rounded-lg shadow-xl p-4 border border-white/10">
+            <div className="bg-spk-black text-white rounded-sm shadow-xl p-4 border border-white/10">
               <div className="flex items-start gap-3">
-                <RefreshCw className="w-5 h-5 text-[#E31E24] flex-shrink-0 mt-0.5" />
+                <RefreshCw className="w-5 h-5 text-spk-red flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="text-sm font-medium">Nueva versión disponible</p>
                   <p className="text-xs text-white/60 mt-1">
@@ -91,7 +91,7 @@ export function OfflineBanner() {
                   <div className="flex gap-2 mt-3">
                     <button
                       onClick={handleUpdate}
-                      className="px-3 py-1.5 bg-[#E31E24] text-white text-xs font-medium rounded hover:bg-[#E31E24]/90 transition-colors"
+                      className="px-3 py-1.5 bg-spk-red text-white text-xs font-medium rounded hover:bg-spk-red/90 transition-colors"
                     >
                       Actualizar
                     </button>

@@ -2,3 +2,34 @@
 @source '../**/*.{js,ts,jsx,tsx}';
 
 @import 'tw-animate-css';
+
+/* ─── Design-system tokens exposed as Tailwind utilities ───────────
+   Lets components write `bg-spk-red`, `text-spk-black` instead of
+   hardcoding hex values. Falls back to the CSS variables defined in
+   `theme.css`, so theme changes propagate everywhere automatically. */
+@theme {
+  --color-spk-red: #E31E24;
+  --color-spk-red-dark: #B71C1C;
+  --color-spk-blue: #003087;
+  --color-spk-blue-light: #1565C0;
+  --color-spk-black: #0F0F14;
+  --color-spk-white: #FFFFFF;
+  --color-spk-surface: #FFFFFF;
+  --color-spk-surface-alt: #F4F5F7;
+  --color-spk-hairline: rgba(0, 0, 0, 0.10);
+  --color-spk-text: #0F0F14;
+  --color-spk-text-muted: #6B7280;
+  --color-spk-text-disabled: #D1D5DB;
+  --color-spk-win: #00C853;
+  --color-spk-loss: #E31E24;
+  --color-spk-draw: #FFB300;
+  --color-spk-live: #E31E24;
+  --color-spk-gold: #FFB300;
+  --color-spk-silver: #C0C0C0;
+  --color-spk-bronze: #CD7F32;
+
+  /* Font families — `font-display` and `font-ui` usable as utilities */
+  --font-display: 'Barlow Condensed', 'Impact', 'Arial Narrow', sans-serif;
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-score: 'Barlow Condensed', 'Impact', sans-serif;
+}

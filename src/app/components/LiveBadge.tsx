@@ -29,7 +29,7 @@ export function LiveBadge({ size = 'md', showText = true, label = 'EN VIVO' }: L
     <span
       role="status"
       aria-label={label.toLowerCase()}
-      className={`inline-flex items-center ${s.gap} bg-[#E31E24] text-white rounded-sm ${s.container} font-bold uppercase`}
+      className={`inline-flex items-center ${s.gap} bg-spk-red text-white rounded-sm ${s.container} font-bold uppercase`}
       style={{
         fontFamily: 'Barlow Condensed, sans-serif',
         letterSpacing: '0.08em',

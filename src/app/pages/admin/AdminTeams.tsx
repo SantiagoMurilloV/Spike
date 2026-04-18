@@ -83,7 +83,7 @@ export function AdminTeams() {
   if (loading.teams && teams.length === 0) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#E31E24]" />
+        <Loader2 className="w-8 h-8 animate-spin text-spk-red" />
       </div>
     );
   }
@@ -94,7 +94,7 @@ export function AdminTeams() {
         <p className="text-red-600 mb-4">{error.teams}</p>
         <button
           onClick={() => refreshTeams()}
-          className="px-4 py-2 bg-[#E31E24] text-white rounded-lg hover:bg-[#B71C1C] transition-colors"
+          className="px-4 py-2 bg-spk-red text-white rounded-sm hover:bg-spk-red-dark transition-colors"
         >
           Reintentar
         </button>
@@ -116,28 +116,28 @@ export function AdminTeams() {
         </div>
         <button
           onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-[#E31E24] text-white hover:bg-[#B71C1C] rounded-lg transition-colors font-medium"
+          className="flex items-center gap-2 px-4 py-2 bg-spk-red text-white hover:bg-spk-red-dark rounded-sm transition-colors font-medium"
         >
           <Plus className="w-4 h-4" />
-          <span>Crear Equipo</span>
+          <span style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.05em' }} className="uppercase font-bold">Crear Equipo</span>
         </button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-white border border-black/10 rounded-lg px-3 py-2 text-center">
+        <div className="bg-white border border-black/10 rounded-sm px-3 py-2 text-center">
           <div className="text-xl font-bold leading-none" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             {teams.length}
           </div>
           <div className="text-[10px] text-black/60 mt-1">Registrados</div>
         </div>
-        <div className="bg-white border border-black/10 rounded-lg px-3 py-2 text-center">
+        <div className="bg-white border border-black/10 rounded-sm px-3 py-2 text-center">
           <div className="text-xl font-bold leading-none" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             {new Set(teams.map(t => t.category).filter(Boolean)).size}
           </div>
           <div className="text-[10px] text-black/60 mt-1">Categorías</div>
         </div>
-        <div className="bg-white border border-black/10 rounded-lg px-3 py-2 text-center">
+        <div className="bg-white border border-black/10 rounded-sm px-3 py-2 text-center">
           <div className="text-xl font-bold leading-none" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             {new Set(teams.map(t => t.city).filter(Boolean)).size}
           </div>
@@ -154,17 +154,17 @@ export function AdminTeams() {
             placeholder="Buscar equipos..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white border-2 border-black/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+            className="w-full pl-10 pr-4 py-2 bg-white border-2 border-black/10 rounded-sm focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
           />
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-black/5 hover:bg-black/10 rounded-lg transition-colors font-medium">
+        <button className="flex items-center gap-2 px-4 py-2 bg-black/5 hover:bg-black/10 rounded-sm transition-colors font-medium">
           <Filter className="w-4 h-4" />
-          <span>Filtros</span>
+          <span style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.05em' }} className="uppercase font-bold">Filtros</span>
         </button>
       </div>
 
       {/* Teams Table */}
-      <div className="bg-white border-2 border-black/10 rounded-xl overflow-hidden">
+      <div className="bg-white border-2 border-black/10 rounded-sm overflow-hidden">
         <table className="w-full">
           <thead className="bg-black/5 border-b-2 border-black/10">
             <tr>
@@ -221,7 +221,7 @@ export function AdminTeams() {
                       onClick={() => handleEdit(team)}
                       aria-label={`Editar ${team.name}`}
                       title={`Editar ${team.name}`}
-                      className="p-2 hover:bg-[#003087]/10 text-[#003087] rounded-lg transition-colors"
+                      className="p-2 hover:bg-spk-blue/10 text-spk-blue rounded-sm transition-colors"
                     >
                       <Edit className="w-4 h-4" aria-hidden="true" />
                     </button>
@@ -231,7 +231,7 @@ export function AdminTeams() {
                       disabled={deletingId === team.id}
                       aria-label={`Eliminar ${team.name}`}
                       title={`Eliminar ${team.name}`}
-                      className="p-2 hover:bg-[#E31E24]/10 text-[#E31E24] rounded-lg transition-colors disabled:opacity-50"
+                      className="p-2 hover:bg-spk-red/10 text-spk-red rounded-sm transition-colors disabled:opacity-50"
                     >
                       {deletingId === team.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
