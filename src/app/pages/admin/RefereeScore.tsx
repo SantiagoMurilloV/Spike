@@ -65,6 +65,17 @@ export function RefereeScore() {
     if (undoStack.current.length > 10) undoStack.current.shift();
   }, [scoreH, scoreA, sets, serving]);
 
+  // `hydrated` flips true once we've loaded the match and populated local
+  // state from it. Used to gate the autosave so the initial hydration
+  // doesn't trigger a spurious "save" (that would POST `duration: 0` and
+  // get rejected by the backend).
+  const hydrated = useRef(false);
+
+  // Holds a monotonically-increasing counter that the autosave effect watches.
+  // Any score/set mutation bumps it; the hydration load does NOT.
+  const [dirtyTick, setDirtyTick] = useState(0);
+  const markDirty = useCallback(() => setDirtyTick((n) => n + 1), []);
+
   // ── Load match once on mount ──────────────────────────────────
   useEffect(() => {
     if (!matchId) return;
@@ -77,6 +88,12 @@ export function RefereeScore() {
         setSets(data.sets ?? []);
         setScoreH(data.score?.team1 ?? 0);
         setScoreA(data.score?.team2 ?? 0);
+        // If the match already has a persisted duration, rehydrate the timer
+        // so "seconds since opened" isn't out of sync with reality.
+        if (data.duration && data.duration > 0) {
+          setSeconds(data.duration * 60);
+        }
+        hydrated.current = true;
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : 'Error al cargar el partido');
@@ -97,17 +114,29 @@ export function RefereeScore() {
   }, [timerRunning]);
 
   // ── Debounced autosave ────────────────────────────────────────
-  // Fires whenever scoreH/scoreA/sets change. Persists `status = 'live'`,
-  // current scores, the committed-set history, and the running duration.
+  // Fires only when the referee actually touches the match (dirty tick
+  // changes). Ignores the initial hydration. Uses a ref for the match so
+  // a save that returns a fresh match object doesn't loop back into the
+  // effect.
+  const matchRef = useRef<Match | null>(null);
+  useEffect(() => {
+    matchRef.current = match;
+  }, [match]);
+
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (!match) return;
+    if (!hydrated.current) return;
+    if (dirtyTick === 0) return;
+    const current = matchRef.current;
+    if (!current) return;
+
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       try {
         setSync('syncing');
-        const payload = {
-          status: 'live' as const,
+        const minutes = Math.max(1, Math.round(seconds / 60));
+        const payload: Parameters<typeof api.updateMatchScore>[1] = {
+          status: 'live',
           scoreTeam1: scoreH,
           scoreTeam2: scoreA,
           sets: sets.map((s, i) => ({
@@ -115,9 +144,12 @@ export function RefereeScore() {
             team1Points: s.team1,
             team2Points: s.team2,
           })),
-          duration: Math.round(seconds / 60),
         };
-        const updated = await api.updateMatchScore(match.id, payload);
+        // Only persist duration once the timer has ticked past a full minute
+        // — the backend only accepts positive integers.
+        if (seconds >= 60) payload.duration = minutes;
+
+        const updated = await api.updateMatchScore(current.id, payload);
         setMatch(updated);
         setLastSyncedAt(new Date());
         setSync('saved');
@@ -129,10 +161,11 @@ export function RefereeScore() {
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-    // seconds intentionally excluded — it's persisted on every score change instead
-    // of every tick, which would spam the server.
+    // `seconds` is intentionally excluded: persisting on every tick would
+    // spam the server. It's captured when the timer fires, alongside the
+    // score/sets snapshot.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [match, scoreH, scoreA, sets]);
+  }, [dirtyTick, scoreH, scoreA, sets]);
 
   // ── Score controls ────────────────────────────────────────────
   const addPoint = (side: ServingSide) => {
@@ -143,6 +176,7 @@ export function RefereeScore() {
       setScoreA((v) => v + 1);
     }
     setServing(side);
+    markDirty();
   };
 
   const subtractPoint = (side: ServingSide) => {
@@ -150,6 +184,7 @@ export function RefereeScore() {
     pushUndo();
     if (side === 'home') setScoreH((v) => Math.max(0, v - 1));
     else setScoreA((v) => Math.max(0, v - 1));
+    markDirty();
   };
 
   const undo = () => {
@@ -162,6 +197,7 @@ export function RefereeScore() {
     setScoreA(snap.scoreA);
     setSets(snap.sets);
     setServing(snap.serving);
+    markDirty();
   };
 
   // ── Set-closing logic ─────────────────────────────────────────
@@ -185,6 +221,7 @@ export function RefereeScore() {
     setSets([...sets, { team1: scoreH, team2: scoreA }]);
     setScoreH(0);
     setScoreA(0);
+    markDirty();
     toast.success(`Set ${currentSetNumber} cerrado`);
   };
 
@@ -195,16 +232,17 @@ export function RefereeScore() {
       const finalSets = scoreH === 0 && scoreA === 0 ? sets : [...sets, { team1: scoreH, team2: scoreA }];
       const setsH = finalSets.filter((s) => s.team1 > s.team2).length;
       const setsA = finalSets.filter((s) => s.team2 > s.team1).length;
+      const minutes = Math.max(1, Math.round(seconds / 60));
       await api.updateMatchScore(match.id, {
         status: 'completed',
         scoreTeam1: setsH,
         scoreTeam2: setsA,
+        duration: seconds >= 60 ? minutes : 1,
         sets: finalSets.map((s, i) => ({
           setNumber: i + 1,
           team1Points: s.team1,
           team2Points: s.team2,
         })),
-        duration: Math.round(seconds / 60),
       });
       toast.success('Partido finalizado');
       navigate(`/admin/tournaments/${match.tournamentId}`);
