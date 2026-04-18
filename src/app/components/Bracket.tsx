@@ -15,10 +15,8 @@ function fireChampionConfetti() {
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
 
   const colors = ['#E31E24', '#FFB300', '#FFFFFF', '#003087'];
-  // Double-sided burst from the bottom corners
   confetti({ particleCount: 120, angle: 60, spread: 70, origin: { x: 0, y: 1 }, colors });
   confetti({ particleCount: 120, angle: 120, spread: 70, origin: { x: 1, y: 1 }, colors });
-  // Center burst slightly later for emphasis
   setTimeout(() => {
     confetti({ particleCount: 180, spread: 100, origin: { x: 0.5, y: 0.6 }, colors });
   }, 350);
@@ -26,7 +24,11 @@ function fireChampionConfetti() {
 
 interface BracketProps {
   matches: BracketMatch[];
-  groupMatches?: Match[]; // optional group-phase matches to show as first column
+  /**
+   * Deprecated — the bracket no longer renders group matches as a column.
+   * Kept for backwards compatibility so callers don't break.
+   */
+  groupMatches?: Match[];
 }
 
 const FONT = { fontFamily: 'Barlow Condensed, sans-serif' };
@@ -37,16 +39,6 @@ const FONT = { fontFamily: 'Barlow Condensed, sans-serif' };
  * Placeholders are stored in the DB as `"{position}|{groupName}"` where
  * `groupName` may itself contain a pipe if the tournament has multiple
  * categories (e.g. `"1|Sub-14 Masculino|A"`).
- *
- * Examples:
- *   "1|A"                     → "1° A"
- *   "2|Grupo B"               → "2° Grupo B"
- *   "1|Sub-14 Masculino|A"    → "1° A"        (single category → drop prefix)
- *   "3|Sub-16 Femenino|C"     → "3° C (Sub-16 Femenino)" when useCategory=true
- *
- * @param raw The raw placeholder from `match.team1Placeholder` or `team2Placeholder`.
- * @param showCategory Whether to append the category name in parentheses
- *                     (only relevant when the tournament has multiple categories).
  */
 export function formatBracketPlaceholder(
   raw: string | undefined,
@@ -60,49 +52,43 @@ export function formatBracketPlaceholder(
   const lastPipe = rest.lastIndexOf('|');
   const category = lastPipe > -1 ? rest.substring(0, lastPipe) : '';
   const groupLetter = lastPipe > -1 ? rest.substring(lastPipe + 1) : rest;
-  // Strip a leading "Grupo " so we don't render "Grupo Grupo A"
   const bareLetter = groupLetter.replace(/^grupo\s+/i, '');
   const base = `${position}° ${bareLetter}`;
   return showCategory && category ? `${base} (${category})` : base;
 }
 
 /**
- * Generate seeding labels for bracket first round.
- * For 4 groups A,B,C,D: [[1°A, 4°D], [2°C, 3°B], [1°B, 4°C], [2°D, 3°A], ...]
- * For 2 groups A,B: [[1°A, 2°B], [1°B, 2°A]]
- *
- * Used only as a last-resort fallback when the backend didn't persist any
+ * Generate fallback seeding labels when the backend didn't persist any
  * placeholder on a first-round match (shouldn't happen after the admin has
- * configured the crossings).
+ * configured the crossings — only triggers on brand-new brackets).
  */
 function generateSeedLabels(groups: string[]): [string, string][] {
   const n = groups.length;
   if (n <= 1) return [];
   if (n === 2) {
     return [
-      [`1°${groups[0]}`, `2°${groups[1]}`],
-      [`1°${groups[1]}`, `2°${groups[0]}`],
+      [`1° ${groups[0]}`, `2° ${groups[1]}`],
+      [`1° ${groups[1]}`, `2° ${groups[0]}`],
     ];
   }
-  // For 4+ groups: cross-seeding pattern
   const seeds: [string, string][] = [];
   for (let i = 0; i < n; i++) {
-    const topGroup = groups[i];
-    const bottomGroup = groups[(n - 1) - i];
-    seeds.push([`1°${topGroup}`, `${n}°${bottomGroup}`]);
+    seeds.push([`1° ${groups[i]}`, `${n}° ${groups[(n - 1) - i]}`]);
   }
   for (let i = 0; i < n; i++) {
-    const topGroup = groups[(n - 1) - i];
-    const bottomGroup = groups[i];
-    seeds.push([`2°${topGroup}`, `${n - 1}°${bottomGroup}`]);
+    seeds.push([`2° ${groups[(n - 1) - i]}`, `${n - 1}° ${groups[i]}`]);
   }
   return seeds;
 }
-const MATCH_W = 190;
-const MATCH_H = 56;
-const COL_GAP = 40;
+
+// ── Dimensions (bigger, broadcast-scale) ─────────────────────────
+const MATCH_W = 280;           // match card width
+const MATCH_H = 96;             // match card height
+const COL_GAP = 72;             // horizontal gap between rounds
 const ROUND_W = MATCH_W + COL_GAP;
-const ROW_GAP = 8;
+const ROW_GAP = 20;             // vertical gap between match cards in a round
+const HEADER_H = 56;            // round header (black bar + red underline)
+const TEAM_COLOR_RAIL_W = 5;    // left-edge team color strip inside each slot
 
 function parseRound(round: string) {
   if (round.includes('|')) {
@@ -112,8 +98,7 @@ function parseRound(round: string) {
   return { category: '', name: round };
 }
 
-export function Bracket({ matches, groupMatches = [] }: BracketProps) {
-  // Group bracket matches by category
+export function Bracket({ matches }: BracketProps) {
   const categories = useMemo(() => {
     const map = new Map<string, BracketMatch[]>();
     for (const m of matches) {
@@ -124,8 +109,7 @@ export function Bracket({ matches, groupMatches = [] }: BracketProps) {
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [matches]);
 
-  // Fire confetti the first time a final is won — deduped per champion id so
-  // navigating away and back doesn't retrigger the burst.
+  // Fire confetti the first time a final is won — deduped per champion id.
   const celebratedChampionsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     for (const [, catMatches] of categories) {
@@ -143,27 +127,15 @@ export function Bracket({ matches, groupMatches = [] }: BracketProps) {
     }
   }, [categories]);
 
-  // Group group-matches by category (from group name prefix)
-  const groupMatchesByCategory = useMemo(() => {
-    const map = new Map<string, Match[]>();
-    for (const m of groupMatches) {
-      const cat = m.group?.includes('|') ? m.group.split('|')[0] : '';
-      if (!map.has(cat)) map.set(cat, []);
-      map.get(cat)!.push(m);
-    }
-    return map;
-  }, [groupMatches]);
-
-  if (categories.length === 0 && groupMatches.length === 0) return null;
+  if (categories.length === 0) return null;
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-16">
       {categories.map(([category, catMatches]) => (
         <CategoryBracket
           key={category || '_'}
           category={category}
           bracketMatches={catMatches}
-          groupMatches={groupMatchesByCategory.get(category) || []}
         />
       ))}
     </div>
@@ -173,16 +145,13 @@ export function Bracket({ matches, groupMatches = [] }: BracketProps) {
 function CategoryBracket({
   category,
   bracketMatches,
-  groupMatches,
 }: {
   category: string;
   bracketMatches: BracketMatch[];
-  groupMatches: Match[];
 }) {
   const standard = bracketMatches.filter((m) => !parseRound(m.round).name.includes('tercer'));
   const thirdPlace = bracketMatches.find((m) => parseRound(m.round).name.includes('tercer'));
 
-  // Build rounds from bracket matches
   const bracketRounds = useMemo(() => {
     const names = [...new Set(standard.map((m) => m.round))];
     return names
@@ -194,105 +163,128 @@ function CategoryBracket({
       .sort((a, b) => b.matches.length - a.matches.length);
   }, [standard]);
 
-  // Build group round (group matches as first column)
-  const groupRound = useMemo(() => {
-    if (groupMatches.length === 0) return null;
-    // Group by group name, sort by group letter
-    const byGroup = new Map<string, Match[]>();
-    for (const m of groupMatches) {
-      const g = m.group || 'X';
-      if (!byGroup.has(g)) byGroup.set(g, []);
-      byGroup.get(g)!.push(m);
-    }
-    const sorted = [...byGroup.entries()].sort(([a], [b]) => a.localeCompare(b));
-    // Flatten: all group matches in order
-    const allMatches = sorted.flatMap(([, ms]) => ms);
-    return { label: 'Grupos', matches: allMatches, groups: sorted };
-  }, [groupMatches]);
+  if (bracketRounds.length === 0) return null;
 
-  // Calculate dimensions
-  const allRounds: { label: string; count: number }[] = [];
-  if (groupRound) allRounds.push({ label: groupRound.label, count: groupRound.matches.length });
-  for (const r of bracketRounds) allRounds.push({ label: r.label, count: r.matches.length });
-
-  const maxCount = Math.max(...allRounds.map((r) => r.count), 1);
-  const headerH = 36;
-  const contentH = maxCount * (MATCH_H + ROW_GAP);
-  const totalH = headerH + contentH + 10;
-  const totalW = allRounds.length * ROUND_W + 20;
+  // The vertical space needed is governed by the first round (most matches).
+  const firstRoundCount = bracketRounds[0]?.matches.length ?? 1;
+  const contentH = firstRoundCount * (MATCH_H + ROW_GAP);
+  const totalH = HEADER_H + contentH + 24;
+  const totalW = bracketRounds.length * ROUND_W + 40;
 
   return (
     <div>
       {category && (
-        <h2 className="text-2xl font-bold mb-4 pb-2 border-b-2 border-spk-red" style={FONT}>
-          {category.toUpperCase()}
+        <h2
+          className="text-3xl font-bold mb-5 pb-3 uppercase"
+          style={{ ...FONT, letterSpacing: '-0.02em', borderBottom: '3px solid var(--brand-red)' }}
+        >
+          {category}
         </h2>
       )}
-      <div className="overflow-x-auto pb-4">
-        <svg width={totalW} height={totalH} className="block">
-          {/* Group round (first column) */}
-          {groupRound && (
-            <g>
-              <text
-                x={MATCH_W / 2 + 10}
-                y={16}
-                textAnchor="middle"
-                className="fill-black text-[10px] font-bold uppercase tracking-widest"
-                style={FONT}
-              >
-                GRUPOS
-              </text>
-              <line x1={10} y1={24} x2={MATCH_W + 10} y2={24} stroke="black" strokeWidth={2} />
 
-              {groupRound.matches.map((m, mIdx) => {
-                const x = 10;
-                const y = headerH + mIdx * (MATCH_H + ROW_GAP);
-                return (
-                  <GroupMatchBox key={m.id} x={x} y={y} match={m} />
-                );
-              })}
-            </g>
-          )}
-
-          {/* Bracket rounds */}
+      <div
+        className="overflow-x-auto pb-6 rounded-sm"
+        style={{ background: 'linear-gradient(180deg, #F8F9FB 0%, #FFFFFF 100%)', border: '1px solid rgba(0,0,0,0.06)' }}
+      >
+        <svg
+          width={totalW}
+          height={totalH}
+          className="block"
+          style={{ minWidth: totalW }}
+          role="img"
+          aria-label={category ? `Bracket de ${category}` : 'Bracket del torneo'}
+        >
+          {/* Connectors layer — drawn BEFORE boxes so they sit behind */}
           {bracketRounds.map((round, rIdx) => {
-            const colIdx = groupRound ? rIdx + 1 : rIdx;
+            if (rIdx >= bracketRounds.length - 1) return null;
             const matchCount = round.matches.length;
             const slotH = matchCount > 0 ? contentH / matchCount : contentH;
+            const nextMatchCount = bracketRounds[rIdx + 1].matches.length;
+            const nextSlotH = nextMatchCount > 0 ? contentH / nextMatchCount : contentH;
+            const x = rIdx * ROUND_W + 20;
+
+            return (
+              <g key={`connectors-${round.round}`}>
+                {round.matches.map((match, mIdx) => {
+                  if (mIdx % 2 !== 0) return null; // draw connector from each pair's top match
+                  const pairIdx = Math.floor(mIdx / 2);
+                  const hasPair = mIdx + 1 < matchCount;
+                  if (!hasPair) return null;
+
+                  const topCY = HEADER_H + slotH * mIdx + slotH / 2;
+                  const botCY = HEADER_H + slotH * (mIdx + 1) + slotH / 2;
+                  const nextCY = HEADER_H + nextSlotH * pairIdx + nextSlotH / 2;
+
+                  const startX = x + MATCH_W;
+                  const endX = x + MATCH_W + COL_GAP;
+                  const midX = (startX + endX) / 2;
+
+                  // Smooth Bezier curve from each source match to the common join point
+                  const topPath = `M ${startX} ${topCY} C ${midX} ${topCY}, ${midX} ${nextCY}, ${endX} ${nextCY}`;
+                  const botPath = `M ${startX} ${botCY} C ${midX} ${botCY}, ${midX} ${nextCY}, ${endX} ${nextCY}`;
+
+                  const stroke =
+                    match.status === 'completed' && match.winner
+                      ? 'rgba(15,15,20,0.24)'
+                      : 'rgba(15,15,20,0.14)';
+
+                  return (
+                    <g key={`c-${match.id}`}>
+                      <path d={topPath} fill="none" stroke={stroke} strokeWidth={1.5} />
+                      <path d={botPath} fill="none" stroke={stroke} strokeWidth={1.5} />
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })}
+
+          {/* Match boxes */}
+          {bracketRounds.map((round, rIdx) => {
+            const matchCount = round.matches.length;
+            const slotH = matchCount > 0 ? contentH / matchCount : contentH;
+            const x = rIdx * ROUND_W + 20;
+            const isFinal = rIdx === bracketRounds.length - 1;
 
             return (
               <g key={round.round}>
+                {/* Round header */}
+                <rect
+                  x={x}
+                  y={8}
+                  width={MATCH_W}
+                  height={32}
+                  fill={isFinal ? '#E31E24' : '#0F0F14'}
+                  rx={4}
+                />
                 <text
-                  x={colIdx * ROUND_W + MATCH_W / 2 + 10}
-                  y={16}
+                  x={x + MATCH_W / 2}
+                  y={28}
                   textAnchor="middle"
-                  className="fill-black text-[10px] font-bold uppercase tracking-widest"
-                  style={FONT}
+                  className="fill-white text-[13px] font-bold uppercase"
+                  style={{ ...FONT, letterSpacing: '0.16em' }}
                 >
                   {round.label.toUpperCase()}
                 </text>
-                <line
-                  x1={colIdx * ROUND_W + 10}
-                  y1={24}
-                  x2={colIdx * ROUND_W + MATCH_W + 10}
-                  y2={24}
-                  stroke="black"
-                  strokeWidth={2}
-                />
+                {/* Match count pill */}
+                <text
+                  x={x + MATCH_W / 2}
+                  y={50}
+                  textAnchor="middle"
+                  className="fill-black/40 text-[10px] font-bold uppercase"
+                  style={{ ...FONT, letterSpacing: '0.14em' }}
+                >
+                  {matchCount} {matchCount === 1 ? 'Partido' : 'Partidos'}
+                </text>
 
                 {round.matches.map((match, mIdx) => {
-                  const x = colIdx * ROUND_W + 10;
-                  const centerY = headerH + slotH * mIdx + slotH / 2;
+                  const centerY = HEADER_H + slotH * mIdx + slotH / 2;
                   const y = centerY - MATCH_H / 2;
 
-                  // Decide what placeholder labels to show for each slot.
-                  //
-                  // 1. If the team is already resolved → no label needed.
-                  // 2. Else, prefer the backend-stored `team1Placeholder` /
-                  //    `team2Placeholder` (this reflects the crossings the
-                  //    admin actually configured).
-                  // 3. Only when the first round has no persisted placeholders
-                  //    at all do we fall back to auto-generated seed labels.
+                  // Cascade for placeholder labels (see commit b9d8b0b):
+                  //   1. resolved team → no label
+                  //   2. backend placeholder → formatted label
+                  //   3. first round with NO placeholder → auto-seed fallback
                   let label1: string | undefined;
                   let label2: string | undefined;
 
@@ -310,17 +302,11 @@ function CategoryBracket({
                     !match.team1Placeholder &&
                     !match.team2Placeholder
                   ) {
-                    const groupSet = new Set<string>();
-                    for (const gm of groupMatches) {
-                      const g = gm.group?.includes('|') ? gm.group.split('|').slice(1).join('') : gm.group;
-                      if (g) groupSet.add(g);
+                    const allGroups: string[] = [];
+                    for (let gi = 0; gi < Math.max(2, matchCount); gi++) {
+                      allGroups.push(String.fromCharCode(65 + gi));
                     }
-                    const groupCount = Math.max(2, groupSet.size);
-                    const groups = Array.from(groupSet).sort();
-                    if (groups.length === 0) {
-                      for (let gi = 0; gi < groupCount; gi++) groups.push(String.fromCharCode(65 + gi));
-                    }
-                    const seeds = generateSeedLabels(groups);
+                    const seeds = generateSeedLabels(allGroups);
                     if (seeds[mIdx]) {
                       label1 = seeds[mIdx][0];
                       label2 = seeds[mIdx][1];
@@ -328,30 +314,14 @@ function CategoryBracket({
                   }
 
                   return (
-                    <g key={match.id}>
-                      <BracketMatchBox x={x} y={y} match={match} label1={label1} label2={label2} />
-
-                      {/* Connectors */}
-                      {rIdx < bracketRounds.length - 1 && (() => {
-                        const midX = x + MATCH_W + COL_GAP / 2;
-                        const pairIdx = Math.floor(mIdx / 2);
-                        const isTop = mIdx % 2 === 0;
-                        const hasPair = mIdx + 1 < matchCount;
-                        const lines = [
-                          <line key={`h-${match.id}`} x1={x + MATCH_W} y1={centerY} x2={midX} y2={centerY} stroke="#d1d5db" strokeWidth={1.5} />,
-                        ];
-                        if (isTop && hasPair) {
-                          const pairCY = headerH + slotH * (mIdx + 1) + slotH / 2;
-                          const nextSlotH = contentH / bracketRounds[rIdx + 1].matches.length;
-                          const nextCY = headerH + nextSlotH * pairIdx + nextSlotH / 2;
-                          lines.push(
-                            <line key={`v-${match.id}`} x1={midX} y1={centerY} x2={midX} y2={pairCY} stroke="#d1d5db" strokeWidth={1.5} />,
-                            <line key={`hn-${match.id}`} x1={midX} y1={nextCY} x2={midX + COL_GAP / 2} y2={nextCY} stroke="#d1d5db" strokeWidth={1.5} />,
-                          );
-                        }
-                        return lines;
-                      })()}
-                    </g>
+                    <BracketMatchBox
+                      key={match.id}
+                      x={x}
+                      y={y}
+                      match={match}
+                      label1={label1}
+                      label2={label2}
+                    />
                   );
                 })}
               </g>
@@ -361,8 +331,13 @@ function CategoryBracket({
       </div>
 
       {thirdPlace && (
-        <div className="mt-4 max-w-[240px]">
-          <h3 className="text-xs font-bold mb-2 uppercase tracking-wider text-black/60" style={FONT}>3er Puesto</h3>
+        <div className="mt-6 max-w-md">
+          <h3
+            className="text-sm font-bold mb-3 uppercase text-black/60"
+            style={{ ...FONT, letterSpacing: '0.14em' }}
+          >
+            3er Puesto
+          </h3>
           <ThirdPlaceCard match={thirdPlace} />
         </div>
       )}
@@ -370,91 +345,107 @@ function CategoryBracket({
   );
 }
 
-// Group match box (from Match type)
-function GroupMatchBox({ x, y, match }: { x: number; y: number; match: Match }) {
-  const isCompleted = match.status === 'completed';
-  const isLive = match.status === 'live';
-  const border = isLive ? '#E31E24' : isCompleted ? '#9ca3af' : '#e5e7eb';
-  const halfH = MATCH_H / 2;
-  const groupLabel = match.group?.includes('|') ? match.group.split('|').slice(1).join('') : match.group || '';
+// ── Match box (SVG) ────────────────────────────────────────────
 
-  return (
-    <g>
-      <rect x={x} y={y} width={MATCH_W} height={MATCH_H} rx={3} fill="white" stroke={border} strokeWidth={isLive ? 2 : 1} />
-      <line x1={x} y1={y + halfH} x2={x + MATCH_W} y2={y + halfH} stroke="#f3f4f6" strokeWidth={1} />
-      {isLive && <rect x={x} y={y} width={MATCH_W} height={2} fill="#E31E24" rx={3} />}
-      {/* Group label */}
-      {groupLabel && (
-        <text x={x + MATCH_W - 4} y={y + 8} textAnchor="end" className="fill-black/20 text-[7px] font-bold" style={FONT}>
-          {groupLabel}
-        </text>
-      )}
-      {/* Team 1 */}
-      <GroupTeamSlot x={x} y={y} team={match.team1} score={match.score?.team1} isWinner={isCompleted && !!match.score && match.score.team1 > match.score.team2} />
-      {/* Team 2 */}
-      <GroupTeamSlot x={x} y={y + halfH} team={match.team2} score={match.score?.team2} isWinner={isCompleted && !!match.score && match.score.team2 > match.score.team1} />
-    </g>
-  );
-}
-
-function GroupTeamSlot({
-  x, y, team, score, isWinner,
+function BracketMatchBox({
+  x,
+  y,
+  match,
+  label1,
+  label2,
 }: {
-  x: number; y: number;
-  team: { id: string; name: string; initials: string; colors: { primary: string } };
-  score?: number;
-  isWinner: boolean;
+  x: number;
+  y: number;
+  match: BracketMatch;
+  label1?: string;
+  label2?: string;
 }) {
-  const halfH = MATCH_H / 2;
-  const cy = y + halfH / 2;
-
-  return (
-    <g>
-      {isWinner && <rect x={x + 1} y={y + 1} width={MATCH_W - 2} height={halfH - 1} fill="rgba(0,0,0,0.03)" />}
-      <rect x={x + 5} y={cy - 6} width={12} height={12} rx={2} fill={team.colors.primary} />
-      <text x={x + 11} y={cy} dominantBaseline="central" textAnchor="middle" className="fill-white text-[6px] font-bold" style={FONT}>
-        {team.initials}
-      </text>
-      <text x={x + 22} y={cy} dominantBaseline="central" className={`text-[9px] ${isWinner ? 'fill-black font-bold' : 'fill-black/60'}`} style={FONT}>
-        {team.name.length > 16 ? team.name.slice(0, 16) + '…' : team.name}
-      </text>
-      {score !== undefined && (
-        <text x={x + MATCH_W - 6} y={cy} dominantBaseline="central" textAnchor="end" className={`text-[10px] font-bold ${isWinner ? 'fill-black' : 'fill-black/25'}`} style={FONT}>
-          {score}
-        </text>
-      )}
-    </g>
-  );
-}
-
-// Bracket match box (from BracketMatch type)
-function BracketMatchBox({ x, y, match, label1, label2 }: { x: number; y: number; match: BracketMatch; label1?: string; label2?: string }) {
   const isLive = match.status === 'live';
   const isCompleted = match.status === 'completed';
   const hasWinner = match.winner !== undefined;
   const t1Won = hasWinner && match.winner?.id === match.team1?.id;
   const t2Won = hasWinner && match.winner?.id === match.team2?.id;
   const halfH = MATCH_H / 2;
-  const border = isLive ? '#E31E24' : isCompleted ? '#9ca3af' : '#e5e7eb';
+
+  const border = isLive ? '#E31E24' : isCompleted ? 'rgba(0,0,0,0.14)' : 'rgba(0,0,0,0.10)';
 
   return (
     <g>
-      <rect x={x} y={y} width={MATCH_W} height={MATCH_H} rx={3} fill="white" stroke={border} strokeWidth={isLive ? 2 : 1} />
-      <line x1={x} y1={y + halfH} x2={x + MATCH_W} y2={y + halfH} stroke="#f3f4f6" strokeWidth={1} />
-      {isLive && <rect x={x} y={y} width={MATCH_W} height={2} fill="#E31E24" rx={3} />}
-      <BracketTeamSlot x={x} y={y} team={match.team1} score={match.score?.team1} isWinner={t1Won} label={label1} />
-      <BracketTeamSlot x={x} y={y + halfH} team={match.team2} score={match.score?.team2} isWinner={t2Won} label={label2} />
+      {/* Shadow (simulated with a translated rect) */}
+      <rect
+        x={x}
+        y={y + 2}
+        width={MATCH_W}
+        height={MATCH_H}
+        rx={6}
+        fill="rgba(0,0,0,0.06)"
+      />
+      {/* Card body */}
+      <rect
+        x={x}
+        y={y}
+        width={MATCH_W}
+        height={MATCH_H}
+        rx={6}
+        fill="white"
+        stroke={border}
+        strokeWidth={isLive ? 2 : 1.5}
+      />
+
+      {/* Live red top bar with pulse */}
+      {isLive && (
+        <rect x={x} y={y} width={MATCH_W} height={4} fill="#E31E24">
+          <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite" />
+        </rect>
+      )}
+
+      {/* Divider between slots */}
+      <line
+        x1={x}
+        y1={y + halfH}
+        x2={x + MATCH_W}
+        y2={y + halfH}
+        stroke="rgba(0,0,0,0.06)"
+        strokeWidth={1}
+      />
+
+      <BracketTeamSlot
+        x={x}
+        y={y}
+        team={match.team1}
+        score={match.score?.team1}
+        isWinner={t1Won}
+        isLoser={isCompleted && !t1Won && hasWinner}
+        label={label1}
+      />
+      <BracketTeamSlot
+        x={x}
+        y={y + halfH}
+        team={match.team2}
+        score={match.score?.team2}
+        isWinner={t2Won}
+        isLoser={isCompleted && !t2Won && hasWinner}
+        label={label2}
+      />
     </g>
   );
 }
 
 function BracketTeamSlot({
-  x, y, team, score, isWinner, label,
+  x,
+  y,
+  team,
+  score,
+  isWinner,
+  isLoser,
+  label,
 }: {
-  x: number; y: number;
+  x: number;
+  y: number;
   team?: BracketMatch['team1'];
   score?: number;
   isWinner: boolean;
+  isLoser: boolean;
   label?: string;
 }) {
   const halfH = MATCH_H / 2;
@@ -462,30 +453,104 @@ function BracketTeamSlot({
 
   if (!team) {
     return (
-      <text x={x + 6} y={cy} dominantBaseline="central" className="fill-black/40 text-[9px] font-bold" style={FONT}>
-        {label || 'Por definir'}
-      </text>
+      <g>
+        <text
+          x={x + 20}
+          y={cy}
+          dominantBaseline="central"
+          className="fill-black/40 text-[13px] font-bold uppercase"
+          style={{ ...FONT, letterSpacing: '0.04em' }}
+        >
+          {label || 'Por definir'}
+        </text>
+      </g>
     );
   }
 
   return (
     <g>
-      {isWinner && <rect x={x + 1} y={y + 1} width={MATCH_W - 2} height={halfH - 1} fill="rgba(0,0,0,0.03)" />}
-      <rect x={x + 5} y={cy - 6} width={12} height={12} rx={2} fill={team.colors.primary} />
-      <text x={x + 11} y={cy} dominantBaseline="central" textAnchor="middle" className="fill-white text-[6px] font-bold" style={FONT}>
+      {/* Team color rail on the left */}
+      <rect
+        x={x}
+        y={y + 2}
+        width={TEAM_COLOR_RAIL_W}
+        height={halfH - 4}
+        fill={team.colors.primary}
+      />
+      {/* Winner highlight band */}
+      {isWinner && (
+        <rect
+          x={x + TEAM_COLOR_RAIL_W}
+          y={y + 1}
+          width={MATCH_W - TEAM_COLOR_RAIL_W - 2}
+          height={halfH - 2}
+          fill="rgba(227,30,36,0.06)"
+        />
+      )}
+      {/* Team avatar (square with initials) */}
+      <rect
+        x={x + TEAM_COLOR_RAIL_W + 12}
+        y={cy - 14}
+        width={28}
+        height={28}
+        rx={4}
+        fill={team.colors.primary}
+      />
+      <text
+        x={x + TEAM_COLOR_RAIL_W + 12 + 14}
+        y={cy + 1}
+        dominantBaseline="central"
+        textAnchor="middle"
+        className="fill-white text-[12px] font-bold uppercase"
+        style={{ ...FONT, letterSpacing: '0.02em' }}
+      >
         {team.initials}
       </text>
-      <text x={x + 22} y={cy} dominantBaseline="central" className={`text-[9px] ${isWinner ? 'fill-black font-bold' : 'fill-black/60'}`} style={FONT}>
-        {team.name.length > 16 ? team.name.slice(0, 16) + '…' : team.name}
+      {/* Team name */}
+      <text
+        x={x + TEAM_COLOR_RAIL_W + 50}
+        y={cy}
+        dominantBaseline="central"
+        className={`text-[15px] font-bold uppercase ${
+          isLoser ? 'fill-black/45' : isWinner ? 'fill-black' : 'fill-black/80'
+        }`}
+        style={{ ...FONT, letterSpacing: '-0.01em' }}
+      >
+        {team.name.length > 22 ? team.name.slice(0, 22) + '…' : team.name}
       </text>
+      {/* Score */}
       {score !== undefined && (
-        <text x={x + MATCH_W - 6} y={cy} dominantBaseline="central" textAnchor="end" className={`text-[10px] font-bold ${isWinner ? 'fill-black' : 'fill-black/25'}`} style={FONT}>
+        <text
+          x={x + MATCH_W - 14}
+          y={cy}
+          dominantBaseline="central"
+          textAnchor="end"
+          className={`text-[22px] font-bold tabular-nums ${
+            isWinner ? 'fill-[#E31E24]' : isLoser ? 'fill-black/35' : 'fill-black/80'
+          }`}
+          style={{ ...FONT, letterSpacing: '-0.02em' }}
+        >
           {score}
         </text>
+      )}
+      {/* Trophy on winner */}
+      {isWinner && (
+        <g transform={`translate(${x + MATCH_W - 44}, ${cy - 7})`}>
+          <path
+            d="M6 4h8l-1.3 10.7H7.3L6 4z M9 8h2 M2 6h2 M16 6h2"
+            fill="none"
+            stroke="#FFB300"
+            strokeWidth={1.6}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </g>
       )}
     </g>
   );
 }
+
+// ── Third-place card (HTML, bigger than before) ────────────────
 
 function ThirdPlaceCard({ match }: { match: BracketMatch }) {
   const hasWinner = match.winner !== undefined;
@@ -495,20 +560,36 @@ function ThirdPlaceCard({ match }: { match: BracketMatch }) {
   const placeholder1 = formatBracketPlaceholder(match.team1Placeholder);
   const placeholder2 = formatBracketPlaceholder(match.team2Placeholder);
 
-  // Fully empty with no placeholder → show the "Por definir" filler
   if (!match.team1 && !match.team2 && !placeholder1 && !placeholder2) {
     return (
-      <div className="bg-black/5 border-2 border-dashed border-black/15 rounded-sm text-center py-4">
-        <span className="text-xs text-black/30 font-bold uppercase" style={FONT}>Por definir</span>
+      <div className="bg-black/5 border-2 border-dashed border-black/15 rounded-sm text-center py-6">
+        <span className="text-sm text-black/30 font-bold uppercase" style={FONT}>
+          Por definir
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-black/10 rounded-sm overflow-hidden">
-      <TeamRowHTML team={match.team1} score={match.score?.team1} isWinner={t1Won} placeholder={placeholder1} />
+    <div
+      className="bg-white rounded-sm overflow-hidden"
+      style={{ border: '2px solid rgba(0,0,0,0.10)', boxShadow: 'var(--shadow-card)' }}
+    >
+      <TeamRowHTML
+        team={match.team1}
+        score={match.score?.team1}
+        isWinner={t1Won}
+        isLoser={match.status === 'completed' && hasWinner && !t1Won}
+        placeholder={placeholder1}
+      />
       <div className="border-t border-black/10" />
-      <TeamRowHTML team={match.team2} score={match.score?.team2} isWinner={t2Won} placeholder={placeholder2} />
+      <TeamRowHTML
+        team={match.team2}
+        score={match.score?.team2}
+        isWinner={t2Won}
+        isLoser={match.status === 'completed' && hasWinner && !t2Won}
+        placeholder={placeholder2}
+      />
     </div>
   );
 }
@@ -517,31 +598,61 @@ function TeamRowHTML({
   team,
   score,
   isWinner,
+  isLoser,
   placeholder,
 }: {
   team?: BracketMatch['team1'];
   score?: number;
   isWinner: boolean;
+  isLoser: boolean;
   placeholder?: string;
 }) {
   if (!team) {
     return (
-      <div className="px-3 py-2 bg-black/5">
-        <span className="text-xs text-black/40 font-bold uppercase" style={FONT}>
+      <div className="px-4 py-3 bg-black/5">
+        <span
+          className="text-sm text-black/40 font-bold uppercase"
+          style={{ ...FONT, letterSpacing: '0.04em' }}
+        >
           {placeholder || 'Por definir'}
         </span>
       </div>
     );
   }
   return (
-    <div className={`flex items-center justify-between px-2 py-1.5 ${isWinner ? 'bg-black/5' : ''}`}>
-      <div className="flex items-center gap-1.5 flex-1 min-w-0">
-        <TeamAvatar team={team} size="xs" />
-        <span className={`text-xs truncate ${isWinner ? 'font-bold' : 'text-black/70'}`} style={FONT}>{team.name}</span>
+    <div
+      className={`relative flex items-center justify-between px-4 py-3 ${
+        isWinner ? 'bg-spk-red/5' : ''
+      }`}
+    >
+      <div
+        className="absolute left-0 top-0 bottom-0 w-[5px]"
+        style={{ backgroundColor: team.colors.primary }}
+        aria-hidden="true"
+      />
+      <div className="flex items-center gap-3 flex-1 min-w-0 pl-2">
+        <TeamAvatar team={team} size="sm" />
+        <span
+          className={`text-base font-bold uppercase truncate ${
+            isLoser ? 'text-black/45' : isWinner ? 'text-black' : 'text-black/80'
+          }`}
+          style={{ ...FONT, letterSpacing: '-0.01em' }}
+        >
+          {team.name}
+        </span>
       </div>
-      <div className="flex items-center gap-1">
-        {score !== undefined && <span className={`text-sm font-bold ${isWinner ? 'text-black' : 'text-black/30'}`} style={FONT}>{score}</span>}
-        {isWinner && <Trophy className="w-3 h-3 text-spk-gold" />}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {score !== undefined && (
+          <span
+            className={`text-xl font-bold tabular-nums ${
+              isWinner ? 'text-spk-red' : isLoser ? 'text-black/35' : 'text-black/80'
+            }`}
+            style={{ ...FONT, letterSpacing: '-0.02em' }}
+          >
+            {score}
+          </span>
+        )}
+        {isWinner && <Trophy className="w-4 h-4 text-spk-gold" aria-hidden="true" />}
       </div>
     </div>
   );
