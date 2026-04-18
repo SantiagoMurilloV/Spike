@@ -1,0 +1,518 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MatchService } from './match.service';
+import { CreateMatchDto } from '../types';
+
+// Mock the database module
+vi.mock('../config/database', () => ({
+  getPool: vi.fn(),
+}));
+
+// Mock the standings service to avoid real recalculation
+vi.mock('./standings.service', () => ({
+  standingsCalculator: {
+    recalculate: vi.fn().mockResolvedValue([]),
+  },
+}));
+
+import { getPool } from '../config/database';
+import { standingsCalculator } from './standings.service';
+
+const service = new MatchService();
+
+function validDto(overrides: Partial<CreateMatchDto> = {}): CreateMatchDto {
+  return {
+    tournamentId: 'tournament-1',
+    team1Id: 'team-1',
+    team2Id: 'team-2',
+    date: '2025-06-05',
+    time: '10:00',
+    court: 'Cancha 1',
+    phase: 'groups',
+    ...overrides,
+  };
+}
+
+// Helper to create a mock pool with a query function
+function mockPool(queryFn: ReturnType<typeof vi.fn>) {
+  (getPool as ReturnType<typeof vi.fn>).mockReturnValue({ query: queryFn });
+  return queryFn;
+}
+
+// A sample match DB row as returned by PostgreSQL
+function sampleMatchRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 'match-1',
+    tournament_id: 'tournament-1',
+    team1_id: 'team-1',
+    team2_id: 'team-2',
+    date: '2025-06-05',
+    time: '10:00',
+    court: 'Cancha 1',
+    referee: null,
+    status: 'upcoming',
+    score_team1: null,
+    score_team2: null,
+    phase: 'groups',
+    group_name: null,
+    duration: null,
+    created_at: '2025-01-01T00:00:00Z',
+    updated_at: '2025-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+function sampleSetRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 'set-1',
+    match_id: 'match-1',
+    set_number: 1,
+    team1_points: 25,
+    team2_points: 20,
+    ...overrides,
+  };
+}
+
+describe('MatchService.validateData', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Req 6.4: Los dos equipos deben ser diferentes
+  it('should reject same team for team1 and team2', async () => {
+    const queryFn = mockPool(vi.fn());
+    await expect(
+      service.validateData(validDto({ team1Id: 'team-1', team2Id: 'team-1' }))
+    ).rejects.toThrow('Los dos equipos deben ser diferentes');
+    // Should not query DB since validation fails before that
+    expect(queryFn).not.toHaveBeenCalled();
+  });
+
+  // Req 6.5: El torneo referenciado debe existir
+  it('should reject non-existent tournament', async () => {
+    mockPool(
+      vi.fn()
+        // Tournament check returns empty
+        .mockResolvedValueOnce({ rows: [] })
+    );
+    await expect(service.validateData(validDto())).rejects.toThrow('Torneo no fue encontrado');
+  });
+
+  // Req 6.6: Ambos equipos deben existir
+  it('should reject non-existent team1', async () => {
+    mockPool(
+      vi.fn()
+        // Tournament exists
+        .mockResolvedValueOnce({ rows: [{ id: 'tournament-1' }] })
+        // Team1 does not exist
+        .mockResolvedValueOnce({ rows: [] })
+    );
+    await expect(service.validateData(validDto())).rejects.toThrow('Equipo 1 no fue encontrado');
+  });
+
+  it('should reject non-existent team2', async () => {
+    mockPool(
+      vi.fn()
+        // Tournament exists
+        .mockResolvedValueOnce({ rows: [{ id: 'tournament-1' }] })
+        // Team1 exists
+        .mockResolvedValueOnce({ rows: [{ id: 'team-1' }] })
+        // Team2 does not exist
+        .mockResolvedValueOnce({ rows: [] })
+    );
+    await expect(service.validateData(validDto())).rejects.toThrow('Equipo 2 no fue encontrado');
+  });
+
+  it('should reject missing required fields', async () => {
+    const dto = validDto();
+    (dto as unknown as Record<string, unknown>).date = undefined;
+    await expect(service.validateData(dto)).rejects.toThrow();
+  });
+
+  it('should accept valid match data when all references exist', async () => {
+    mockPool(
+      vi.fn()
+        // Tournament exists
+        .mockResolvedValueOnce({ rows: [{ id: 'tournament-1' }] })
+        // Team1 exists
+        .mockResolvedValueOnce({ rows: [{ id: 'team-1' }] })
+        // Team2 exists
+        .mockResolvedValueOnce({ rows: [{ id: 'team-2' }] })
+    );
+    const result = await service.validateData(validDto());
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+});
+
+describe('MatchService.updateScore', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Req 6.7: Puntos de set deben ser enteros no negativos
+  it('should reject negative team1 set points', async () => {
+    // getById returns existing match
+    mockPool(
+      vi.fn()
+        .mockResolvedValueOnce({ rows: [sampleMatchRow({ status: 'live' })] }) // getById SELECT
+        .mockResolvedValueOnce({ rows: [] }) // getSets
+    );
+    await expect(
+      service.updateScore('match-1', {
+        sets: [{ setNumber: 1, team1Points: -1, team2Points: 25 }],
+      })
+    ).rejects.toThrow('Los puntos del equipo 1 deben ser un entero no negativo');
+  });
+
+  it('should reject negative team2 set points', async () => {
+    mockPool(
+      vi.fn()
+        .mockResolvedValueOnce({ rows: [sampleMatchRow({ status: 'live' })] })
+        .mockResolvedValueOnce({ rows: [] })
+    );
+    await expect(
+      service.updateScore('match-1', {
+        sets: [{ setNumber: 1, team1Points: 25, team2Points: -3 }],
+      })
+    ).rejects.toThrow('Los puntos del equipo 2 deben ser un entero no negativo');
+  });
+
+  it('should reject invalid set number (0)', async () => {
+    mockPool(
+      vi.fn()
+        .mockResolvedValueOnce({ rows: [sampleMatchRow({ status: 'live' })] })
+        .mockResolvedValueOnce({ rows: [] })
+    );
+    await expect(
+      service.updateScore('match-1', {
+        sets: [{ setNumber: 0, team1Points: 25, team2Points: 20 }],
+      })
+    ).rejects.toThrow('El número de set debe ser un entero entre 1 y 5');
+  });
+
+  it('should reject invalid set number (6)', async () => {
+    mockPool(
+      vi.fn()
+        .mockResolvedValueOnce({ rows: [sampleMatchRow({ status: 'live' })] })
+        .mockResolvedValueOnce({ rows: [] })
+    );
+    await expect(
+      service.updateScore('match-1', {
+        sets: [{ setNumber: 6, team1Points: 25, team2Points: 20 }],
+      })
+    ).rejects.toThrow('El número de set debe ser un entero entre 1 y 5');
+  });
+
+  it('should reject non-integer duration', async () => {
+    mockPool(
+      vi.fn()
+        .mockResolvedValueOnce({ rows: [sampleMatchRow({ status: 'live' })] })
+        .mockResolvedValueOnce({ rows: [] })
+    );
+    await expect(
+      service.updateScore('match-1', { duration: 1.5 })
+    ).rejects.toThrow('La duración debe ser un entero positivo');
+  });
+
+  // Req 6.2: Actualizar marcador de un partido en vivo
+  it('should update score and upsert sets', async () => {
+    const updatedRow = sampleMatchRow({ status: 'live', score_team1: 2, score_team2: 1 });
+    const queryFn = mockPool(
+      vi.fn()
+        // getById (existing match)
+        .mockResolvedValueOnce({ rows: [sampleMatchRow({ status: 'live' })] })
+        // getSets for getById
+        .mockResolvedValueOnce({ rows: [] })
+        // UPDATE match
+        .mockResolvedValueOnce({ rows: [updatedRow] })
+        // DELETE sets not in list
+        .mockResolvedValueOnce({ rows: [] })
+        // Upsert set 1
+        .mockResolvedValueOnce({ rows: [] })
+        // Final getById
+        .mockResolvedValueOnce({ rows: [updatedRow] })
+        // Final getSets
+        .mockResolvedValueOnce({ rows: [sampleSetRow()] })
+    );
+
+    const result = await service.updateScore('match-1', {
+      status: 'live',
+      scoreTeam1: 2,
+      scoreTeam2: 1,
+      sets: [{ setNumber: 1, team1Points: 25, team2Points: 20 }],
+    });
+
+    expect(result.id).toBe('match-1');
+    expect(queryFn).toHaveBeenCalled();
+  });
+
+  // Req 6.3: Cambiar estado a "completed" recalcula clasificación
+  it('should trigger standings recalculation when status changes to completed', async () => {
+    const liveRow = sampleMatchRow({ status: 'live' });
+    const completedRow = sampleMatchRow({ status: 'completed', score_team1: 3, score_team2: 1 });
+    mockPool(
+      vi.fn()
+        // getById (existing match with status 'live')
+        .mockResolvedValueOnce({ rows: [liveRow] })
+        // getSets for getById
+        .mockResolvedValueOnce({ rows: [] })
+        // UPDATE match
+        .mockResolvedValueOnce({ rows: [completedRow] })
+        // Final getById
+        .mockResolvedValueOnce({ rows: [completedRow] })
+        // Final getSets
+        .mockResolvedValueOnce({ rows: [] })
+    );
+
+    await service.updateScore('match-1', { status: 'completed', scoreTeam1: 3, scoreTeam2: 1 });
+
+    expect(standingsCalculator.recalculate).toHaveBeenCalledWith('tournament-1');
+  });
+
+  it('should NOT trigger standings recalculation when status stays live', async () => {
+    const liveRow = sampleMatchRow({ status: 'live' });
+    mockPool(
+      vi.fn()
+        .mockResolvedValueOnce({ rows: [liveRow] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [liveRow] })
+        .mockResolvedValueOnce({ rows: [liveRow] })
+        .mockResolvedValueOnce({ rows: [] })
+    );
+
+    await service.updateScore('match-1', { scoreTeam1: 1, scoreTeam2: 0 });
+
+    expect(standingsCalculator.recalculate).not.toHaveBeenCalled();
+  });
+});
+
+describe('MatchService CRUD operations', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('getAll', () => {
+    it('should return all matches mapped from DB rows', async () => {
+      const queryFn = mockPool(
+        vi.fn()
+          // SELECT matches
+          .mockResolvedValueOnce({
+            rows: [sampleMatchRow(), sampleMatchRow({ id: 'match-2' })],
+          })
+          // SELECT set_scores for attachSets
+          .mockResolvedValueOnce({ rows: [] })
+      );
+
+      const result = await service.getAll();
+
+      expect(queryFn).toHaveBeenCalledTimes(2);
+      expect(result).toHaveLength(2);
+      expect(result[0].id).toBe('match-1');
+      expect(result[1].id).toBe('match-2');
+    });
+
+    it('should return empty array when no matches exist', async () => {
+      mockPool(vi.fn().mockResolvedValue({ rows: [] }));
+
+      const result = await service.getAll();
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getById', () => {
+    it('should return a match by id with sets', async () => {
+      mockPool(
+        vi.fn()
+          // SELECT match
+          .mockResolvedValueOnce({ rows: [sampleMatchRow()] })
+          // SELECT set_scores
+          .mockResolvedValueOnce({ rows: [sampleSetRow()] })
+      );
+
+      const result = await service.getById('match-1');
+
+      expect(result.id).toBe('match-1');
+      expect(result.tournamentId).toBe('tournament-1');
+      expect(result.sets).toHaveLength(1);
+      expect(result.sets![0].team1Points).toBe(25);
+    });
+
+    it('should throw NotFoundError when match does not exist', async () => {
+      mockPool(vi.fn().mockResolvedValue({ rows: [] }));
+
+      await expect(service.getById('nonexistent')).rejects.toThrow('Partido no fue encontrado');
+    });
+  });
+
+  describe('getByTournament', () => {
+    it('should return matches for a tournament', async () => {
+      mockPool(
+        vi.fn()
+          // Tournament check
+          .mockResolvedValueOnce({ rows: [{ id: 'tournament-1' }] })
+          // SELECT matches
+          .mockResolvedValueOnce({ rows: [sampleMatchRow()] })
+          // SELECT set_scores for attachSets
+          .mockResolvedValueOnce({ rows: [] })
+      );
+
+      const result = await service.getByTournament('tournament-1');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].tournamentId).toBe('tournament-1');
+    });
+
+    it('should throw NotFoundError if tournament does not exist', async () => {
+      mockPool(vi.fn().mockResolvedValue({ rows: [] }));
+
+      await expect(service.getByTournament('nonexistent')).rejects.toThrow(
+        'Torneo no fue encontrado'
+      );
+    });
+  });
+
+  describe('create', () => {
+    it('should validate data and insert a new match', async () => {
+      const row = sampleMatchRow();
+      mockPool(
+        vi.fn()
+          // validateData: tournament check
+          .mockResolvedValueOnce({ rows: [{ id: 'tournament-1' }] })
+          // validateData: team1 check
+          .mockResolvedValueOnce({ rows: [{ id: 'team-1' }] })
+          // validateData: team2 check
+          .mockResolvedValueOnce({ rows: [{ id: 'team-2' }] })
+          // INSERT RETURNING
+          .mockResolvedValueOnce({ rows: [row] })
+      );
+
+      const result = await service.create(validDto());
+
+      expect(result.id).toBe('match-1');
+      expect(result.tournamentId).toBe('tournament-1');
+    });
+
+    it('should throw validation error for same teams before querying DB', async () => {
+      const queryFn = mockPool(vi.fn());
+
+      await expect(
+        service.create(validDto({ team1Id: 'team-1', team2Id: 'team-1' }))
+      ).rejects.toThrow('Los dos equipos deben ser diferentes');
+      // Only the validate call for required fields happens, no DB queries for FK checks
+      expect(queryFn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update', () => {
+    it('should update an existing match', async () => {
+      const existingRow = sampleMatchRow();
+      const updatedRow = sampleMatchRow({ court: 'Cancha 2' });
+      mockPool(
+        vi.fn()
+          // getById check (match exists)
+          .mockResolvedValueOnce({ rows: [existingRow] })
+          // getSets for getById
+          .mockResolvedValueOnce({ rows: [] })
+          // UPDATE query
+          .mockResolvedValueOnce({ rows: [updatedRow] })
+      );
+
+      const result = await service.update('match-1', { court: 'Cancha 2' });
+
+      expect(result.court).toBe('Cancha 2');
+    });
+
+    it('should throw NotFoundError when updating non-existent match', async () => {
+      mockPool(vi.fn().mockResolvedValue({ rows: [] }));
+
+      await expect(service.update('nonexistent', { court: 'Cancha 2' })).rejects.toThrow(
+        'Partido no fue encontrado'
+      );
+    });
+
+    it('should return unchanged match when no fields are provided', async () => {
+      const existingRow = sampleMatchRow();
+      mockPool(
+        vi.fn()
+          // getById check
+          .mockResolvedValueOnce({ rows: [existingRow] })
+          // getSets for getById
+          .mockResolvedValueOnce({ rows: [] })
+          // getById return (no fields to update)
+          .mockResolvedValueOnce({ rows: [existingRow] })
+          // getSets for second getById
+          .mockResolvedValueOnce({ rows: [] })
+      );
+
+      const result = await service.update('match-1', {});
+
+      expect(result.id).toBe('match-1');
+    });
+
+    it('should validate team references when updating team ids', async () => {
+      const existingRow = sampleMatchRow();
+      mockPool(
+        vi.fn()
+          // getById check
+          .mockResolvedValueOnce({ rows: [existingRow] })
+          // getSets for getById
+          .mockResolvedValueOnce({ rows: [] })
+          // Second getById for merge
+          .mockResolvedValueOnce({ rows: [existingRow] })
+          // getSets for second getById
+          .mockResolvedValueOnce({ rows: [] })
+          // team1 check - not found
+          .mockResolvedValueOnce({ rows: [] })
+      );
+
+      await expect(
+        service.update('match-1', { team1Id: 'nonexistent-team' })
+      ).rejects.toThrow('Equipo 1 no fue encontrado');
+    });
+
+    it('should reject update when team1Id equals team2Id after merge', async () => {
+      const existingRow = sampleMatchRow({ team2_id: 'team-2' });
+      mockPool(
+        vi.fn()
+          // getById check
+          .mockResolvedValueOnce({ rows: [existingRow] })
+          // getSets for getById
+          .mockResolvedValueOnce({ rows: [] })
+          // Second getById for merge
+          .mockResolvedValueOnce({ rows: [existingRow] })
+          // getSets for second getById
+          .mockResolvedValueOnce({ rows: [] })
+      );
+
+      await expect(
+        service.update('match-1', { team1Id: 'team-2' })
+      ).rejects.toThrow('Los dos equipos deben ser diferentes');
+    });
+  });
+
+  describe('delete', () => {
+    it('should delete an existing match', async () => {
+      const queryFn = mockPool(
+        vi.fn()
+          // getById check
+          .mockResolvedValueOnce({ rows: [sampleMatchRow()] })
+          // getSets for getById
+          .mockResolvedValueOnce({ rows: [] })
+          // DELETE
+          .mockResolvedValueOnce({ rows: [] })
+      );
+
+      await service.delete('match-1');
+
+      expect(queryFn).toHaveBeenCalledTimes(3);
+      expect(queryFn.mock.calls[2][0]).toBe('DELETE FROM matches WHERE id = $1');
+      expect(queryFn.mock.calls[2][1]).toEqual(['match-1']);
+    });
+
+    it('should throw NotFoundError when deleting non-existent match', async () => {
+      mockPool(vi.fn().mockResolvedValue({ rows: [] }));
+
+      await expect(service.delete('nonexistent')).rejects.toThrow('Partido no fue encontrado');
+    });
+  });
+});

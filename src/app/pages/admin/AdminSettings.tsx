@@ -1,0 +1,229 @@
+import { Save, Globe, Shield, Mail, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+import { api, type SystemSettings } from '../../services/api';
+
+export function AdminSettings() {
+  const [showPassword, setShowPassword] = useState(false);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+
+  const [settings, setSettings] = useState<SystemSettings>({
+    systemName: '',
+    clubName: '',
+    location: '',
+    language: 'es',
+    contactEmail: '',
+    website: '',
+  });
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const data = await api.getSettings();
+        setSettings(data);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Error al cargar configuración');
+      } finally {
+        setLoadingSettings(false);
+      }
+    }
+    loadSettings();
+  }, []);
+
+  const handleSaveSettings = async () => {
+    setSaving(true);
+    try {
+      const updated = await api.updateSettings({
+        systemName: settings.systemName,
+        clubName: settings.clubName,
+        location: settings.location,
+        language: settings.language,
+        contactEmail: settings.contactEmail,
+        website: settings.website,
+      });
+      setSettings(updated);
+      toast.success('Configuración guardada correctamente');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al guardar configuración');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword || newPassword.length < 8) {
+      toast.error('La contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      await api.changePassword(newPassword);
+      setNewPassword('');
+      toast.success('Contraseña actualizada correctamente');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al cambiar contraseña');
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  if (loadingSettings) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#E31E24]" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6 max-w-4xl">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold mb-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+          CONFIGURACIÓN
+        </h1>
+        <p className="text-muted-foreground">
+          Ajusta las configuraciones generales del sistema
+        </p>
+      </div>
+
+      {/* General Settings */}
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="bg-secondary px-6 py-4 border-b border-border">
+          <h2 className="font-bold flex items-center gap-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+            <Globe className="w-5 h-5" />
+            CONFIGURACIÓN GENERAL
+          </h2>
+        </div>
+        <div className="p-6 space-y-6">
+          <div>
+            <label className="block text-sm font-medium mb-2">Nombre del Sistema</label>
+            <input
+              type="text"
+              value={settings.systemName}
+              onChange={(e) => setSettings({ ...settings, systemName: e.target.value })}
+              className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Nombre del Club</label>
+            <input
+              type="text"
+              value={settings.clubName || ''}
+              onChange={(e) => setSettings({ ...settings, clubName: e.target.value })}
+              className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Ubicación por Defecto</label>
+            <input
+              type="text"
+              value={settings.location || ''}
+              onChange={(e) => setSettings({ ...settings, location: e.target.value })}
+              className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Idioma</label>
+            <select
+              value={settings.language}
+              onChange={(e) => setSettings({ ...settings, language: e.target.value })}
+              className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+            >
+              <option value="es">Español</option>
+              <option value="en">English</option>
+              <option value="pt">Português</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Security Settings */}
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="bg-secondary px-6 py-4 border-b border-border">
+          <h2 className="font-bold flex items-center gap-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+            <Shield className="w-5 h-5" />
+            SEGURIDAD
+          </h2>
+        </div>
+        <div className="p-6 space-y-6">
+          <div>
+            <label className="block text-sm font-medium mb-2">Nueva Contraseña de Administrador</label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Ingresa nueva contraseña"
+                className="w-full px-4 py-2 pr-12 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Usa una contraseña segura de al menos 8 caracteres
+            </p>
+          </div>
+          <button
+            onClick={handleChangePassword}
+            disabled={savingPassword || !newPassword}
+            className="flex items-center gap-2 px-4 py-2 bg-[#003087] text-white hover:bg-[#003087]/90 rounded-lg transition-colors font-medium disabled:opacity-50"
+          >
+            {savingPassword && <Loader2 className="w-4 h-4 animate-spin" />}
+            Cambiar Contraseña
+          </button>
+        </div>
+      </div>
+
+      {/* Contact Settings */}
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="bg-secondary px-6 py-4 border-b border-border">
+          <h2 className="font-bold flex items-center gap-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+            <Mail className="w-5 h-5" />
+            INFORMACIÓN DE CONTACTO
+          </h2>
+        </div>
+        <div className="p-6 space-y-6">
+          <div>
+            <label className="block text-sm font-medium mb-2">Email de Contacto</label>
+            <input
+              type="email"
+              value={settings.contactEmail || ''}
+              onChange={(e) => setSettings({ ...settings, contactEmail: e.target.value })}
+              className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Sitio Web</label>
+            <input
+              type="url"
+              value={settings.website || ''}
+              onChange={(e) => setSettings({ ...settings, website: e.target.value })}
+              className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E31E24]/50"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Save Button */}
+      <div className="flex justify-end gap-3 pt-4">
+        <button
+          onClick={handleSaveSettings}
+          disabled={saving}
+          className="flex items-center gap-2 px-6 py-2 bg-[#E31E24] text-white hover:bg-[#B71C1C] rounded-lg transition-colors font-medium disabled:opacity-50"
+        >
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Guardar Cambios
+        </button>
+      </div>
+    </div>
+  );
+}

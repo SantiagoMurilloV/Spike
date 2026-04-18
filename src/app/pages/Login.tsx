@@ -1,0 +1,251 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
+import { Trophy, Lock, User, ArrowRight } from 'lucide-react';
+import { motion } from 'motion/react';
+import { ImageWithFallback } from '../components/figma/ImageWithFallback';
+import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
+import { ApiError } from '../services/api';
+
+export function Login() {
+  const navigate = useNavigate();
+  const { login, isAuthenticated, sessionMessage } = useAuth();
+  const { tournaments, teams, matches } = useData();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Show session expiry message if present
+  useEffect(() => {
+    if (sessionMessage) {
+      setError(sessionMessage);
+    }
+  }, [sessionMessage]);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/admin', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
+    try {
+      await login(username, password);
+      navigate('/admin');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Error de conexión. Intenta de nuevo.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-black text-white flex">
+      {/* Left Side - Login Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 md:p-12">
+        <div className="w-full max-w-md">
+          {/* Logo */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-12"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-12 h-12 rounded-sm bg-white flex items-center justify-center">
+                <Trophy className="w-6 h-6 text-black" />
+              </div>
+              <h1 
+                className="text-3xl font-bold tracking-tighter"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+              >
+                SPK-CUP
+              </h1>
+            </div>
+            <div className="w-20 h-1 bg-[#E31E24]" />
+          </motion.div>
+
+          {/* Title */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="mb-10"
+          >
+            <h2 
+              className="text-5xl md:text-6xl font-bold mb-4 tracking-tighter"
+              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+            >
+              PANEL DE
+              <br />
+              ADMINISTRACIÓN
+            </h2>
+            <p className="text-white/60 text-lg">
+              Ingresa tus credenciales para continuar
+            </p>
+          </motion.div>
+
+          {/* Login Form */}
+          <motion.form
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            onSubmit={handleLogin}
+            className="space-y-6"
+          >
+            {/* Username */}
+            <div>
+              <label 
+                htmlFor="username" 
+                className="block text-sm font-bold uppercase tracking-wider mb-3 text-white/80"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+              >
+                Usuario
+              </label>
+              <div className="relative">
+                <User className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                <input
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Ingresa tu usuario"
+                  className="w-full pl-14 pr-5 py-4 bg-white/10 border-2 border-white/20 text-white placeholder:text-white/40 rounded-sm focus:outline-none focus:border-white transition-colors text-lg"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label 
+                htmlFor="password" 
+                className="block text-sm font-bold uppercase tracking-wider mb-3 text-white/80"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+              >
+                Contraseña
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Ingresa tu contraseña"
+                  className="w-full pl-14 pr-5 py-4 bg-white/10 border-2 border-white/20 text-white placeholder:text-white/40 rounded-sm focus:outline-none focus:border-white transition-colors text-lg"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-[#E31E24]/20 border-2 border-[#E31E24] rounded-sm"
+              >
+                <p className="text-sm font-medium text-white">{error}</p>
+              </motion.div>
+            )}
+
+            {/* Submit Button */}
+            <motion.button
+              type="submit"
+              disabled={isLoading}
+              whileHover={{ scale: isLoading ? 1 : 1.02 }}
+              whileTap={{ scale: isLoading ? 1 : 0.98 }}
+              className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-white text-black rounded-sm font-bold text-lg hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+            >
+              {isLoading ? (
+                <>
+                  <motion.div
+                    className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  />
+                  INGRESANDO...
+                </>
+              ) : (
+                <>
+                  INGRESAR
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
+            </motion.button>
+
+            {/* Back to Home */}
+            <motion.button
+              type="button"
+              onClick={() => navigate('/')}
+              whileHover={{ x: -5 }}
+              className="w-full text-center text-white/60 hover:text-white transition-colors text-sm mt-6"
+            >
+              ← Volver al inicio
+            </motion.button>
+          </motion.form>
+
+          {/* Demo Credentials Info */}
+        </div>
+      </div>
+
+      {/* Right Side - Image */}
+      <div className="hidden lg:block lg:w-1/2 relative">
+        <div className="absolute inset-0 bg-gradient-to-l from-transparent via-black/50 to-black z-10" />
+        <ImageWithFallback
+          src="https://images.unsplash.com/photo-1771909713106-86b9a412964a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx2b2xsZXliYWxsJTIwY291cnQlMjBzcG9ydHMlMjBhcmVuYXxlbnwxfHx8fDE3NzU1NzU1MTB8MA&ixlib=rb-4.1.0&q=80&w=1080"
+          alt="Volleyball court"
+          className="w-full h-full object-cover"
+        />
+        
+        {/* Floating stats */}
+        <div className="absolute bottom-12 left-12 right-12 z-20">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white/10 backdrop-blur-xl border border-white/20 p-8 rounded-sm"
+          >
+            <h3 
+              className="text-3xl font-bold mb-6"
+              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+            >
+              GESTIONA TUS TORNEOS
+            </h3>
+            <div className="grid grid-cols-3 gap-6">
+              <div>
+                <div className="text-4xl font-bold mb-1" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+                  {tournaments.length}
+                </div>
+                <div className="text-sm text-white/60 uppercase tracking-wider">Torneos</div>
+              </div>
+              <div>
+                <div className="text-4xl font-bold mb-1" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+                  {teams.length}
+                </div>
+                <div className="text-sm text-white/60 uppercase tracking-wider">Equipos</div>
+              </div>
+              <div>
+                <div className="text-4xl font-bold mb-1" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+                  {matches.length}
+                </div>
+                <div className="text-sm text-white/60 uppercase tracking-wider">Partidos</div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </div>
+  );
+}

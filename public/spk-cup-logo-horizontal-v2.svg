@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 90" width="720" height="180">
+  <defs>
+    <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0C0C0E"/>
+      <stop offset="100%" stop-color="#111318"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fondo -->
+  <rect width="360" height="90" rx="12" fill="url(#bg2)"/>
+
+  <!-- Copa geométrica -->
+  <g transform="translate(40, 45)">
+    <polygon points="-13,-19 13,-19 9,10 -9,10" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round"/>
+    <line x1="-7" y1="2" x2="7" y2="2" stroke="#FFFFFF" stroke-width="1.2" opacity="0.3"/>
+    <polyline points="-13,-8 -21,-8 -21,5 -13,5" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+    <polyline points="13,-8 21,-8 21,5 13,5" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+    <line x1="-3" y1="10" x2="-3" y2="18" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+    <line x1="3" y1="10" x2="3" y2="18" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+    <line x1="-10" y1="18" x2="10" y2="18" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="0" cy="-24" r="3.5" fill="#E31E24"/>
+  </g>
+
+  <!-- Línea vertical separadora -->
+  <line x1="72" y1="18" x2="72" y2="72" stroke="#FFFFFF" stroke-width="0.5" opacity="0.18"/>
+
+  <!-- SPK + CUP centrados verticalmente en el espacio restante -->
+  <!-- Centro horizontal del área de texto: desde x=80 hasta x=348, centro = 214 -->
+  <!-- Centro vertical: 45 -->
+
+  <!-- SPK -->
+  <text
+    x="176"
+    y="58"
+    font-family="'Arial Black','Impact','Haettenschweiler',sans-serif"
+    font-weight="900"
+    font-size="52"
+    letter-spacing="-2"
+    text-anchor="end"
+    fill="#FFFFFF">SPK</text>
+
+  <!-- Guión rojo -->
+  <rect x="182" y="40" width="14" height="4" rx="2" fill="#E31E24"/>
+
+  <!-- CUP -->
+  <text
+    x="202"
+    y="58"
+    font-family="'Arial Black','Impact','Haettenschweiler',sans-serif"
+    font-weight="900"
+    font-size="52"
+    letter-spacing="-2"
+    text-anchor="start"
+    fill="#E31E24">CUP</text>
+
+  <!-- Tagline debajo centrada -->
+  <text
+    x="214"
+    y="78"
+    font-family="'Arial',sans-serif"
+    font-weight="400"
+    font-size="9"
+    letter-spacing="4"
+    text-anchor="middle"
+    fill="#FFFFFF"
+    opacity="0.25">SPIKE VOLLEY CLUB</text>
+
+  <!-- Esquinas decorativas -->
+  <g stroke="#E31E24" stroke-width="1.8" fill="none" opacity="0.7" stroke-linecap="round">
+    <path d="M6 22 L6 6 L22 6"/>
+    <path d="M338 6 L354 6 L354 22"/>
+    <path d="M6 68 L6 84 L22 84"/>
+    <path d="M338 84 L354 84 L354 68"/>
+  </g>
+
+</svg>
