@@ -12,7 +12,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['icon-192.png', 'icon-512.png', 'spk-cup-logo-v4.svg'],
+      includeAssets: ['icon-192.png', 'icon-512.png', 'spk-cup-logo-v4.svg', 'spk-cup-logo-horizontal.svg'],
       manifest: {
         name: 'SPK-CUP — Sistema de Torneos',
         short_name: 'SPK-CUP',

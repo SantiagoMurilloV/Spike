@@ -254,19 +254,19 @@ export function Home() {
                 className="flex flex-wrap gap-8 md:gap-12 mt-16"
               >
                 <div>
-                  <div className="text-4xl sm:text-5xl font-bold mb-1" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+                  <div className="text-4xl sm:text-5xl font-bold mb-1 tabular-nums" style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.02em' }}>
                     {statusCounts.all}
                   </div>
                   <div className="text-sm text-white/60 uppercase tracking-wider">Torneos</div>
                 </div>
                 <div>
-                  <div className="text-4xl sm:text-5xl font-bold mb-1" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+                  <div className="text-4xl sm:text-5xl font-bold mb-1 tabular-nums" style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.02em' }}>
                     {teams.length}
                   </div>
                   <div className="text-sm text-white/60 uppercase tracking-wider">Equipos</div>
                 </div>
                 <div>
-                  <div className="text-4xl sm:text-5xl font-bold mb-1" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+                  <div className="text-4xl sm:text-5xl font-bold mb-1 tabular-nums" style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.02em' }}>
                     {statusCounts.ongoing}
                   </div>
                   <div className="text-sm text-white/60 uppercase tracking-wider">En vivo</div>

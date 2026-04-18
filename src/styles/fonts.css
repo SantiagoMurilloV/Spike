@@ -1,5 +1,3 @@
-/* Barlow Condensed - Para headlines, scores y números */
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&display=swap');
-
-/* Inter - Para UI principal */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Barlow Condensed — headlines, scores, numbers, labels (400-900 for full range)
+   Inter — UI body copy, forms, descriptions (400-800) */
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap');
