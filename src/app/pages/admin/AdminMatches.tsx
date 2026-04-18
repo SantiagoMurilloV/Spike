@@ -206,10 +206,13 @@ export function AdminMatches() {
       <div className="space-y-4">
         {filteredMatches.map(match => (
           <div key={match.id} className="relative group">
-            <MatchCard
-              match={match}
-              onClick={() => navigate(`/match/${match.id}`)}
-            />
+            {/*
+              Admin view: match cards are display-only. The row-level actions
+              (referee console, edit, delete) are exposed as icon buttons in the
+              overlay — the public match-detail page is not useful to an
+              organizer, so we don't navigate on card click here.
+            */}
+            <MatchCard match={match} />
             {/* Action Buttons Overlay */}
             <div className="absolute top-2 right-2 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
               <button

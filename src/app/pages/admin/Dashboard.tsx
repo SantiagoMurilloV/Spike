@@ -158,7 +158,13 @@ export function AdminDashboard() {
             </div>
             <div className="space-y-4">
               {liveMatches.map(match => (
-                <MatchCard key={match.id} match={match} onClick={() => navigate(`/match/${match.id}`)} />
+                // Admin shortcut: clicking a live match opens the referee
+                // console directly, which is the action an organizer wants.
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  onClick={() => navigate(`/admin/referee/${match.id}`)}
+                />
               ))}
             </div>
           </motion.div>
@@ -185,7 +191,14 @@ export function AdminDashboard() {
           {upcomingMatches.length > 0 ? (
             <div className="space-y-4">
               {upcomingMatches.map(match => (
-                <MatchCard key={match.id} match={match} onClick={() => navigate(`/match/${match.id}`)} />
+                // Upcoming matches jump straight into the referee console so
+                // an organizer can start live-scoring without going through
+                // /admin/matches first.
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  onClick={() => navigate(`/admin/referee/${match.id}`)}
+                />
               ))}
             </div>
           ) : (
@@ -220,7 +233,7 @@ export function AdminDashboard() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.7 + index * 0.1 }}
                   whileHover={{ y: -4 }}
-                  onClick={() => navigate(`/tournament/${tournament.id}`)}
+                  onClick={() => navigate(`/admin/tournaments/${tournament.id}`)}
                   className="bg-white border-2 p-6 rounded-sm cursor-pointer transition-all group shadow-sm hover:shadow-md"
                   style={{ borderColor: 'rgba(0, 0, 0, 0.1)' }}
                 >
