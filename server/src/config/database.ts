@@ -59,6 +59,28 @@ export async function checkConnection(): Promise<boolean> {
   }
 }
 
+/**
+ * Locate the directory with migration .sql files.
+ *
+ * When compiled with `tsc`, __dirname is `dist/config`, so the expected path
+ * is `dist/db/migrations`. The build script (`npm run copy-sql`) copies the
+ * SQL files into `dist/db/` so this works.
+ *
+ * But if the copy step didn't run (old build, running via ts-node, etc.) we
+ * fall back to looking in the source tree at `src/db/migrations`. This keeps
+ * dev mode working and makes the server resilient to misconfigured builds.
+ */
+function resolveDbAssetDir(relative: string): string | null {
+  const candidates = [
+    path.join(__dirname, '..', 'db', relative),          // dist/db/...  or  src/db/... (ts-node)
+    path.join(__dirname, '..', '..', 'src', 'db', relative), // dist → src fallback
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
 export async function runMigrations(): Promise<void> {
   const db = getPool();
 
@@ -71,13 +93,12 @@ export async function runMigrations(): Promise<void> {
     )
   `);
 
-  // Read migration files
-  const migrationsDir = path.join(__dirname, '..', 'db', 'migrations');
-
-  if (!fs.existsSync(migrationsDir)) {
-    console.log('No se encontró directorio de migraciones.');
+  const migrationsDir = resolveDbAssetDir('migrations');
+  if (!migrationsDir) {
+    console.log('No se encontró directorio de migraciones. Saltando.');
     return;
   }
+  console.log(`Leyendo migraciones de: ${migrationsDir}`);
 
   const files = fs.readdirSync(migrationsDir)
     .filter(f => f.endsWith('.sql'))
@@ -112,8 +133,8 @@ export async function runMigrations(): Promise<void> {
   }
 
   // Run seed if it exists and hasn't been run
-  const seedPath = path.join(__dirname, '..', 'db', 'seed.sql');
-  if (fs.existsSync(seedPath)) {
+  const seedPath = resolveDbAssetDir('seed.sql');
+  if (seedPath) {
     const seedResult = await db.query(
       "SELECT id FROM _migrations WHERE name = 'seed.sql'"
     );

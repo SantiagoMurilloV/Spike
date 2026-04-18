@@ -5,7 +5,8 @@
   "description": "SPK-CUP Tournament App - Express.js Backend",
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
-    "build": "tsc",
+    "build": "tsc && npm run copy-sql",
+    "copy-sql": "node -e \"const fs=require('fs'),path=require('path');const src=path.join('src','db'),dst=path.join('dist','db');if(fs.existsSync(dst))fs.rmSync(dst,{recursive:true,force:true});fs.cpSync(src,dst,{recursive:true});console.log('SQL migrations copied to dist/db');\"",
     "test": "vitest --run",
     "start": "node dist/index.js"
   },
