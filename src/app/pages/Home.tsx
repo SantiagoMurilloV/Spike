@@ -1,11 +1,13 @@
 import { motion, useScroll, useTransform } from 'motion/react';
-import { Trophy, Users, Calendar, ArrowRight, Target, TrendingUp, Award, Search, RefreshCw } from 'lucide-react';
+import { Trophy, Users, ArrowRight, Search, RefreshCw } from 'lucide-react';
 import { TournamentCard } from '../components/TournamentCard';
+import { MatchCard } from '../components/MatchCard';
 import { TournamentCardSkeleton } from '../components/SkeletonLoaders';
+import { LiveBadge } from '../components/LiveBadge';
 import { useData } from '../context/DataContext';
 import { useNavigate } from 'react-router';
 import spkLogo from '../../imports/spk-cup-logo-v4-1.svg';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 
 export function Home() {
@@ -41,6 +43,28 @@ export function Home() {
     ongoing: tournaments.filter(t => t.status === 'ongoing').length,
     upcoming: tournaments.filter(t => t.status === 'upcoming').length,
     completed: tournaments.filter(t => t.status === 'completed').length,
+  };
+
+  // Live matches across all tournaments — what "PARTIDOS EN VIVO" shows.
+  const liveMatches = useMemo(
+    () => matches.filter((m) => m.status === 'live'),
+    [matches],
+  );
+
+  /**
+   * Scrolls the viewport to the live-matches section if any match is live;
+   * otherwise falls back to the tournaments grid so the CTA never ends up
+   * being a no-op.
+   */
+  const scrollToLiveOrTournaments = () => {
+    const target = document.getElementById(
+      liveMatches.length > 0 ? 'live-matches' : 'tournaments',
+    );
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
+    }
   };
 
   return (
@@ -217,10 +241,30 @@ export function Home() {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.98 }}
-                  className="flex items-center gap-3 px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white text-lg font-bold rounded-sm hover:bg-white/20 transition-colors"
+                  onClick={scrollToLiveOrTournaments}
+                  className="relative flex items-center gap-3 px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white text-lg font-bold rounded-sm hover:bg-white/20 transition-colors"
                   style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                  aria-label={
+                    liveMatches.length > 0
+                      ? `Ver los ${liveMatches.length} partidos en vivo`
+                      : 'Ver todos los torneos'
+                  }
                 >
-                  RESULTADOS EN VIVO
+                  {liveMatches.length > 0 && (
+                    <span
+                      className="w-2.5 h-2.5 bg-spk-red rounded-full spk-live-dot"
+                      aria-hidden="true"
+                    />
+                  )}
+                  PARTIDOS EN VIVO
+                  {liveMatches.length > 0 && (
+                    <span
+                      className="ml-1 bg-spk-red text-white text-[11px] font-bold px-2 py-0.5 rounded-sm tabular-nums"
+                      style={{ letterSpacing: '0.08em' }}
+                    >
+                      {liveMatches.length}
+                    </span>
+                  )}
                 </motion.button>
               </motion.div>
 
@@ -275,8 +319,67 @@ export function Home() {
         </motion.div>
       </section>
 
+      {/* Live Matches — only rendered when there's live action, anchored so
+          the hero CTA can scroll here. Uses the dark broadcast treatment to
+          stand apart from the white tournaments section below. */}
+      {liveMatches.length > 0 && (
+        <section
+          id="live-matches"
+          className="bg-spk-black text-white py-16 md:py-24 scroll-mt-20"
+        >
+          <div className="max-w-[1600px] mx-auto px-6 md:px-12">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="flex items-end justify-between mb-10 flex-wrap gap-4"
+            >
+              <div>
+                <div className="flex items-center gap-3 mb-3">
+                  <LiveBadge size="md" />
+                  <span
+                    className="text-xs text-white/60 uppercase"
+                    style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.12em' }}
+                  >
+                    {liveMatches.length} {liveMatches.length === 1 ? 'partido' : 'partidos'} ahora
+                  </span>
+                </div>
+                <h2
+                  className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter uppercase"
+                  style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                >
+                  Partidos en vivo
+                </h2>
+                <div className="w-20 h-1 bg-spk-red mt-4" />
+              </div>
+              <p className="text-white/60 text-sm max-w-md">
+                Sigue el marcador en tiempo real. Toca un partido para ver los sets y más detalles.
+              </p>
+            </motion.div>
+
+            <div className="grid gap-5 md:gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {liveMatches.map((match, index) => (
+                <motion.div
+                  key={match.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.08, duration: 0.4 }}
+                >
+                  <MatchCard
+                    match={match}
+                    onClick={() => navigate(`/match/${match.id}`)}
+                  />
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Main Content Section */}
-      <section className="bg-white text-black py-20 md:py-32">
+      <section id="tournaments" className="bg-white text-black py-20 md:py-32 scroll-mt-20">
         <div className="max-w-[1600px] mx-auto px-6 md:px-12">
           {/* Section Header */}
           <motion.div
