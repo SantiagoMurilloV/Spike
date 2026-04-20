@@ -1,5 +1,6 @@
 import { motion, useScroll, useTransform } from 'motion/react';
-import { Trophy, Users, ArrowRight, Search, RefreshCw } from 'lucide-react';
+import { Trophy, Users, ArrowRight, Search, RefreshCw, LogIn, UserPlus } from 'lucide-react';
+import { toast } from 'sonner';
 import { TournamentCard } from '../components/TournamentCard';
 import { MatchCard } from '../components/MatchCard';
 import { TeamAvatar } from '../components/TeamAvatar';
@@ -174,16 +175,37 @@ export function Home() {
               </div>
             </motion.div>
 
-            {/* Admin Access */}
-            <motion.button
-              onClick={() => navigate('/login')}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.98 }}
-              className="flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-sm text-sm font-medium hover:bg-white/90 transition-colors"
-            >
-              <Users className="w-4 h-4" />
-              <span className="hidden md:inline">Admin</span>
-            </motion.button>
+            {/* Auth actions — primary "Iniciar sesión" links to /login
+                (which is also the admin gate), secondary "Registrarse" is
+                a placeholder until the public-registration flow is built. */}
+            <div className="flex items-center gap-2">
+              <motion.button
+                type="button"
+                onClick={() =>
+                  toast('Registro disponible pronto', {
+                    description: 'Estamos terminando el flujo público. Por ahora contactá al club.',
+                  })
+                }
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-transparent border border-white/20 text-white text-xs sm:text-sm font-bold uppercase tracking-[0.08em] rounded-sm hover:bg-white/5 hover:border-white/40 transition-colors"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+              >
+                <UserPlus className="w-4 h-4" aria-hidden="true" />
+                <span className="hidden sm:inline">Registrarse</span>
+              </motion.button>
+              <motion.button
+                type="button"
+                onClick={() => navigate('/login')}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-white text-black text-xs sm:text-sm font-bold uppercase tracking-[0.08em] rounded-sm hover:bg-white/90 transition-colors"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+              >
+                <LogIn className="w-4 h-4" aria-hidden="true" />
+                <span className="hidden sm:inline">Iniciar sesión</span>
+              </motion.button>
+            </div>
           </div>
         </div>
       </motion.header>
