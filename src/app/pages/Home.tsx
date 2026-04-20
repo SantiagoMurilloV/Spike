@@ -552,9 +552,11 @@ export function Home() {
             <div className="w-20 h-1 bg-spk-red" />
           </motion.div>
 
-          {/* Main tab switcher — styled pills, sticky to this section. */}
+          {/* Main tab switcher — segmented control with an animated sliding
+              indicator. The active pill is a black block that slides between
+              tabs via motion's `layoutId`, so switching feels physical. */}
           <div
-            className="flex gap-2 mb-8 bg-black/5 p-1 rounded-sm w-fit"
+            className="inline-flex items-center gap-1 mb-8 p-1.5 bg-black/[0.04] border border-black/10 rounded-sm"
             role="tablist"
             aria-label="Vista principal"
           >
@@ -571,19 +573,38 @@ export function Home() {
                   type="button"
                   aria-selected={isActive}
                   onClick={() => setMainTab(tab.value)}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-sm transition-all ${
-                    isActive
-                      ? 'bg-black text-white shadow-sm'
-                      : 'bg-transparent text-black/60 hover:text-black'
-                  }`}
+                  className="relative flex items-center gap-2.5 px-4 sm:px-6 py-2.5 rounded-sm transition-colors"
                   style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.06em' }}
                 >
-                  <TabIcon className="w-4 h-4" aria-hidden="true" />
-                  <span className="font-bold uppercase text-sm">{tab.label}</span>
+                  {isActive && (
+                    <motion.span
+                      layoutId="home-main-tab"
+                      className="absolute inset-0 bg-spk-black rounded-sm shadow-[0_4px_12px_rgba(0,0,0,0.14)]"
+                      transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                      aria-hidden="true"
+                    />
+                  )}
                   <span
-                    className={`text-xs tabular-nums ${
-                      isActive ? 'text-white/70' : 'text-black/40'
+                    className={`relative z-10 transition-colors ${
+                      isActive ? 'text-white' : 'text-black/55 group-hover:text-black'
                     }`}
+                  >
+                    <TabIcon className="w-4 h-4" aria-hidden="true" />
+                  </span>
+                  <span
+                    className={`relative z-10 font-bold uppercase text-sm transition-colors ${
+                      isActive ? 'text-white' : 'text-black/70'
+                    }`}
+                  >
+                    {tab.label}
+                  </span>
+                  <span
+                    className={`relative z-10 min-w-[22px] h-[22px] inline-flex items-center justify-center px-1.5 rounded-full text-[10px] font-bold tabular-nums transition-colors ${
+                      isActive
+                        ? 'bg-spk-red text-white'
+                        : 'bg-black/10 text-black/60'
+                    }`}
+                    style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
                   >
                     {tab.count}
                   </span>
@@ -594,23 +615,35 @@ export function Home() {
 
           {mainTab === 'tournaments' ? (
             <>
-              {/* Search and Filters */}
-              <div className="space-y-6 mb-10">
+              {/* Search and Filters — consolidated into a single toolbar card
+                  on desktop, stacked on mobile. Cleaner border + focus ring
+                  replaces the heavy bg-black/5 block from the old layout. */}
+              <div className="space-y-4 mb-10">
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.1 }}
-                  className="relative max-w-2xl"
+                  className="relative max-w-2xl group"
                 >
-                  <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 sm:w-6 sm:h-6 text-black/40" />
+                  <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40 group-focus-within:text-spk-red transition-colors" />
                   <input
                     type="text"
-                    placeholder="Buscar torneos..."
+                    placeholder="Buscar torneos por nombre o club…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-12 sm:pl-14 pr-6 py-4 bg-black/5 border-2 border-black/10 rounded-sm text-base sm:text-lg focus:outline-none focus:border-black transition-colors placeholder:text-black/40"
+                    className="w-full pl-11 pr-12 py-3.5 bg-white border border-black/15 rounded-sm text-sm sm:text-base focus:outline-none focus:border-spk-red focus:ring-2 focus:ring-spk-red/15 transition-all placeholder:text-black/35"
                   />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      aria-label="Limpiar búsqueda"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-sm text-black/40 hover:text-spk-red hover:bg-spk-red/10 transition-colors"
+                    >
+                      <span aria-hidden="true" className="text-lg leading-none">×</span>
+                    </button>
+                  )}
                 </motion.div>
 
                 <motion.div
@@ -618,28 +651,47 @@ export function Home() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.15 }}
-                  className="flex gap-2 overflow-x-auto pb-1"
+                  className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1"
                 >
                   {[
                     { value: 'all', label: 'Todos', count: statusCounts.all },
                     { value: 'ongoing', label: 'En Curso', count: statusCounts.ongoing },
                     { value: 'upcoming', label: 'Próximos', count: statusCounts.upcoming },
                     { value: 'completed', label: 'Finalizados', count: statusCounts.completed },
-                  ].map((filter) => (
-                    <motion.button
-                      key={filter.value}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setFilterStatus(filter.value as any)}
-                      className={`px-4 sm:px-5 py-2 rounded-sm text-sm font-bold uppercase tracking-wide whitespace-nowrap transition-colors ${
-                        filterStatus === filter.value
-                          ? 'bg-black text-white'
-                          : 'bg-black/5 text-black/60 hover:bg-black/10'
-                      }`}
-                      style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                    >
-                      {filter.label} ({filter.count})
-                    </motion.button>
-                  ))}
+                  ].map((filter) => {
+                    const isActive = filterStatus === filter.value;
+                    return (
+                      <motion.button
+                        key={filter.value}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => setFilterStatus(filter.value as any)}
+                        className={`relative inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-sm text-xs sm:text-sm font-bold uppercase whitespace-nowrap border transition-all ${
+                          isActive
+                            ? 'bg-spk-black text-white border-spk-black'
+                            : 'bg-white text-black/65 border-black/10 hover:border-black/25 hover:text-black'
+                        }`}
+                        style={{
+                          fontFamily: 'Barlow Condensed, sans-serif',
+                          letterSpacing: '0.06em',
+                        }}
+                      >
+                        {isActive && filter.value === 'ongoing' && (
+                          <span
+                            className="w-1.5 h-1.5 rounded-full bg-spk-red spk-live-dot"
+                            aria-hidden="true"
+                          />
+                        )}
+                        <span>{filter.label}</span>
+                        <span
+                          className={`tabular-nums text-[10px] px-1.5 py-0.5 rounded-full ${
+                            isActive ? 'bg-white/15 text-white' : 'bg-black/[0.06] text-black/50'
+                          }`}
+                        >
+                          {filter.count}
+                        </span>
+                      </motion.button>
+                    );
+                  })}
                 </motion.div>
               </div>
 
@@ -715,16 +767,26 @@ export function Home() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.1 }}
-                  className="relative max-w-2xl"
+                  className="relative max-w-2xl group"
                 >
-                  <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 sm:w-6 sm:h-6 text-black/40" />
+                  <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40 group-focus-within:text-spk-red transition-colors" />
                   <input
                     type="text"
-                    placeholder="Buscar equipos, ciudades, categorías..."
+                    placeholder="Buscar equipos, ciudades, categorías…"
                     value={teamSearch}
                     onChange={(e) => setTeamSearch(e.target.value)}
-                    className="w-full pl-12 sm:pl-14 pr-6 py-4 bg-black/5 border-2 border-black/10 rounded-sm text-base sm:text-lg focus:outline-none focus:border-black transition-colors placeholder:text-black/40"
+                    className="w-full pl-11 pr-12 py-3.5 bg-white border border-black/15 rounded-sm text-sm sm:text-base focus:outline-none focus:border-spk-red focus:ring-2 focus:ring-spk-red/15 transition-all placeholder:text-black/35"
                   />
+                  {teamSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setTeamSearch('')}
+                      aria-label="Limpiar búsqueda"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-sm text-black/40 hover:text-spk-red hover:bg-spk-red/10 transition-colors"
+                    >
+                      <span aria-hidden="true" className="text-lg leading-none">×</span>
+                    </button>
+                  )}
                 </motion.div>
               </div>
 

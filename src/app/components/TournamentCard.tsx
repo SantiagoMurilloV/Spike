@@ -9,13 +9,6 @@ interface TournamentCardProps {
   onClick?: () => void;
 }
 
-const FORMAT_LABELS: Record<Tournament['format'], string> = {
-  groups: 'Fase de grupos',
-  knockout: 'Eliminación directa',
-  'groups+knockout': 'Grupos + Eliminación',
-  league: 'Liga',
-};
-
 /**
  * TournamentCard — hero card for tournament lists.
  *
@@ -37,7 +30,7 @@ export function TournamentCard({ tournament, onClick }: TournamentCardProps) {
 
   return (
     <motion.div
-      className="group relative bg-white overflow-hidden cursor-pointer"
+      className="group relative bg-white overflow-hidden cursor-pointer flex flex-col"
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -53,27 +46,42 @@ export function TournamentCard({ tournament, onClick }: TournamentCardProps) {
         boxShadow: 'var(--shadow-card)',
       }}
       whileHover={{
-        y: -4,
+        y: -6,
         boxShadow: 'var(--shadow-elevated)' as unknown as string,
       }}
-      transition={{ duration: 0.2 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
     >
+      {/* Left red accent rail — slides in on hover (or stays on for live) */}
+      <motion.div
+        className="absolute left-0 top-0 bottom-0 w-[3px] bg-spk-red z-20"
+        style={{ originY: 0 }}
+        initial={{ scaleY: 0 }}
+        whileHover={{ scaleY: 1 }}
+        animate={isLive ? { scaleY: 1 } : undefined}
+        transition={{ duration: 0.3, ease: 'easeOut' }}
+        aria-hidden="true"
+      />
+
       {/* ── Image / banner area ──────────────────────────────── */}
-      <div
-        className="spk-tcard-image relative h-44 sm:h-52 overflow-hidden"
-        style={
-          tournament.coverImage
-            ? {
-                background: `linear-gradient(to top, rgba(0,0,0,0.75), rgba(0,0,0,0.25)), url(${tournament.coverImage}) center/cover`,
-              }
-            : {
-                background: 'linear-gradient(135deg, #003087 0%, #0F0F14 100%)',
-              }
-        }
-      >
+      <div className="spk-tcard-image relative h-48 sm:h-56 overflow-hidden">
+        {/* Background image or gradient — scales on hover for a subtle
+            "zoom into the action" effect. */}
+        <motion.div
+          className="absolute inset-0"
+          style={
+            tournament.coverImage
+              ? { background: `url(${tournament.coverImage}) center/cover` }
+              : { background: 'linear-gradient(135deg, #003087 0%, #0F0F14 100%)' }
+          }
+          whileHover={{ scale: 1.06 }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+          aria-hidden="true"
+        />
+
+        {/* Diagonal red pattern on the gradient fallback */}
         {!tournament.coverImage && (
           <div
-            className="absolute inset-0 opacity-[0.18]"
+            className="absolute inset-0 opacity-[0.18] pointer-events-none"
             aria-hidden="true"
             style={{
               backgroundImage:
@@ -82,28 +90,35 @@ export function TournamentCard({ tournament, onClick }: TournamentCardProps) {
           />
         )}
 
-        {/* Status badges */}
-        <div className="absolute top-3 left-3 flex items-center gap-1.5">
+        {/* Dark gradient overlay — ensures title contrast on any image */}
+        <div
+          className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/10"
+          aria-hidden="true"
+        />
+
+        {/* Status + sport badges — top left */}
+        <div className="absolute top-3 left-3 flex items-center gap-1.5 z-10">
           {isLive && <LiveBadge size="sm" />}
           {isUpcoming && (
             <span
-              className="inline-block px-2.5 py-1 bg-black text-white rounded-sm text-[11px] font-bold uppercase"
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-white text-black rounded-sm text-[11px] font-bold uppercase"
               style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
             >
-              PRÓXIMO
+              <span className="w-1 h-1 rounded-full bg-black" aria-hidden="true" />
+              Próximo
             </span>
           )}
           {isCompleted && (
             <span
-              className="inline-block px-2.5 py-1 bg-black/60 text-white rounded-sm text-[11px] font-bold uppercase"
+              className="inline-block px-2.5 py-1 bg-black/70 text-white/90 border border-white/10 rounded-sm text-[11px] font-bold uppercase"
               style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
             >
-              FINALIZADO
+              Finalizado
             </span>
           )}
           {tournament.sport && (
             <span
-              className="inline-block px-2.5 py-1 bg-white/10 backdrop-blur text-white border border-white/20 rounded-sm text-[11px] font-bold uppercase"
+              className="inline-block px-2.5 py-1 bg-white/10 backdrop-blur-md text-white border border-white/20 rounded-sm text-[11px] font-bold uppercase"
               style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
             >
               {tournament.sport}
@@ -111,10 +126,28 @@ export function TournamentCard({ tournament, onClick }: TournamentCardProps) {
           )}
         </div>
 
-        {/* Title over image */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5">
+        {/* Hover arrow in top-right — hints at clickability */}
+        <motion.div
+          className="absolute top-3 right-3 w-10 h-10 bg-white/10 backdrop-blur-md border border-white/20 rounded-sm flex items-center justify-center z-10"
+          initial={{ opacity: 0, scale: 0.8 }}
+          whileHover={{ opacity: 1, scale: 1 }}
+          aria-hidden="true"
+        >
+          <ArrowRight className="w-4 h-4 text-white" />
+        </motion.div>
+
+        {/* Title block — bottom-aligned, strong type hierarchy */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 z-10">
+          {tournament.club && (
+            <p
+              className="text-[10px] sm:text-xs text-white/75 uppercase mb-1.5 tracking-[0.14em] truncate"
+              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+            >
+              {tournament.club}
+            </p>
+          )}
           <h3
-            className="spk-tcard-title text-2xl sm:text-3xl font-bold text-white leading-tight uppercase"
+            className="spk-tcard-title text-xl sm:text-2xl font-bold text-white leading-[0.95] uppercase"
             style={{
               fontFamily: 'Barlow Condensed, sans-serif',
               letterSpacing: '-0.02em',
@@ -122,57 +155,91 @@ export function TournamentCard({ tournament, onClick }: TournamentCardProps) {
           >
             {tournament.name}
           </h3>
-          {tournament.club && (
-            <p className="text-xs text-white/70 mt-1 truncate" style={{ fontFamily: 'Inter, sans-serif' }}>
-              {tournament.club}
-            </p>
-          )}
         </div>
       </div>
 
-      {/* ── Meta + CTA ───────────────────────────────────────── */}
-      <div className="spk-tcard-body p-4 sm:p-5">
-        <div className="spk-tcard-meta grid grid-cols-2 gap-2.5 text-xs text-black/70 mb-4">
-          <div className="inline-flex items-center gap-1.5 min-w-0">
-            <Calendar className="w-3.5 h-3.5 text-black/40 flex-shrink-0" aria-hidden="true" />
-            <span className="truncate">{dateLabel}</span>
-          </div>
-          <div className="inline-flex items-center gap-1.5 min-w-0">
-            <Users className="w-3.5 h-3.5 text-black/40 flex-shrink-0" aria-hidden="true" />
-            <span className="truncate">{tournament.teamsCount} equipos</span>
-          </div>
-          <div className="inline-flex items-center gap-1.5 min-w-0">
-            <MapPin className="w-3.5 h-3.5 text-black/40 flex-shrink-0" aria-hidden="true" />
-            <span className="truncate">{courtsLabel}</span>
-          </div>
-          <div className="inline-flex items-center gap-1.5 min-w-0">
-            <Trophy className="w-3.5 h-3.5 text-black/40 flex-shrink-0" aria-hidden="true" />
-            <span className="truncate">{FORMAT_LABELS[tournament.format]}</span>
-          </div>
+      {/* ── Meta row + CTA ───────────────────────────────────── */}
+      <div className="spk-tcard-body flex-1 flex flex-col p-4 sm:p-5 gap-4">
+        {/* Meta stats — compact horizontal row with column dividers. */}
+        <div className="spk-tcard-meta grid grid-cols-4 divide-x divide-black/10 text-center">
+          <Stat icon={Calendar} value={formatShortDate(tournament.startDate)} label="Inicia" />
+          <Stat icon={Users} value={`${tournament.teamsCount}`} label="Equipos" />
+          <Stat icon={MapPin} value={`${tournament.courts.length}`} label={tournament.courts.length === 1 ? 'Cancha' : 'Canchas'} />
+          <Stat icon={Trophy} value={shortFormat(tournament.format)} label="Formato" />
         </div>
 
-        {/* Full-width CTA — switches to red on hover */}
+        {/* Full-width CTA — arrow slides on hover, bg shifts to red */}
         <button
           type="button"
-          className="w-full inline-flex items-center justify-center gap-2 bg-black text-white px-4 py-2.5 rounded-sm font-bold uppercase text-sm transition-colors group-hover:bg-spk-red"
-          style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.05em' }}
+          className="relative overflow-hidden w-full inline-flex items-center justify-center gap-2 bg-spk-black text-white px-4 py-3 rounded-sm font-bold uppercase text-sm transition-colors group-hover:bg-spk-red"
+          style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
           aria-label={`Ver torneo ${tournament.name}`}
         >
-          Ver torneo
-          <ArrowRight className="w-4 h-4" aria-hidden="true" />
+          <span className="relative z-10">Ver torneo</span>
+          <motion.span
+            className="relative z-10 inline-flex"
+            initial={{ x: 0 }}
+            animate={{ x: 0 }}
+            whileHover={{ x: 3 }}
+          >
+            <ArrowRight className="w-4 h-4" aria-hidden="true" />
+          </motion.span>
         </button>
-      </div>
 
-      {/* Bottom red accent — reveals on hover */}
-      <motion.div
-        className="absolute bottom-0 left-0 right-0 h-[3px] bg-spk-red"
-        style={{ originX: 0 }}
-        initial={{ scaleX: 0 }}
-        whileHover={{ scaleX: 1 }}
-        animate={isLive ? { scaleX: 1 } : undefined}
-        transition={{ duration: 0.3 }}
-        aria-hidden="true"
-      />
+        {/* Full-date subline as helper text */}
+        <p
+          className="-mt-2 text-[10px] text-black/40 text-center uppercase tracking-[0.14em]"
+          style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+        >
+          {dateLabel}
+        </p>
+      </div>
     </motion.div>
   );
+}
+
+// ── Helpers ─────────────────────────────────────────────────────
+
+function Stat({
+  icon: Icon,
+  value,
+  label,
+}: {
+  icon: typeof Calendar;
+  value: string;
+  label: string;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center px-1 py-1 min-w-0">
+      <Icon className="w-3.5 h-3.5 text-black/35 mb-1" aria-hidden="true" />
+      <span
+        className="text-sm sm:text-base font-bold text-black/90 truncate max-w-full"
+        style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.01em' }}
+      >
+        {value}
+      </span>
+      <span
+        className="text-[9px] text-black/40 uppercase tracking-[0.12em] truncate max-w-full"
+        style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+/** Short-form format labels so they fit inside the compact stat cell. */
+function shortFormat(format: Tournament['format']): string {
+  switch (format) {
+    case 'groups':
+      return 'Grupos';
+    case 'knockout':
+      return 'Direct.';
+    case 'groups+knockout':
+      return 'Mixto';
+    case 'league':
+      return 'Liga';
+    default:
+      return '—';
+  }
 }
