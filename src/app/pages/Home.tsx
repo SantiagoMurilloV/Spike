@@ -887,7 +887,7 @@ export function Home() {
               className="text-[11px] uppercase tracking-[0.14em] text-white/35"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
-              &copy; 2026 Santiago Murillo Valencia · All Rights Reserved
+              &copy; 2026 · All Rights Reserved to the Developer
             </div>
           </div>
         </div>
