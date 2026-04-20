@@ -819,21 +819,24 @@ export function Home() {
               </div>
             </div>
 
-            {/* Developer signature — email link that wraps the whole card
-                so the whole thing is tappable. */}
+            {/* Developer signature — no card, no box. Just the `</>` glyph
+                next to the name, a thin vertical red rule between them and
+                the kicker beneath. The whole block is a mailto link and the
+                name brightens subtly on hover. */}
             <a
               href="mailto:santiagomurilloval@gmail.com"
-              className="group inline-flex items-center gap-3 px-4 py-2.5 bg-white/5 border border-white/10 hover:border-spk-red/60 rounded-sm transition-colors"
+              className="group inline-flex items-center gap-3"
             >
               <span
-                className="font-mono text-lg font-bold text-spk-red group-hover:text-spk-red-dark transition-colors"
+                className="font-mono text-base text-spk-red/85 group-hover:text-spk-red transition-colors"
                 aria-hidden="true"
               >
                 &lt;/&gt;
               </span>
-              <div className="flex flex-col leading-tight">
+              <span className="w-px h-8 bg-white/10" aria-hidden="true" />
+              <span className="flex flex-col leading-tight">
                 <span
-                  className="text-sm font-bold text-white"
+                  className="text-sm text-white/80 group-hover:text-white transition-colors"
                   style={{
                     fontFamily: 'Barlow Condensed, sans-serif',
                     letterSpacing: '0.02em',
@@ -842,15 +845,15 @@ export function Home() {
                   Santiago Murillo Valencia
                 </span>
                 <span
-                  className="text-[10px] text-white/50 uppercase"
+                  className="text-[10px] text-white/40 uppercase"
                   style={{
                     fontFamily: 'Barlow Condensed, sans-serif',
-                    letterSpacing: '0.18em',
+                    letterSpacing: '0.22em',
                   }}
                 >
                   Full-Stack Developer
                 </span>
-              </div>
+              </span>
             </a>
           </div>
 
