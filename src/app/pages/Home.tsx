@@ -1,20 +1,42 @@
-import { motion } from 'motion/react';
+import { motion, useScroll, useTransform, AnimatePresence } from 'motion/react';
 import { Trophy, Users, ArrowRight, Search, RefreshCw } from 'lucide-react';
 import { TournamentCard } from '../components/TournamentCard';
 import { MatchCard } from '../components/MatchCard';
 import { TeamAvatar } from '../components/TeamAvatar';
 import { TournamentCardSkeleton } from '../components/SkeletonLoaders';
 import { LiveBadge } from '../components/LiveBadge';
-import { SpikeHero3D } from '../components/SpikeHero3D';
 import { useData } from '../context/DataContext';
 import { useNavigate, useSearchParams } from 'react-router';
 import spkLogo from '../../imports/spk-cup-logo-v4-1.svg';
 import { useState, useEffect, useMemo } from 'react';
+import { ImageWithFallback } from '../components/figma/ImageWithFallback';
+
+/**
+ * Hero slideshow — crossfaded volleyball action shots with a slow Ken-Burns
+ * zoom so the background feels like it's moving with the game. Each slide
+ * holds for ~5.5s with a 1.4s crossfade, and the zoom is linear-timed to
+ * the slide duration so the reset happens while the image is fully faded
+ * out (no pop).
+ *
+ * All URLs are landscape Unsplash photos tagged volleyball / action.
+ * ImageWithFallback catches any 404 so a broken image just becomes the
+ * gradient background instead of a white flash.
+ */
+const HERO_IMAGES = [
+  'https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?auto=format&fit=crop&w=1920&q=80',
+  'https://images.unsplash.com/photo-1534158914592-062992fbe900?auto=format&fit=crop&w=1920&q=80',
+  'https://images.unsplash.com/photo-1599474918935-1d1fc5de9ab8?auto=format&fit=crop&w=1920&q=80',
+  'https://images.unsplash.com/photo-1593341646782-e0b495cff86d?auto=format&fit=crop&w=1920&q=80',
+  'https://images.unsplash.com/photo-1765109260914-de67ccbbcab3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1920',
+];
+
+const HERO_SLIDE_MS = 5500;
 
 export function Home() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { tournaments, teams, matches, loading, error, refreshTournaments } = useData();
+  const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'ongoing' | 'upcoming' | 'completed'>('all');
@@ -22,15 +44,49 @@ export function Home() {
   // Main directory view: toggles the big white section between the tournaments
   // list and the teams directory. Persisted via ?view=teams for deep links.
   const [mainTab, setMainTab] = useState<'tournaments' | 'teams'>('tournaments');
+  const [heroIndex, setHeroIndex] = useState(0);
+  
+  const heroOpacity = useTransform(scrollY, [0, 300], [1, 0]);
+  const heroScale = useTransform(scrollY, [0, 300], [1, 1.2]);
+  const heroY = useTransform(scrollY, [0, 300], [0, 100]);
 
-  // Handle scroll — only used to tint the floating header when the user
-  // has scrolled past the hero.
+  // Handle scroll
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 50);
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Auto-advance the hero slideshow. Paused automatically when the tab is
+  // hidden so we don't burn cycles / animations while backgrounded.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    // Respect users who ask for less motion — freeze on the first slide.
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    let id: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      id = setInterval(() => {
+        setHeroIndex((i) => (i + 1) % HERO_IMAGES.length);
+      }, HERO_SLIDE_MS);
+    };
+    const stop = () => {
+      if (id) {
+        clearInterval(id);
+        id = null;
+      }
+    };
+    start();
+    const onVisibility = () => {
+      if (document.hidden) stop();
+      else if (!id) start();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   // Deep-link handler:
@@ -177,19 +233,244 @@ export function Home() {
       </motion.header>
 
       {/* Hero Section - Full Screen slideshow */}
-      {/* Hero — 3D-styled scene with a looped serve/spike simulation and
-          a parallaxed copy block. Shares the black stage with the rest of
-          the page so the handoff to content stays continuous. */}
-      <SpikeHero3D
-        liveCount={statusCounts.ongoing}
-        tournamentCount={statusCounts.all}
-        teamCount={teams.length}
-        onPrimaryAction={() => {
-          const el = document.getElementById('directory');
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }}
-        onSecondaryAction={scrollToLiveOrTournaments}
-      />
+      <section className="relative h-screen overflow-hidden">
+        {/* Slideshow stack with parallax. Each image cross-fades and does a
+            slow Ken-Burns zoom so the background feels alive. Fixed black
+            gradient + animated brand-color wash sit on top so the text stays
+            readable regardless of which shot is current. */}
+        <motion.div
+          style={{ scale: heroScale, y: heroY }}
+          className="absolute inset-0"
+        >
+          <div className="relative w-full h-full bg-spk-black">
+            <AnimatePresence>
+              {HERO_IMAGES.map((src, idx) =>
+                idx === heroIndex ? (
+                  <motion.div
+                    key={src}
+                    className="absolute inset-0"
+                    initial={{ opacity: 0, scale: 1.02 }}
+                    animate={{ opacity: 1, scale: 1.12 }}
+                    exit={{ opacity: 0, scale: 1.18 }}
+                    transition={{
+                      opacity: { duration: 1.4, ease: 'easeInOut' },
+                      scale: { duration: (HERO_SLIDE_MS + 1400) / 1000, ease: 'linear' },
+                    }}
+                  >
+                    <ImageWithFallback
+                      src={src}
+                      alt=""
+                      className="w-full h-full object-cover opacity-65"
+                    />
+                  </motion.div>
+                ) : null,
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Fixed dark gradient — keeps hero copy readable on any slide */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black z-10" />
+
+          {/* Animated brand-color wash */}
+          <motion.div
+            className="absolute inset-0 z-10"
+            style={{
+              background:
+                'linear-gradient(to right, rgba(227, 30, 36, 0.22), transparent, rgba(0, 48, 135, 0.22))',
+            }}
+            animate={{ opacity: [0.3, 0.55, 0.3] }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        </motion.div>
+
+        {/* Slide indicator — tappable dots so spectators can jump to any shot.
+            Positioned bottom-right on desktop, bottom-center on mobile. */}
+        <div className="absolute bottom-24 md:bottom-8 right-1/2 translate-x-1/2 md:right-12 md:translate-x-0 z-30 flex items-center gap-2">
+          {HERO_IMAGES.map((_, idx) => {
+            const isActive = idx === heroIndex;
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setHeroIndex(idx)}
+                aria-label={`Mostrar imagen ${idx + 1} de ${HERO_IMAGES.length}`}
+                className="group relative h-1.5 overflow-hidden rounded-full bg-white/20 hover:bg-white/40 transition-colors"
+                style={{ width: isActive ? 34 : 14 }}
+              >
+                {isActive && (
+                  <motion.span
+                    className="absolute inset-y-0 left-0 bg-spk-red"
+                    initial={{ width: '0%' }}
+                    animate={{ width: '100%' }}
+                    transition={{ duration: HERO_SLIDE_MS / 1000, ease: 'linear' }}
+                    key={`progress-${idx}-${heroIndex}`}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Hero Content */}
+        <motion.div
+          style={{ opacity: heroOpacity }}
+          className="relative z-20 h-full flex items-center"
+        >
+          <div className="max-w-[1600px] mx-auto px-6 md:px-12 w-full">
+            <div className="max-w-4xl">
+              {/* Small Badge */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full mb-8"
+              >
+                <motion.div
+                  className="w-2 h-2 bg-spk-red rounded-full"
+                  animate={{
+                    scale: [1, 1.3, 1],
+                    opacity: [1, 0.5, 1],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                  }}
+                />
+                <span className="text-sm font-medium tracking-wide">
+                  {statusCounts.ongoing} TORNEOS EN VIVO
+                </span>
+              </motion.div>
+
+              {/* Main Title */}
+              <motion.h1
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, type: "spring", stiffness: 100 }}
+                className="text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-bold mb-6 leading-[0.9] tracking-tighter"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+              >
+                VIVE LA
+                <br />
+                <span className="relative inline-block">
+                  COMPETENCIA
+                  <motion.div
+                    className="absolute bottom-0 left-0 right-0 h-3 md:h-5 bg-spk-red"
+                    initial={{ scaleX: 0 }}
+                    animate={{ scaleX: 1 }}
+                    transition={{ delay: 0.8, duration: 0.8, ease: "easeOut" }}
+                    style={{ originX: 0, zIndex: -1 }}
+                  />
+                </span>
+              </motion.h1>
+
+              {/* Description */}
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="text-lg sm:text-xl md:text-2xl text-white/80 mb-10 max-w-2xl leading-relaxed"
+              >
+                Consulta torneos, resultados en vivo, clasificaciones y toda la acción deportiva en tiempo real
+              </motion.p>
+
+              {/* CTA Buttons */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.7 }}
+                className="flex flex-wrap gap-4"
+              >
+                <motion.button
+                  whileHover={{ scale: 1.05, x: 5 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
+                  className="flex items-center gap-3 px-8 py-4 bg-white text-black text-lg font-bold rounded-sm hover:bg-white/90 transition-colors"
+                  style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                >
+                  VER TORNEOS
+                  <ArrowRight className="w-5 h-5" />
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={scrollToLiveOrTournaments}
+                  className="relative flex items-center gap-3 px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white text-lg font-bold rounded-sm hover:bg-white/20 transition-colors"
+                  style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                  aria-label={
+                    liveMatches.length > 0
+                      ? `Ver los ${liveMatches.length} partidos en vivo`
+                      : 'Ver todos los torneos'
+                  }
+                >
+                  {liveMatches.length > 0 && (
+                    <span
+                      className="w-2.5 h-2.5 bg-spk-red rounded-full spk-live-dot"
+                      aria-hidden="true"
+                    />
+                  )}
+                  PARTIDOS EN VIVO
+                  {liveMatches.length > 0 && (
+                    <span
+                      className="ml-1 bg-spk-red text-white text-[11px] font-bold px-2 py-0.5 rounded-sm tabular-nums"
+                      style={{ letterSpacing: '0.08em' }}
+                    >
+                      {liveMatches.length}
+                    </span>
+                  )}
+                </motion.button>
+              </motion.div>
+
+              {/* Stats */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1 }}
+                className="flex flex-wrap gap-8 md:gap-12 mt-16"
+              >
+                <div>
+                  <div className="text-4xl sm:text-5xl font-bold mb-1 tabular-nums" style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.02em' }}>
+                    {statusCounts.all}
+                  </div>
+                  <div className="text-sm text-white/60 uppercase tracking-wider">Torneos</div>
+                </div>
+                <div>
+                  <div className="text-4xl sm:text-5xl font-bold mb-1 tabular-nums" style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.02em' }}>
+                    {teams.length}
+                  </div>
+                  <div className="text-sm text-white/60 uppercase tracking-wider">Equipos</div>
+                </div>
+                <div>
+                  <div className="text-4xl sm:text-5xl font-bold mb-1 tabular-nums" style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.02em' }}>
+                    {statusCounts.ongoing}
+                  </div>
+                  <div className="text-sm text-white/60 uppercase tracking-wider">En vivo</div>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Scroll Indicator */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.5 }}
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20"
+        >
+          <motion.div
+            animate={{ y: [0, 10, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className="w-6 h-10 border-2 border-white/30 rounded-full flex items-start justify-center p-2"
+          >
+            <motion.div
+              animate={{ opacity: [0, 1, 0] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+              className="w-1 h-2 bg-white rounded-full"
+            />
+          </motion.div>
+        </motion.div>
+      </section>
 
       {/* Live Matches — only rendered when there's live action, anchored so
           the hero CTA can scroll here. Uses the dark broadcast treatment to
@@ -251,23 +532,9 @@ export function Home() {
       )}
 
       {/* Main Directory Section — Torneos / Equipos tabs share this slot so
-          users switch between the two lists without losing hero context.
-          Dark-themed to match the hero / live-matches bands so the whole
-          page reads as one continuous stage. */}
-      <section
-        id="directory"
-        className="relative bg-[#050505] text-white py-16 md:py-24 scroll-mt-20"
-      >
-        {/* Subtle radial accent so the section isn't flat black */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          aria-hidden="true"
-          style={{
-            background:
-              'radial-gradient(ellipse 70% 50% at 20% 0%, rgba(227,30,36,0.08), transparent 70%), radial-gradient(ellipse 70% 50% at 80% 100%, rgba(0,48,135,0.08), transparent 70%)',
-          }}
-        />
-        <div className="relative max-w-[1600px] mx-auto px-6 md:px-12">
+          users switch between the two lists without losing hero context. */}
+      <section id="directory" className="bg-white text-black py-16 md:py-24 scroll-mt-20">
+        <div className="max-w-[1600px] mx-auto px-6 md:px-12">
           {/* Section Header */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -277,7 +544,7 @@ export function Home() {
             className="mb-8 md:mb-12"
           >
             <h2
-              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 tracking-tighter text-white"
+              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 tracking-tighter"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
               {mainTab === 'tournaments' ? 'TODOS LOS TORNEOS' : 'TODOS LOS EQUIPOS'}
@@ -286,9 +553,10 @@ export function Home() {
           </motion.div>
 
           {/* Main tab switcher — segmented control with an animated sliding
-              indicator. Dark-glass shell, red active pill. */}
+              indicator. The active pill is a black block that slides between
+              tabs via motion's `layoutId`, so switching feels physical. */}
           <div
-            className="inline-flex items-center gap-1 mb-8 p-1.5 bg-white/[0.04] border border-white/10 rounded-sm backdrop-blur-sm"
+            className="inline-flex items-center gap-1 mb-8 p-1.5 bg-black/[0.04] border border-black/10 rounded-sm"
             role="tablist"
             aria-label="Vista principal"
           >
@@ -311,21 +579,21 @@ export function Home() {
                   {isActive && (
                     <motion.span
                       layoutId="home-main-tab"
-                      className="absolute inset-0 bg-spk-red rounded-sm shadow-[0_6px_22px_rgba(227,30,36,0.35)]"
+                      className="absolute inset-0 bg-spk-black rounded-sm shadow-[0_4px_12px_rgba(0,0,0,0.14)]"
                       transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                       aria-hidden="true"
                     />
                   )}
                   <span
                     className={`relative z-10 transition-colors ${
-                      isActive ? 'text-white' : 'text-white/55'
+                      isActive ? 'text-white' : 'text-black/55 group-hover:text-black'
                     }`}
                   >
                     <TabIcon className="w-4 h-4" aria-hidden="true" />
                   </span>
                   <span
                     className={`relative z-10 font-bold uppercase text-sm transition-colors ${
-                      isActive ? 'text-white' : 'text-white/70'
+                      isActive ? 'text-white' : 'text-black/70'
                     }`}
                   >
                     {tab.label}
@@ -333,8 +601,8 @@ export function Home() {
                   <span
                     className={`relative z-10 min-w-[22px] h-[22px] inline-flex items-center justify-center px-1.5 rounded-full text-[10px] font-bold tabular-nums transition-colors ${
                       isActive
-                        ? 'bg-white/20 text-white'
-                        : 'bg-white/10 text-white/60'
+                        ? 'bg-spk-red text-white'
+                        : 'bg-black/10 text-black/60'
                     }`}
                     style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
                   >
@@ -358,20 +626,20 @@ export function Home() {
                   transition={{ delay: 0.1 }}
                   className="relative max-w-2xl group"
                 >
-                  <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-spk-red transition-colors" />
+                  <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40 group-focus-within:text-spk-red transition-colors" />
                   <input
                     type="text"
                     placeholder="Buscar torneos por nombre o club…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-11 pr-12 py-3.5 bg-white/[0.04] border border-white/10 rounded-sm text-sm sm:text-base text-white focus:outline-none focus:border-spk-red focus:ring-2 focus:ring-spk-red/25 transition-all placeholder:text-white/35 backdrop-blur-sm"
+                    className="w-full pl-11 pr-12 py-3.5 bg-white border border-black/15 rounded-sm text-sm sm:text-base focus:outline-none focus:border-spk-red focus:ring-2 focus:ring-spk-red/15 transition-all placeholder:text-black/35"
                   />
                   {searchQuery && (
                     <button
                       type="button"
                       onClick={() => setSearchQuery('')}
                       aria-label="Limpiar búsqueda"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-sm text-white/40 hover:text-spk-red hover:bg-spk-red/15 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-sm text-black/40 hover:text-spk-red hover:bg-spk-red/10 transition-colors"
                     >
                       <span aria-hidden="true" className="text-lg leading-none">×</span>
                     </button>
@@ -399,8 +667,8 @@ export function Home() {
                         onClick={() => setFilterStatus(filter.value as any)}
                         className={`relative inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-sm text-xs sm:text-sm font-bold uppercase whitespace-nowrap border transition-all ${
                           isActive
-                            ? 'bg-spk-red text-white border-spk-red shadow-[0_6px_18px_rgba(227,30,36,0.35)]'
-                            : 'bg-white/[0.04] text-white/65 border-white/10 hover:border-white/25 hover:text-white backdrop-blur-sm'
+                            ? 'bg-spk-black text-white border-spk-black'
+                            : 'bg-white text-black/65 border-black/10 hover:border-black/25 hover:text-black'
                         }`}
                         style={{
                           fontFamily: 'Barlow Condensed, sans-serif',
@@ -409,14 +677,14 @@ export function Home() {
                       >
                         {isActive && filter.value === 'ongoing' && (
                           <span
-                            className="w-1.5 h-1.5 rounded-full bg-white spk-live-dot"
+                            className="w-1.5 h-1.5 rounded-full bg-spk-red spk-live-dot"
                             aria-hidden="true"
                           />
                         )}
                         <span>{filter.label}</span>
                         <span
                           className={`tabular-nums text-[10px] px-1.5 py-0.5 rounded-full ${
-                            isActive ? 'bg-white/20 text-white' : 'bg-white/[0.08] text-white/50'
+                            isActive ? 'bg-white/15 text-white' : 'bg-black/[0.06] text-black/50'
                           }`}
                         >
                           {filter.count}
@@ -437,15 +705,15 @@ export function Home() {
                 <div className="text-center py-20">
                   <div className="text-5xl mb-6">⚠️</div>
                   <h3
-                    className="text-2xl font-bold mb-3 text-white"
+                    className="text-2xl font-bold mb-3"
                     style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
                   >
                     ERROR AL CARGAR TORNEOS
                   </h3>
-                  <p className="text-white/60 mb-6">{error.tournaments}</p>
+                  <p className="text-black/60 mb-6">{error.tournaments}</p>
                   <button
                     onClick={() => refreshTournaments()}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-spk-red text-white rounded-sm font-bold hover:bg-spk-red-dark transition-colors"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-sm font-bold hover:bg-black/90 transition-colors"
                   >
                     <RefreshCw className="w-4 h-4" />
                     Reintentar
@@ -479,14 +747,14 @@ export function Home() {
                   animate={{ opacity: 1 }}
                   className="text-center py-20"
                 >
-                  <Search className="w-16 h-16 text-white/20 mx-auto mb-6" />
+                  <Search className="w-16 h-16 text-black/20 mx-auto mb-6" />
                   <h3
-                    className="text-2xl font-bold mb-3 text-white"
+                    className="text-2xl font-bold mb-3"
                     style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
                   >
                     NO SE ENCONTRARON TORNEOS
                   </h3>
-                  <p className="text-white/60">Intenta con otros términos de búsqueda</p>
+                  <p className="text-black/60">Intenta con otros términos de búsqueda</p>
                 </motion.div>
               )}
             </>
@@ -501,20 +769,20 @@ export function Home() {
                   transition={{ delay: 0.1 }}
                   className="relative max-w-2xl group"
                 >
-                  <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-spk-red transition-colors" />
+                  <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40 group-focus-within:text-spk-red transition-colors" />
                   <input
                     type="text"
                     placeholder="Buscar equipos, ciudades, categorías…"
                     value={teamSearch}
                     onChange={(e) => setTeamSearch(e.target.value)}
-                    className="w-full pl-11 pr-12 py-3.5 bg-white/[0.04] border border-white/10 rounded-sm text-sm sm:text-base text-white focus:outline-none focus:border-spk-red focus:ring-2 focus:ring-spk-red/25 transition-all placeholder:text-white/35 backdrop-blur-sm"
+                    className="w-full pl-11 pr-12 py-3.5 bg-white border border-black/15 rounded-sm text-sm sm:text-base focus:outline-none focus:border-spk-red focus:ring-2 focus:ring-spk-red/15 transition-all placeholder:text-black/35"
                   />
                   {teamSearch && (
                     <button
                       type="button"
                       onClick={() => setTeamSearch('')}
                       aria-label="Limpiar búsqueda"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-sm text-white/40 hover:text-spk-red hover:bg-spk-red/15 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-sm text-black/40 hover:text-spk-red hover:bg-spk-red/10 transition-colors"
                     >
                       <span aria-hidden="true" className="text-lg leading-none">×</span>
                     </button>
@@ -523,21 +791,21 @@ export function Home() {
               </div>
 
               {loading.teams && teams.length === 0 ? (
-                <p className="text-white/50 text-center py-12">Cargando equipos…</p>
+                <p className="text-black/50 text-center py-12">Cargando equipos…</p>
               ) : filteredTeams.length === 0 ? (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="text-center py-20"
                 >
-                  <Users className="w-16 h-16 text-white/20 mx-auto mb-6" />
+                  <Users className="w-16 h-16 text-black/20 mx-auto mb-6" />
                   <h3
-                    className="text-2xl font-bold mb-3 text-white"
+                    className="text-2xl font-bold mb-3"
                     style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
                   >
                     {teams.length === 0 ? 'AÚN NO HAY EQUIPOS' : 'NO SE ENCONTRARON EQUIPOS'}
                   </h3>
-                  <p className="text-white/60">
+                  <p className="text-black/60">
                     {teams.length === 0
                       ? 'Los equipos aparecerán acá cuando se registren'
                       : 'Probá con otro nombre, categoría o ciudad'}
@@ -550,18 +818,18 @@ export function Home() {
                       key={team.id}
                       type="button"
                       onClick={() => navigate(`/team/${team.id}`)}
-                      initial={{ opacity: 0, y: 16 }}
+                      initial={{ opacity: 0, y: 10 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       viewport={{ once: true }}
-                      transition={{ delay: Math.min(idx * 0.03, 0.4), duration: 0.35 }}
-                      whileHover={{ y: -3, backgroundColor: 'rgba(255,255,255,0.06)' }}
+                      transition={{ delay: Math.min(idx * 0.03, 0.4), duration: 0.3 }}
+                      whileHover={{ y: -2 }}
                       whileTap={{ scale: 0.98 }}
-                      className="flex items-center gap-3 p-4 bg-white/[0.03] border border-white/10 hover:border-spk-red/50 rounded-sm text-left transition-colors backdrop-blur-sm"
+                      className="flex items-center gap-3 p-4 bg-white border-2 border-black/10 hover:border-black rounded-sm text-left transition-colors"
                     >
                       <TeamAvatar team={team} size="md" />
                       <div className="flex-1 min-w-0">
                         <div
-                          className="font-bold uppercase truncate text-white"
+                          className="font-bold uppercase truncate"
                           style={{
                             fontFamily: 'Barlow Condensed, sans-serif',
                             letterSpacing: '-0.01em',
@@ -569,26 +837,26 @@ export function Home() {
                         >
                           {team.name}
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-white/50 mt-0.5 flex-wrap">
+                        <div className="flex items-center gap-2 text-xs text-black/50 mt-0.5 flex-wrap">
                           <span style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
                             {team.initials}
                           </span>
                           {team.category && (
                             <>
-                              <span className="text-white/20">·</span>
+                              <span className="text-black/20">·</span>
                               <span className="truncate">{team.category}</span>
                             </>
                           )}
                           {team.city && (
                             <>
-                              <span className="text-white/20">·</span>
+                              <span className="text-black/20">·</span>
                               <span className="truncate">{team.city}</span>
                             </>
                           )}
                         </div>
                       </div>
                       <ArrowRight
-                        className="w-4 h-4 text-white/30 flex-shrink-0"
+                        className="w-4 h-4 text-black/30 flex-shrink-0"
                         aria-hidden="true"
                       />
                     </motion.button>

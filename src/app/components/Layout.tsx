@@ -10,10 +10,7 @@ import { InstallPrompt } from './InstallPrompt';
  */
 export function Layout() {
   return (
-    // Unified black stage across every public route so transitions between
-    // sections don't flash a bright background in between. Individual pages
-    // layer their own color accents on top of this base.
-    <div className="min-h-screen bg-[#050505] text-white">
+    <div className="min-h-screen bg-background">
       <Outlet />
       <InstallPrompt />
     </div>
