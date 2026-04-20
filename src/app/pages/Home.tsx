@@ -845,13 +845,12 @@ export function Home() {
                 <span className="text-spk-red" aria-hidden="true">✉</span>
                 santiagomurilloval@gmail.com
               </a>
-              {/* TODO: reemplaza con tu número real si querés que sea clickable */}
               <a
-                href="tel:+573000000000"
+                href="tel:+573166275710"
                 className="inline-flex items-center gap-2 hover:text-white transition-colors"
               >
                 <span className="text-spk-red" aria-hidden="true">☎</span>
-                +57 300 000 0000
+                +57 316 627 5710
               </a>
             </div>
             <div
