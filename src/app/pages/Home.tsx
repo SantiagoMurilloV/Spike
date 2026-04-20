@@ -819,10 +819,11 @@ export function Home() {
               </div>
             </div>
 
-            {/* Developer signature — no card, no box. Just the `</>` glyph
-                next to the name, a thin vertical red rule between them and
-                the kicker beneath. The whole block is a mailto link and the
-                name brightens subtly on hover. */}
+            {/* Developer signature — magazine-byline style: tiny red
+                "DESARROLLADO POR" kicker above the name, `</>` glyph +
+                subtle vertical rule to the left, role beneath the name.
+                The whole thing is a mailto link; the name brightens on
+                hover. */}
             <a
               href="mailto:santiagomurilloval@gmail.com"
               className="group inline-flex items-center gap-3"
@@ -833,10 +834,19 @@ export function Home() {
               >
                 &lt;/&gt;
               </span>
-              <span className="w-px h-8 bg-white/10" aria-hidden="true" />
+              <span className="w-px h-10 bg-white/10" aria-hidden="true" />
               <span className="flex flex-col leading-tight">
                 <span
-                  className="text-sm text-white/80 group-hover:text-white transition-colors"
+                  className="text-[9px] text-spk-red/80 uppercase"
+                  style={{
+                    fontFamily: 'Barlow Condensed, sans-serif',
+                    letterSpacing: '0.28em',
+                  }}
+                >
+                  Desarrollado por
+                </span>
+                <span
+                  className="mt-0.5 text-sm text-white/85 group-hover:text-white transition-colors"
                   style={{
                     fontFamily: 'Barlow Condensed, sans-serif',
                     letterSpacing: '0.02em',
