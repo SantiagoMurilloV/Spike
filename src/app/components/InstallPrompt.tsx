@@ -27,7 +27,7 @@ export function InstallPrompt() {
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 100, opacity: 0 }}
         transition={{ type: 'spring', damping: 22, stiffness: 240 }}
-        className="fixed bottom-24 md:bottom-6 left-4 right-4 md:left-auto md:right-6 md:max-w-sm z-40"
+        className="fixed bottom-6 left-4 right-4 md:left-auto md:right-6 md:max-w-sm z-40"
         role="dialog"
         aria-label="Instalar SPK-CUP"
       >
