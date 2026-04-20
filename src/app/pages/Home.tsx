@@ -886,11 +886,19 @@ export function Home() {
                 +57 316 627 5710
               </a>
             </div>
+            {/* Full copyright on tablet+ ; the email takes most of the row on
+                phones, so the mobile version drops "to the Developer." */}
             <div
-              className="text-[9px] sm:text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.14em] text-white/35 text-right flex-shrink-0"
+              className="hidden sm:block text-[11px] uppercase tracking-[0.14em] text-white/35 text-right flex-shrink-0"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
               &copy; 2026 · All Rights Reserved to the Developer.
+            </div>
+            <div
+              className="sm:hidden text-[9px] uppercase tracking-[0.12em] text-white/35 text-right flex-shrink-0 whitespace-nowrap"
+              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+            >
+              &copy; 2026 · All Rights Reserved
             </div>
           </div>
         </div>
