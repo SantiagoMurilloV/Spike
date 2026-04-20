@@ -23,7 +23,6 @@ import { TeamAvatar } from '../../components/TeamAvatar';
 import { GroupMatrix } from '../../components/GroupMatrix';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
 import { Badge } from '../../components/ui/badge';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import {
   Select,
@@ -74,6 +73,37 @@ const FORMAT_LABELS: Record<string, string> = {
 
 function formatDate(d: Date) {
   return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+/**
+ * SpkPanel — system-branded container replacing shadcn's generic <Card>.
+ * Uses the same shell as AdminTeams / AdminMatches (white body + black
+ * header with Barlow Condensed title) so the tournament-detail page
+ * visually matches the rest of the admin surface.
+ */
+function SpkPanel({
+  title,
+  children,
+  headerAction,
+}: {
+  title: string;
+  children: React.ReactNode;
+  headerAction?: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white border-2 border-black/10 rounded-sm overflow-hidden">
+      <div className="bg-black text-white px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+        <h2
+          className="text-base sm:text-lg font-bold tracking-wider uppercase"
+          style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.06em' }}
+        >
+          {title}
+        </h2>
+        {headerAction}
+      </div>
+      <div className="p-4 sm:p-6">{children}</div>
+    </div>
+  );
 }
 
 // ── Main Component ─────────────────────────────────────────────────
@@ -645,26 +675,34 @@ export function AdminTournamentDetail() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — scrollable horizontally on narrow screens so organizers can
+          reach every section on a phone. Styled with the SPK system tokens
+          (black rail, red active state, Barlow Condensed uppercase) to match
+          the rest of the admin surface. */}
       <Tabs defaultValue="info">
-        <TabsList className="w-full">
-          <TabsTrigger value="info">Información General</TabsTrigger>
-          <TabsTrigger value="teams">Equipos Inscritos</TabsTrigger>
-          <TabsTrigger value="fixtures">Cruces/Fixtures</TabsTrigger>
-          <TabsTrigger value="matches">Partidos</TabsTrigger>
+        <TabsList
+          className="!flex w-full !h-auto overflow-x-auto bg-black p-1 rounded-sm gap-1 justify-start"
+        >
+          {[
+            { value: 'info', label: 'Información General' },
+            { value: 'teams', label: 'Equipos Inscritos' },
+            { value: 'fixtures', label: 'Cruces/Fixtures' },
+            { value: 'matches', label: 'Partidos' },
+          ].map((tab) => (
+            <TabsTrigger
+              key={tab.value}
+              value={tab.value}
+              className="flex-shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 text-[11px] sm:text-xs text-white/70 hover:text-white data-[state=active]:bg-spk-red data-[state=active]:text-white rounded-sm uppercase font-bold transition-colors"
+              style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.06em' }}
+            >
+              {tab.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         {/* ── Info Tab ──────────────────────────────────────────── */}
         <TabsContent value="info">
-          <Card>
-            <CardHeader>
-              <CardTitle
-                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-              >
-                INFORMACIÓN DEL TORNEO
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+          <SpkPanel title="Información del Torneo">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
@@ -744,21 +782,15 @@ export function AdminTournamentDetail() {
                   <p className="mt-1">{tournament.description}</p>
                 </div>
               )}
-            </CardContent>
-          </Card>
+          </SpkPanel>
         </TabsContent>
 
         {/* ── Equipos Tab ──────────────────────────────────────── */}
         <TabsContent value="teams">
-          <Card>
-            <CardHeader>
-              <CardTitle style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                EQUIPOS INSCRITOS ({enrolledTeams.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {/* Enroll team control */}
-              <div className="flex items-center gap-3 mb-6">
+          <SpkPanel title={`Equipos Inscritos (${enrolledTeams.length})`}>
+              {/* Enroll team control — stacks vertically on mobile so the
+                  select + button don't squeeze each other. */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
                 <div className="flex-1">
                   <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
                     <SelectTrigger>
@@ -783,7 +815,7 @@ export function AdminTournamentDetail() {
                 <Button
                   onClick={handleEnroll}
                   disabled={!selectedTeamId || enrolling}
-                  className="bg-spk-red hover:bg-spk-red-dark"
+                  className="bg-spk-red hover:bg-spk-red-dark w-full sm:w-auto flex-shrink-0"
                 >
                   {enrolling ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -848,21 +880,15 @@ export function AdminTournamentDetail() {
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+          </SpkPanel>
         </TabsContent>
 
         {/* ── Cruces Tab ───────────────────────────────────────── */}
         <TabsContent value="fixtures">
-          <Card>
-            <CardHeader>
-              <CardTitle style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                CRUCES / FIXTURES
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {/* Generate button + timestamp */}
-              <div className="flex items-center justify-between mb-6">
+          <SpkPanel title="Cruces / Fixtures">
+              {/* Generate button + timestamp — stacks on mobile so the 2–3
+                  action buttons don't squeeze or spill off-screen. */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
                 <div>
                   {generatedAt && (
                     <div className="flex items-center gap-2 text-sm text-black/60">
@@ -879,10 +905,11 @@ export function AdminTournamentDetail() {
                     </p>
                   )}
                 </div>
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 flex-wrap">
                 <Button
                   onClick={handleGenerateFixtures}
                   disabled={generating || enrolledTeams.length < 2}
-                  className="bg-spk-blue hover:bg-spk-blue/90"
+                  className="bg-spk-blue hover:bg-spk-blue/90 w-full sm:w-auto"
                 >
                   {generating ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -895,7 +922,7 @@ export function AdminTournamentDetail() {
                   <Button
                     onClick={() => setShowBracketCrossings(true)}
                     disabled={generating}
-                    className="bg-spk-win hover:bg-spk-win/90 text-white"
+                    className="bg-spk-win hover:bg-spk-win/90 text-white w-full sm:w-auto"
                   >
                     {generating ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -910,7 +937,7 @@ export function AdminTournamentDetail() {
                     onClick={() => setShowClearDialog(true)}
                     disabled={clearing}
                     variant="outline"
-                    className="border-spk-red text-spk-red hover:bg-spk-red/10"
+                    className="border-spk-red text-spk-red hover:bg-spk-red/10 w-full sm:w-auto"
                   >
                     {clearing ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -920,6 +947,7 @@ export function AdminTournamentDetail() {
                     Limpiar Cruces
                   </Button>
                 )}
+                </div>
               </div>
 
               {/* Fixtures display */}
@@ -1201,8 +1229,7 @@ export function AdminTournamentDetail() {
                   )}
                 </div>
               )}
-            </CardContent>
-          </Card>
+          </SpkPanel>
 
           {/* Regenerate confirmation dialog */}
           <AlertDialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
@@ -1311,15 +1338,9 @@ export function AdminTournamentDetail() {
 
         {/* ── Partidos Tab ─────────────────────────────────────── */}
         <TabsContent value="matches">
-          <Card>
-            <CardHeader>
-              <CardTitle style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                PARTIDOS ({matches.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+          <SpkPanel title={`Partidos (${matches.length})`}>
               {/* Filters */}
-              <div className="flex flex-wrap items-center gap-3 mb-6">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 mb-6">
                 <Filter className="w-4 h-4 text-black/40" />
                 <Select value={phaseFilter} onValueChange={setPhaseFilter}>
                   <SelectTrigger className="w-full sm:w-[180px]">
@@ -1555,8 +1576,7 @@ export function AdminTournamentDetail() {
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+          </SpkPanel>
         </TabsContent>
       </Tabs>
     </div>
