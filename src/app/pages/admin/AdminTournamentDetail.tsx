@@ -616,7 +616,7 @@ export function AdminTournamentDetail() {
   // ── Render ─────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
@@ -627,7 +627,7 @@ export function AdminTournamentDetail() {
         </button>
         <div className="flex-1">
           <h1
-            className="text-3xl font-bold"
+            className="text-2xl sm:text-3xl font-bold"
             style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
           >
             {tournament.name.toUpperCase()}
@@ -1322,7 +1322,7 @@ export function AdminTournamentDetail() {
               <div className="flex flex-wrap items-center gap-3 mb-6">
                 <Filter className="w-4 h-4 text-black/40" />
                 <Select value={phaseFilter} onValueChange={setPhaseFilter}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="Fase" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1335,7 +1335,7 @@ export function AdminTournamentDetail() {
                   </SelectContent>
                 </Select>
                 <Select value={groupFilter} onValueChange={setGroupFilter}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="Grupo" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1348,7 +1348,7 @@ export function AdminTournamentDetail() {
                   </SelectContent>
                 </Select>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full sm:w-[180px]">
                     <SelectValue placeholder="Estado" />
                   </SelectTrigger>
                   <SelectContent>

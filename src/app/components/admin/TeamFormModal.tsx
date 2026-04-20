@@ -200,16 +200,16 @@ export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModal
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-white rounded-sm shadow-2xl max-w-lg w-full"
+        className="bg-white rounded-sm shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto my-4"
       >
         {/* Header */}
-        <div className="bg-white border-b border-black/10 px-6 py-4 flex items-center justify-between rounded-t-xl">
-          <h2 className="text-2xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+        <div className="sticky top-0 bg-white border-b border-black/10 px-4 sm:px-6 py-4 flex items-center justify-between rounded-t-xl">
+          <h2 className="text-xl sm:text-2xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             {team ? 'EDITAR EQUIPO' : 'CREAR EQUIPO'}
           </h2>
           <button
@@ -221,7 +221,7 @@ export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModal
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6" noValidate>
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6" noValidate>
           {/* Server error */}
           {errors.server && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-sm text-red-700 text-sm">

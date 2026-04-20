@@ -117,11 +117,11 @@ export function AdminTournaments() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+          <h1 className="text-2xl sm:text-3xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             GESTIÓN DE TORNEOS
           </h1>
           <p className="text-black/60">
@@ -207,21 +207,23 @@ export function AdminTournaments() {
                 </div>
               </div>
 
-              {/* Actions */}
+              {/* Actions — labels hide on narrow screens so all 3 buttons fit */}
               <div className="flex gap-2">
                 <button
                   onClick={() => navigate(`/admin/tournaments/${tournament.id}`)}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-black/5 hover:bg-black/10 rounded-sm transition-colors"
+                  aria-label={`Ver ${tournament.name}`}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 bg-black/5 hover:bg-black/10 rounded-sm transition-colors min-w-0"
                 >
-                  <Eye className="w-4 h-4" />
-                  <span className="text-sm font-medium">Ver</span>
+                  <Eye className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-sm font-medium truncate">Ver</span>
                 </button>
                 <button
                   onClick={() => handleEdit(tournament)}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-spk-blue text-white hover:bg-spk-blue/90 rounded-sm transition-colors"
+                  aria-label={`Editar ${tournament.name}`}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 bg-spk-blue text-white hover:bg-spk-blue/90 rounded-sm transition-colors min-w-0"
                 >
-                  <Edit className="w-4 h-4" />
-                  <span className="text-sm font-medium">Editar</span>
+                  <Edit className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-sm font-medium truncate">Editar</span>
                 </button>
                 <button
                   type="button"
@@ -229,7 +231,7 @@ export function AdminTournaments() {
                   disabled={deletingId === tournament.id}
                   aria-label={`Eliminar torneo ${tournament.name}`}
                   title="Eliminar torneo"
-                  className="flex items-center justify-center px-3 py-2 bg-spk-red/10 text-spk-red hover:bg-spk-red/20 rounded-sm transition-colors disabled:opacity-50"
+                  className="flex items-center justify-center px-3 py-2 bg-spk-red/10 text-spk-red hover:bg-spk-red/20 rounded-sm transition-colors disabled:opacity-50 flex-shrink-0"
                 >
                   {deletingId === tournament.id ? (
                     <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />

@@ -103,11 +103,11 @@ export function AdminTeams() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+          <h1 className="text-2xl sm:text-3xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             GESTIÓN DE EQUIPOS
           </h1>
           <p className="text-black/60">
@@ -163,102 +163,188 @@ export function AdminTeams() {
         </button>
       </div>
 
-      {/* Teams Table */}
-      <div className="bg-white border-2 border-black/10 rounded-sm overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-black/5 border-b-2 border-black/10">
-            <tr>
-              <th className="px-6 py-4 text-left text-sm font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>EQUIPO</th>
-              <th className="px-6 py-4 text-left text-sm font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>INICIALES</th>
-              <th className="px-6 py-4 text-left text-sm font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>CATEGORÍA</th>
-              <th className="px-6 py-4 text-left text-sm font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>UBICACIÓN</th>
-              <th className="px-6 py-4 text-right text-sm font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>ACCIONES</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y-2 divide-black/10">
-            {filteredTeams.map((team) => (
-              <tr key={team.id} className="hover:bg-black/5 transition-colors">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    {team.logo ? (
-                      <img
-                        src={team.logo}
-                        alt={team.name}
-                        className="w-10 h-10 rounded-sm object-cover border-2 border-black/10"
-                      />
-                    ) : (
-                      <div
-                        className="w-10 h-10 rounded-sm flex items-center justify-center text-white font-bold text-sm"
-                        style={{ backgroundColor: team.colors.primary, fontFamily: 'Barlow Condensed, sans-serif' }}
-                      >
-                        {team.initials}
-                      </div>
-                    )}
-                    <span className="font-medium">{team.name}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="font-bold text-lg" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>{team.initials}</span>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="text-sm text-black/70">{team.category || '—'}</span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm text-black/70">
-                    {team.city || team.department ? (
-                      <>
-                        {team.city && <span>{team.city}</span>}
-                        {team.city && team.department && <span>, </span>}
-                        {team.department && <span className="text-black/50">{team.department}</span>}
-                      </>
-                    ) : '—'}
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleEdit(team)}
-                      aria-label={`Editar ${team.name}`}
-                      title={`Editar ${team.name}`}
-                      className="p-2 hover:bg-spk-blue/10 text-spk-blue rounded-sm transition-colors"
-                    >
-                      <Edit className="w-4 h-4" aria-hidden="true" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(team.id)}
-                      disabled={deletingId === team.id}
-                      aria-label={`Eliminar ${team.name}`}
-                      title={`Eliminar ${team.name}`}
-                      className="p-2 hover:bg-spk-red/10 text-spk-red rounded-sm transition-colors disabled:opacity-50"
-                    >
-                      {deletingId === team.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" aria-hidden="true" />
-                      )}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {/* Empty State */}
-        {filteredTeams.length === 0 && (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 bg-black/5 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Search className="w-8 h-8 text-black/40" />
-            </div>
-            <h3 className="text-lg font-bold mb-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-              No se encontraron equipos
-            </h3>
-            <p className="text-black/60">Intenta con otros términos de búsqueda</p>
+      {/* Teams Table (desktop) / Card grid (mobile) */}
+      {filteredTeams.length === 0 ? (
+        <div className="bg-white border-2 border-black/10 rounded-sm text-center py-16 px-4">
+          <div className="w-16 h-16 bg-black/5 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Search className="w-8 h-8 text-black/40" />
           </div>
-        )}
-      </div>
+          <h3 className="text-lg font-bold mb-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+            No se encontraron equipos
+          </h3>
+          <p className="text-black/60">Intenta con otros términos de búsqueda</p>
+        </div>
+      ) : (
+        <>
+          {/* ── Desktop table (md+) ─────────────────────────────── */}
+          <div className="hidden md:block bg-white border-2 border-black/10 rounded-sm overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-black/5 border-b-2 border-black/10">
+                <tr>
+                  <th className="px-6 py-4 text-left text-sm font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>EQUIPO</th>
+                  <th className="px-6 py-4 text-left text-sm font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>INICIALES</th>
+                  <th className="px-6 py-4 text-left text-sm font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>CATEGORÍA</th>
+                  <th className="px-6 py-4 text-left text-sm font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>UBICACIÓN</th>
+                  <th className="px-6 py-4 text-right text-sm font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>ACCIONES</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y-2 divide-black/10">
+                {filteredTeams.map((team) => (
+                  <tr key={team.id} className="hover:bg-black/5 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        {team.logo ? (
+                          <img
+                            src={team.logo}
+                            alt={team.name}
+                            className="w-10 h-10 rounded-sm object-cover border-2 border-black/10"
+                          />
+                        ) : (
+                          <div
+                            className="w-10 h-10 rounded-sm flex items-center justify-center text-white font-bold text-sm"
+                            style={{ backgroundColor: team.colors.primary, fontFamily: 'Barlow Condensed, sans-serif' }}
+                          >
+                            {team.initials}
+                          </div>
+                        )}
+                        <span className="font-medium">{team.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="font-bold text-lg" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>{team.initials}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-black/70">{team.category || '—'}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-black/70">
+                        {team.city || team.department ? (
+                          <>
+                            {team.city && <span>{team.city}</span>}
+                            {team.city && team.department && <span>, </span>}
+                            {team.department && <span className="text-black/50">{team.department}</span>}
+                          </>
+                        ) : '—'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(team)}
+                          aria-label={`Editar ${team.name}`}
+                          title={`Editar ${team.name}`}
+                          className="p-2 hover:bg-spk-blue/10 text-spk-blue rounded-sm transition-colors"
+                        >
+                          <Edit className="w-4 h-4" aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(team.id)}
+                          disabled={deletingId === team.id}
+                          aria-label={`Eliminar ${team.name}`}
+                          title={`Eliminar ${team.name}`}
+                          className="p-2 hover:bg-spk-red/10 text-spk-red rounded-sm transition-colors disabled:opacity-50"
+                        >
+                          {deletingId === team.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" aria-hidden="true" />
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ── Mobile card grid (<md) — visible edit/delete per team ── */}
+          <div className="md:hidden space-y-3">
+            {filteredTeams.map((team) => (
+              <div
+                key={team.id}
+                className="bg-white border-2 border-black/10 rounded-sm p-4 flex items-center gap-3"
+              >
+                {team.logo ? (
+                  <img
+                    src={team.logo}
+                    alt={team.name}
+                    className="w-12 h-12 rounded-sm object-cover border-2 border-black/10 flex-shrink-0"
+                  />
+                ) : (
+                  <div
+                    className="w-12 h-12 rounded-sm flex items-center justify-center text-white font-bold flex-shrink-0"
+                    style={{
+                      backgroundColor: team.colors.primary,
+                      fontFamily: 'Barlow Condensed, sans-serif',
+                    }}
+                  >
+                    {team.initials}
+                  </div>
+                )}
+
+                <div className="flex-1 min-w-0">
+                  <div
+                    className="font-bold uppercase truncate"
+                    style={{
+                      fontFamily: 'Barlow Condensed, sans-serif',
+                      letterSpacing: '-0.01em',
+                    }}
+                  >
+                    {team.name}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5 text-xs text-black/60 flex-wrap">
+                    <span
+                      className="font-bold"
+                      style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                    >
+                      {team.initials}
+                    </span>
+                    {team.category && (
+                      <>
+                        <span className="text-black/30">·</span>
+                        <span>{team.category}</span>
+                      </>
+                    )}
+                    {team.city && (
+                      <>
+                        <span className="text-black/30">·</span>
+                        <span>{team.city}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleEdit(team)}
+                    aria-label={`Editar ${team.name}`}
+                    className="p-2.5 bg-spk-blue/10 text-spk-blue rounded-sm active:bg-spk-blue/20 transition-colors"
+                  >
+                    <Edit className="w-4 h-4" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(team.id)}
+                    disabled={deletingId === team.id}
+                    aria-label={`Eliminar ${team.name}`}
+                    className="p-2.5 bg-spk-red/10 text-spk-red rounded-sm active:bg-spk-red/20 transition-colors disabled:opacity-50"
+                  >
+                    {deletingId === team.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* Modal */}
       <TeamFormModal

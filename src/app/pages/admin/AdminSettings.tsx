@@ -98,7 +98,7 @@ export function AdminSettings() {
             CONFIGURACIÓN GENERAL
           </h2>
         </div>
-        <div className="p-6 space-y-6">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           <div>
             <label className="block text-sm font-medium mb-2">Nombre del Sistema</label>
             <input
@@ -149,7 +149,7 @@ export function AdminSettings() {
             SEGURIDAD
           </h2>
         </div>
-        <div className="p-6 space-y-6">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           <div>
             <label className="block text-sm font-medium mb-2">Nueva Contraseña de Administrador</label>
             <div className="relative">
@@ -191,7 +191,7 @@ export function AdminSettings() {
             INFORMACIÓN DE CONTACTO
           </h2>
         </div>
-        <div className="p-6 space-y-6">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           <div>
             <label className="block text-sm font-medium mb-2">Email de Contacto</label>
             <input

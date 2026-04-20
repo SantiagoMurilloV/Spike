@@ -232,16 +232,16 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-white rounded-sm shadow-2xl max-w-3xl w-full my-8"
+        className="bg-white rounded-sm shadow-2xl max-w-3xl w-full my-4 sm:my-8"
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-black/10 px-6 py-4 flex items-center justify-between rounded-t-xl">
-          <h2 className="text-2xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+        <div className="sticky top-0 bg-white border-b border-black/10 px-4 sm:px-6 py-4 flex items-center justify-between rounded-t-xl">
+          <h2 className="text-xl sm:text-2xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             {match ? 'EDITAR PARTIDO' : 'CREAR PARTIDO'}
           </h2>
           <button
@@ -253,7 +253,7 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[calc(90vh-120px)] overflow-y-auto" noValidate>
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-h-[calc(92vh-120px)] sm:max-h-[calc(90vh-120px)] overflow-y-auto" noValidate>
           {/* Server error */}
           {errors.server && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-sm text-red-700 text-sm">

@@ -50,21 +50,21 @@ export function AdminDashboard() {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="border-b-2 border-black/10 bg-black text-white">
-        <div className="p-6 md:p-12">
+        <div className="p-4 sm:p-6 md:p-12">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
-              <h1 className="text-5xl md:text-6xl font-bold tracking-tighter mb-3" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter mb-3" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
                 DASHBOARD
               </h1>
               <div className="w-20 h-1 bg-spk-red mb-4" />
-              <p className="text-white/60 text-lg">Vista general del sistema de torneos</p>
+              <p className="text-white/60 text-base sm:text-lg">Vista general del sistema de torneos</p>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-3">
               <motion.button
                 onClick={() => navigate('/admin/matches')}
                 whileHover={{ scale: 1.05, backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
                 whileTap={{ scale: 0.98 }}
-                className="flex items-center gap-2 px-6 py-3 border border-white/20 rounded-sm transition-colors"
+                className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3 border border-white/20 rounded-sm transition-colors"
                 style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
               >
                 <Plus className="w-5 h-5" />
@@ -76,7 +76,7 @@ export function AdminDashboard() {
                 onClick={() => navigate('/admin/tournaments')}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.98 }}
-                className="flex items-center gap-2 px-6 py-3 bg-spk-red hover:bg-spk-red/90 rounded-sm transition-colors"
+                className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-spk-red hover:bg-spk-red/90 rounded-sm transition-colors"
               >
                 <Plus className="w-5 h-5" />
                 <span className="font-bold uppercase tracking-wider text-sm" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
@@ -88,7 +88,7 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      <div className="p-6 md:p-12 space-y-12">
+      <div className="p-4 sm:p-6 md:p-12 space-y-8 sm:space-y-12">
         {/* Loading indicator */}
         {isLoading && (
           <div className="flex items-center justify-center gap-2 text-black/60">
@@ -274,12 +274,12 @@ export function AdminDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
-          className="bg-black text-white p-8 md:p-12 rounded-sm"
+          className="bg-black text-white p-6 sm:p-8 md:p-12 rounded-sm"
         >
-          <h2 className="text-3xl font-bold tracking-tighter mb-8" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tighter mb-6 sm:mb-8" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             ACCIONES RÁPIDAS
           </h2>
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
             <motion.button
               whileHover={{ scale: 1.02, y: -4, backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
               whileTap={{ scale: 0.98 }}

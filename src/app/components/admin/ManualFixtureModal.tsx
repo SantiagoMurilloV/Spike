@@ -103,9 +103,9 @@ interface ModeDialogProps {
 export function FixtureModeDialog({ open, onClose, onSelectAutomatic, onSelectManual }: ModeDialogProps) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="bg-white rounded-sm shadow-xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-0" onClick={onClose}>
+      <div className="bg-white rounded-sm shadow-xl w-full max-w-md p-4 sm:p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
           <h2
             className="text-xl font-bold"
             style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
@@ -167,9 +167,9 @@ export function AutomaticScheduleModal({ open, onClose, onGenerate, generating, 
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="bg-white rounded-sm shadow-xl w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-0" onClick={onClose}>
+      <div className="bg-white rounded-sm shadow-xl w-full max-w-md p-4 sm:p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
           <h2 className="text-xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             CONFIGURACIÓN DE HORARIOS
           </h2>
@@ -286,14 +286,14 @@ export function ManualGroupsModal({ open, teams, onClose, onGenerate, generating
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-0" onClick={onClose}>
       <div
-        className="bg-white rounded-sm shadow-xl w-full max-w-4xl mx-4 max-h-[85vh] flex flex-col"
+        className="bg-white rounded-sm shadow-xl w-full max-w-4xl max-h-[92vh] sm:max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-black/10">
-          <h2 className="text-xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-black/10">
+          <h2 className="text-lg sm:text-xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             ASIGNACIÓN MANUAL DE GRUPOS
           </h2>
           <button onClick={onClose} className="p-1 hover:bg-black/5 rounded">
@@ -302,9 +302,9 @@ export function ManualGroupsModal({ open, teams, onClose, onGenerate, generating
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {/* Group count controls */}
-          <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center gap-3 mb-4 sm:mb-6">
             <span className="text-sm font-medium">Grupos:</span>
             <Button size="sm" variant="outline" onClick={removeGroup} disabled={groupCount <= 2}>
               −
@@ -315,13 +315,13 @@ export function ManualGroupsModal({ open, teams, onClose, onGenerate, generating
             </Button>
           </div>
 
-          <div className="flex gap-6">
+          <div className="flex flex-col md:flex-row gap-4 md:gap-6">
             {/* Unassigned teams */}
-            <div className="w-64 flex-shrink-0">
+            <div className="w-full md:w-64 md:flex-shrink-0">
               <h3 className="text-sm font-bold mb-3 text-black/60">
                 SIN ASIGNAR ({unassignedTeams.length})
               </h3>
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              <div className="space-y-2 max-h-[240px] md:max-h-[400px] overflow-y-auto">
                 {unassignedTeams.map((team) => (
                   <div
                     key={team.id}
@@ -352,7 +352,7 @@ export function ManualGroupsModal({ open, teams, onClose, onGenerate, generating
             </div>
 
             {/* Group columns */}
-            <div className="flex-1 grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
               {groupNames.map((name) => (
                 <div key={name} className="border border-black/10 rounded-sm p-3">
                   <h4
@@ -394,25 +394,25 @@ export function ManualGroupsModal({ open, teams, onClose, onGenerate, generating
         </div>
 
         {/* Schedule section */}
-        <div className="px-6 pb-4">
+        <div className="px-4 sm:px-6 pb-4">
           <ScheduleFields schedule={schedule} onChange={setSchedule} />
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-black/10">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-6 border-t border-black/10">
           <p className="text-sm text-black/50">
             {unassignedTeams.length > 0
               ? `Faltan ${unassignedTeams.length} equipos por asignar`
               : 'Todos los equipos asignados'}
           </p>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={onClose} className="flex-1 sm:flex-none">
               Cancelar
             </Button>
             <Button
               onClick={handleGenerate}
               disabled={!canGenerate || generating}
-              className="bg-spk-red hover:bg-spk-red-dark"
+              className="bg-spk-red hover:bg-spk-red-dark flex-1 sm:flex-none"
             >
               {generating && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               Generar
@@ -465,14 +465,14 @@ export function ManualBracketModal({ open, teams, onClose, onGenerate, generatin
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-0" onClick={onClose}>
       <div
-        className="bg-white rounded-sm shadow-xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col"
+        className="bg-white rounded-sm shadow-xl w-full max-w-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-black/10">
-          <h2 className="text-xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-black/10">
+          <h2 className="text-lg sm:text-xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             ASIGNACIÓN MANUAL DE BRACKET
           </h2>
           <button onClick={onClose} className="p-1 hover:bg-black/5 rounded">
@@ -481,7 +481,7 @@ export function ManualBracketModal({ open, teams, onClose, onGenerate, generatin
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           <p className="text-sm text-black/60 mb-4">
             Asigná un equipo a cada posición del bracket. Las posiciones se emparejan: 1 vs 2, 3 vs 4, etc.
           </p>
@@ -522,14 +522,14 @@ export function ManualBracketModal({ open, teams, onClose, onGenerate, generatin
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-black/10">
-          <Button variant="outline" onClick={onClose}>
+        <div className="flex items-center justify-end gap-3 p-4 sm:p-6 border-t border-black/10">
+          <Button variant="outline" onClick={onClose} className="flex-1 sm:flex-none">
             Cancelar
           </Button>
           <Button
             onClick={handleGenerate}
             disabled={!canGenerate || generating}
-            className="bg-spk-red hover:bg-spk-red-dark"
+            className="bg-spk-red hover:bg-spk-red-dark flex-1 sm:flex-none"
           >
             {generating && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
             Generar
@@ -601,13 +601,13 @@ export function ManualBracketPositionsModal({ open, groups, onClose, onGenerate,
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-0" onClick={onClose}>
       <div
-        className="bg-white rounded-sm shadow-xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col"
+        className="bg-white rounded-sm shadow-xl w-full max-w-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b border-black/10">
-          <h2 className="text-xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-black/10">
+          <h2 className="text-lg sm:text-xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             CRUCES DIRECTOS DESDE GRUPOS
           </h2>
           <button onClick={onClose} className="p-1 hover:bg-black/5 rounded">
@@ -615,7 +615,7 @@ export function ManualBracketPositionsModal({ open, groups, onClose, onGenerate,
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           <p className="text-sm text-black/60 mb-4">
             Definí el tamaño del bracket de eliminación final y vinculá qué posición de cada grupo ocupará cada lugar (Ej: 1° Grupo A). Las posiciones se emparejan: 1 vs 2, 3 vs 4.
           </p>
@@ -672,14 +672,14 @@ export function ManualBracketPositionsModal({ open, groups, onClose, onGenerate,
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-black/10">
-          <Button variant="outline" onClick={onClose}>
+        <div className="flex items-center justify-end gap-3 p-4 sm:p-6 border-t border-black/10">
+          <Button variant="outline" onClick={onClose} className="flex-1 sm:flex-none">
             Atrás
           </Button>
           <Button
             onClick={() => onGenerate(seeds)}
             disabled={!canGenerate || generating}
-            className="bg-spk-red hover:bg-spk-red-dark"
+            className="bg-spk-red hover:bg-spk-red-dark flex-1 sm:flex-none"
           >
             {generating && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
             Confirmar y Generar
@@ -799,31 +799,31 @@ export function BracketCrossingsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-0"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-sm shadow-xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col"
+        className="bg-white rounded-sm shadow-xl w-full max-w-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-black/10">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-black/10">
           <div className="flex items-center gap-3">
-            <GitMerge className="w-5 h-5 text-spk-blue" />
+            <GitMerge className="w-5 h-5 text-spk-blue flex-shrink-0" />
             <h2
-              className="text-xl font-bold"
+              className="text-lg sm:text-xl font-bold"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
               DEFINIR ELIMINACIÓN DIRECTA
             </h2>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-black/5 rounded">
+          <button onClick={onClose} className="p-1 hover:bg-black/5 rounded flex-shrink-0">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
           {/* Groups summary */}
           <div className="p-3 bg-black/5 rounded-sm text-sm text-black/70">
             <span className="font-medium">Grupos detectados: </span>
@@ -872,59 +872,64 @@ export function BracketCrossingsModal({
             <p className="text-xs text-black/50 mb-4">
               Definí quién juega contra quién. Los espacios vacíos quedan como "Bye" (pase directo).
             </p>
-            <div className="space-y-3">
+            <div className="space-y-4 sm:space-y-3">
               {matchups.map((matchup, idx) => (
-                <div key={idx} className="flex items-center gap-3">
-                  <span
-                    className="text-sm font-bold w-16 text-black/60 flex-shrink-0"
-                    style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                  >
+                <div key={idx} className="border sm:border-0 border-black/10 rounded-sm p-3 sm:p-0">
+                  <div className="text-xs sm:hidden font-bold text-black/60 mb-2 uppercase" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
                     Cruce {idx + 1}
-                  </span>
-                  <div className="flex-1">
-                    <Select
-                      value={matchup[0] ?? '_bye'}
-                      onValueChange={v => setSlot(idx, 0, v === '_bye' ? null : v)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="_bye">— Bye —</SelectItem>
-                        {placeholderOptions.map(ph => (
-                          <SelectItem
-                            key={ph.value}
-                            value={ph.value}
-                            disabled={usedPlaceholders.has(ph.value) && matchup[0] !== ph.value}
-                          >
-                            {ph.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </div>
-                  <span className="text-sm font-bold text-black/40 flex-shrink-0">vs</span>
-                  <div className="flex-1">
-                    <Select
-                      value={matchup[1] ?? '_bye'}
-                      onValueChange={v => setSlot(idx, 1, v === '_bye' ? null : v)}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                    <span
+                      className="hidden sm:block text-sm font-bold w-16 text-black/60 flex-shrink-0"
+                      style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="_bye">— Bye —</SelectItem>
-                        {placeholderOptions.map(ph => (
-                          <SelectItem
-                            key={ph.value}
-                            value={ph.value}
-                            disabled={usedPlaceholders.has(ph.value) && matchup[1] !== ph.value}
-                          >
-                            {ph.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      Cruce {idx + 1}
+                    </span>
+                    <div className="flex-1">
+                      <Select
+                        value={matchup[0] ?? '_bye'}
+                        onValueChange={v => setSlot(idx, 0, v === '_bye' ? null : v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_bye">— Bye —</SelectItem>
+                          {placeholderOptions.map(ph => (
+                            <SelectItem
+                              key={ph.value}
+                              value={ph.value}
+                              disabled={usedPlaceholders.has(ph.value) && matchup[0] !== ph.value}
+                            >
+                              {ph.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <span className="text-center sm:text-left text-xs sm:text-sm font-bold text-black/40 flex-shrink-0 uppercase">vs</span>
+                    <div className="flex-1">
+                      <Select
+                        value={matchup[1] ?? '_bye'}
+                        onValueChange={v => setSlot(idx, 1, v === '_bye' ? null : v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_bye">— Bye —</SelectItem>
+                          {placeholderOptions.map(ph => (
+                            <SelectItem
+                              key={ph.value}
+                              value={ph.value}
+                              disabled={usedPlaceholders.has(ph.value) && matchup[1] !== ph.value}
+                            >
+                              {ph.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -933,18 +938,18 @@ export function BracketCrossingsModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-black/10">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-6 border-t border-black/10">
           <p className="text-xs text-black/50">
             Los cruces se resuelven automáticamente cuando los grupos terminen
           </p>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={onClose} className="flex-1 sm:flex-none">
               Cancelar
             </Button>
             <Button
               onClick={handleGenerate}
               disabled={!canGenerate || generating}
-              className="bg-spk-blue hover:bg-spk-blue/90"
+              className="bg-spk-blue hover:bg-spk-blue/90 flex-1 sm:flex-none"
             >
               {generating && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               Confirmar y Generar
