@@ -876,7 +876,6 @@ export function Home() {
           >
             &copy; 2026 · All Rights Reserved to the Developer.
           </div>
-          </div>
         </div>
       </footer>
     </div>
