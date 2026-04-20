@@ -857,29 +857,29 @@ export function Home() {
             </a>
           </div>
 
-          {/* Red accent rule */}
-          <div className="mt-8 h-px w-full bg-gradient-to-r from-transparent via-spk-red/40 to-transparent" />
+          {/* Hairline rule — subtler than the red gradient we had before */}
+          <div className="mt-8 h-px w-full bg-white/[0.06]" />
 
-          {/* Contact + copyright strip */}
-          <div className="mt-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-xs text-white/50">
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          {/* Contact + copyright strip — plain text links, no icons, with a
+              thin middot between email and phone. */}
+          <div className="mt-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-xs text-white/45">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <a
                 href="mailto:santiagomurilloval@gmail.com"
-                className="inline-flex items-center gap-2 hover:text-white transition-colors"
+                className="hover:text-white transition-colors"
               >
-                <span className="text-spk-red" aria-hidden="true">✉</span>
                 santiagomurilloval@gmail.com
               </a>
+              <span className="text-white/15" aria-hidden="true">·</span>
               <a
                 href="tel:+573166275710"
-                className="inline-flex items-center gap-2 hover:text-white transition-colors"
+                className="hover:text-white transition-colors"
               >
-                <span className="text-spk-red" aria-hidden="true">☎</span>
                 +57 316 627 5710
               </a>
             </div>
             <div
-              className="text-[11px] uppercase tracking-[0.14em] text-white/40"
+              className="text-[11px] uppercase tracking-[0.14em] text-white/35"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
               &copy; 2026 Santiago Murillo Valencia · Todos los derechos reservados
