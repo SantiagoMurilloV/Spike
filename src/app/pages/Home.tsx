@@ -460,33 +460,47 @@ export function Home() {
 
       {/* Main Directory Section — Torneos / Equipos tabs share this slot so
           users switch between the two lists without losing hero context. */}
-      <section id="directory" className="bg-white text-black py-16 md:py-24 scroll-mt-20">
+      <section id="directory" className="bg-white text-black py-14 md:py-20 scroll-mt-20">
         <div className="max-w-[1600px] mx-auto px-6 md:px-12">
-          {/* Section Header */}
+          {/* Section Header — H2 + lead on the left, tab switcher on the
+              right (desktop). Stacks vertically on mobile. */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="mb-8 md:mb-12"
+            className="mb-8 md:mb-10 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6"
           >
-            <h2
-              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 tracking-tighter"
-              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-            >
-              {mainTab === 'tournaments' ? 'TODOS LOS TORNEOS' : 'TODOS LOS EQUIPOS'}
-            </h2>
-            <div className="w-20 h-1 bg-spk-red" />
-          </motion.div>
+            <div>
+              <div
+                className="text-[11px] text-spk-red uppercase tracking-[0.28em] mb-3"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+              >
+                {mainTab === 'tournaments' ? 'Temporada 2026' : 'Clubes & equipos'}
+              </div>
+              <h2
+                className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter leading-[0.95]"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+              >
+                {mainTab === 'tournaments' ? 'TODOS LOS TORNEOS' : 'TODOS LOS EQUIPOS'}
+              </h2>
+              <div className="mt-4 flex items-center gap-4">
+                <div className="w-20 h-1 bg-spk-red" />
+                <p className="text-sm md:text-base text-black/55 max-w-xl leading-relaxed">
+                  {mainTab === 'tournaments'
+                    ? 'Explora torneos en curso, próximos y ya finalizados. Toca cualquier torneo para ver brackets, tablas y resultados en vivo.'
+                    : 'Consulta los clubes registrados, categorías y toda la plantilla participante.'}
+                </p>
+              </div>
+            </div>
 
-          {/* Main tab switcher — segmented control with an animated sliding
-              indicator. The active pill is a black block that slides between
-              tabs via motion's `layoutId`, so switching feels physical. */}
-          <div
-            className="inline-flex items-center gap-1 mb-8 p-1.5 bg-black/[0.04] border border-black/10 rounded-sm"
-            role="tablist"
-            aria-label="Vista principal"
-          >
+            {/* Tab switcher moves inline with the header on lg+ so the
+                content grid sits tight against the controls. */}
+            <div
+              className="inline-flex items-center gap-1 p-1.5 bg-black/[0.04] border border-black/10 rounded-sm self-start lg:self-end shrink-0"
+              role="tablist"
+              aria-label="Vista principal"
+            >
             {([
               { value: 'tournaments', label: 'Torneos', count: tournaments.length, Icon: Trophy },
               { value: 'teams', label: 'Equipos', count: teams.length, Icon: Users },
@@ -538,20 +552,21 @@ export function Home() {
                 </button>
               );
             })}
-          </div>
+            </div>
+          </motion.div>
 
           {mainTab === 'tournaments' ? (
             <>
-              {/* Search and Filters — consolidated into a single toolbar card
-                  on desktop, stacked on mobile. Cleaner border + focus ring
-                  replaces the heavy bg-black/5 block from the old layout. */}
-              <div className="space-y-4 mb-10">
+              {/* Search + status filters — inline on lg+, stacked on mobile
+                  so the toolbar sits in one tidy row on desktop instead of
+                  eating two rows. */}
+              <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4 mb-8 lg:mb-10">
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.1 }}
-                  className="relative max-w-2xl group"
+                  className="relative flex-1 lg:max-w-md group"
                 >
                   <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40 group-focus-within:text-spk-red transition-colors" />
                   <input
@@ -578,7 +593,7 @@ export function Home() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.15 }}
-                  className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1"
+                  className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 lg:pb-0 lg:mx-0 lg:px-0 lg:flex-shrink-0"
                 >
                   {[
                     { value: 'all', label: 'Todos', count: statusCounts.all },
