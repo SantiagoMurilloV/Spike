@@ -42,8 +42,10 @@ const NAV_ITEMS: NavItem[] = [
  *   effect matching the design brief.
  * - Hidden on admin routes (the admin sidebar takes over there) and on
  *   `/login` so the login form owns the full viewport.
- * - Active item gets the brand-red tint and a 2px top rail; inactive
- *   items stay muted. Respects `pb-safe` via the body's safe-area padding.
+ * - Active item gets a full red-tinted highlight block (red top-rail +
+ *   translucent red fill + scaled-up red icon + bright-white uppercase
+ *   label) so the selection is impossible to miss on a phone. The
+ *   highlight block animates between items via `layoutId`.
  */
 export function MobileBottomNav() {
   const location = useLocation();
@@ -68,20 +70,30 @@ export function MobileBottomNav() {
             <li key={item.to}>
               <NavLink
                 to={item.to}
-                className="relative flex flex-col items-center justify-center gap-1 py-2.5 text-white/60 hover:text-white transition-colors"
+                className={`relative flex flex-col items-center justify-center gap-1 py-3 transition-colors ${
+                  isActive ? 'text-white' : 'text-white/55 hover:text-white/85'
+                }`}
                 aria-current={isActive ? 'page' : undefined}
               >
+                {/* Active highlight — full tinted block with red top-rail.
+                    `layoutId` animates the highlight block between items so
+                    the selection slides rather than blinks. */}
                 {isActive && (
                   <motion.span
-                    layoutId="mobile-nav-rail"
-                    className="absolute top-0 left-4 right-4 h-[2px] bg-spk-red"
-                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                    layoutId="mobile-nav-active"
+                    className="absolute inset-x-1.5 top-0 bottom-1 bg-spk-red/15 border-t-[3px] border-spk-red rounded-b-sm"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                     aria-hidden="true"
                   />
                 )}
-                <div className="relative">
+                <div className="relative z-10">
                   <Icon
-                    className={`w-5 h-5 ${isActive ? 'text-spk-red' : ''}`}
+                    className={`transition-all ${
+                      isActive
+                        ? 'w-6 h-6 text-spk-red drop-shadow-[0_0_8px_rgba(227,30,36,0.45)]'
+                        : 'w-5 h-5'
+                    }`}
+                    strokeWidth={isActive ? 2.4 : 2}
                     aria-hidden="true"
                   />
                   {item.live && (
@@ -92,8 +104,13 @@ export function MobileBottomNav() {
                   )}
                 </div>
                 <span
-                  className={`text-[10px] font-bold uppercase ${isActive ? 'text-white' : ''}`}
-                  style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
+                  className={`relative z-10 text-[10px] font-bold uppercase transition-colors ${
+                    isActive ? 'text-white' : ''
+                  }`}
+                  style={{
+                    fontFamily: 'Barlow Condensed, sans-serif',
+                    letterSpacing: '0.08em',
+                  }}
                 >
                   {item.label}
                 </span>
