@@ -43,6 +43,7 @@ function matchRow(overrides: Record<string, unknown> = {}): Record<string, unkno
     score_team1: 2,
     score_team2: 1,
     group_name: null,
+    status: 'completed',
     ...overrides,
   };
 }
@@ -97,23 +98,21 @@ describe('StandingsCalculator', () => {
   });
 
   // =========================================================================
-  // Req 7.2: 3 points per win, 0 per loss
+  // Req 7.2: Volleyball group-phase points
+  //   - 2-0 sweep → 3 pts winner / 0 pts loser
+  //   - 2-1       → 2 pts winner / 1 pt  loser
   // Req 7.3: Stats calculation (played, wins, losses, setsFor, setsAgainst, points)
   // =========================================================================
   describe('calculate() - points and stats (Req 7.2, 7.3)', () => {
-    it('should assign 3 points per win and 0 per loss', async () => {
-      // Single match: team-A wins 2-1 over team-B
+    it('should award 3/0 for a 2-0 sweep', async () => {
+      // team-A sweeps team-B 2-0
       const poolQuery = vi.fn()
-        // 1. Tournament exists
         .mockResolvedValueOnce({ rows: [{ id: 'tournament-1', format: 'groups' }] })
-        // 2. Completed matches
         .mockResolvedValueOnce({
-          rows: [matchRow({ id: 'match-1', team1_id: 'team-A', team2_id: 'team-B', score_team1: 2, score_team2: 1 })],
+          rows: [matchRow({ id: 'match-1', team1_id: 'team-A', team2_id: 'team-B', score_team1: 2, score_team2: 0 })],
         })
-        // 3. Set scores (empty - fallback to score_team1/score_team2)
         .mockResolvedValueOnce({ rows: [] });
 
-      let insertedRows: Record<string, unknown>[] = [];
       const clientQuery = vi.fn().mockImplementation((sql: string, params?: unknown[]) => {
         if (typeof sql === 'string' && sql.startsWith('INSERT INTO standings')) {
           const row = standingsDbRow({
@@ -127,7 +126,6 @@ describe('StandingsCalculator', () => {
             points: params![9],
             is_qualified: params![10],
           });
-          insertedRows.push(row);
           return Promise.resolve({ rows: [row] });
         }
         return Promise.resolve({ rows: [] });
@@ -137,20 +135,59 @@ describe('StandingsCalculator', () => {
       const standings = await calculator.calculate('tournament-1');
 
       expect(standings).toHaveLength(2);
-      // Winner (team-A): 3 points
       const winner = standings.find(s => s.teamId === 'team-A')!;
       expect(winner.points).toBe(3);
       expect(winner.wins).toBe(1);
       expect(winner.losses).toBe(0);
-      // Loser (team-B): 0 points
       const loser = standings.find(s => s.teamId === 'team-B')!;
       expect(loser.points).toBe(0);
       expect(loser.wins).toBe(0);
       expect(loser.losses).toBe(1);
     });
 
-    it('should calculate all stats correctly: played, wins, losses, setsFor, setsAgainst', async () => {
-      // Two matches: team-A beats team-B (2-1), team-A beats team-C (2-0)
+    it('should award 2/1 for a 2-1 win (loser gets a consolation point)', async () => {
+      // team-A wins 2-1 over team-B → 2 pts to A, 1 pt to B
+      const poolQuery = vi.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 'tournament-1', format: 'groups' }] })
+        .mockResolvedValueOnce({
+          rows: [matchRow({ id: 'match-1', team1_id: 'team-A', team2_id: 'team-B', score_team1: 2, score_team2: 1 })],
+        })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const clientQuery = vi.fn().mockImplementation((sql: string, params?: unknown[]) => {
+        if (typeof sql === 'string' && sql.startsWith('INSERT INTO standings')) {
+          const row = standingsDbRow({
+            team_id: params![1],
+            position: params![3],
+            played: params![4],
+            wins: params![5],
+            losses: params![6],
+            sets_for: params![7],
+            sets_against: params![8],
+            points: params![9],
+            is_qualified: params![10],
+          });
+          return Promise.resolve({ rows: [row] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      mockPoolWithClient(poolQuery, clientQuery);
+      const standings = await calculator.calculate('tournament-1');
+
+      expect(standings).toHaveLength(2);
+      const winner = standings.find(s => s.teamId === 'team-A')!;
+      expect(winner.points).toBe(2);
+      expect(winner.wins).toBe(1);
+      expect(winner.losses).toBe(0);
+      const loser = standings.find(s => s.teamId === 'team-B')!;
+      expect(loser.points).toBe(1);
+      expect(loser.wins).toBe(0);
+      expect(loser.losses).toBe(1);
+    });
+
+    it('should calculate all stats correctly across a mix of 2-0 and 2-1 results', async () => {
+      // Two matches: team-A beats team-B 2-1, team-A sweeps team-C 2-0
       const poolQuery = vi.fn()
         .mockResolvedValueOnce({ rows: [{ id: 'tournament-1', format: 'groups' }] })
         .mockResolvedValueOnce({
@@ -159,7 +196,7 @@ describe('StandingsCalculator', () => {
             matchRow({ id: 'match-2', team1_id: 'team-A', team2_id: 'team-C', score_team1: 2, score_team2: 0 }),
           ],
         })
-        .mockResolvedValueOnce({ rows: [] }); // no set_scores
+        .mockResolvedValueOnce({ rows: [] });
 
       const clientQuery = vi.fn().mockImplementation((sql: string, params?: unknown[]) => {
         if (typeof sql === 'string' && sql.startsWith('INSERT INTO standings')) {
@@ -188,7 +225,7 @@ describe('StandingsCalculator', () => {
       expect(teamA.losses).toBe(0);
       expect(teamA.setsFor).toBe(4);      // 2 + 2
       expect(teamA.setsAgainst).toBe(1);  // 1 + 0
-      expect(teamA.points).toBe(6);       // 2 wins * 3
+      expect(teamA.points).toBe(5);       // 2 (2-1 win) + 3 (2-0 sweep)
 
       const teamB = standings.find(s => s.teamId === 'team-B')!;
       expect(teamB.played).toBe(1);
@@ -196,7 +233,7 @@ describe('StandingsCalculator', () => {
       expect(teamB.losses).toBe(1);
       expect(teamB.setsFor).toBe(1);
       expect(teamB.setsAgainst).toBe(2);
-      expect(teamB.points).toBe(0);
+      expect(teamB.points).toBe(1);       // 2-1 loser gets 1 pt
 
       const teamC = standings.find(s => s.teamId === 'team-C')!;
       expect(teamC.played).toBe(1);
@@ -204,11 +241,11 @@ describe('StandingsCalculator', () => {
       expect(teamC.losses).toBe(1);
       expect(teamC.setsFor).toBe(0);
       expect(teamC.setsAgainst).toBe(2);
-      expect(teamC.points).toBe(0);
+      expect(teamC.points).toBe(0);       // 2-0 loser gets 0 pts
     });
 
     it('should use set_scores to determine sets won when available', async () => {
-      // Match with set_scores: team-A wins sets 1 and 3, team-B wins set 2
+      // Match with set_scores: team-A wins sets 1 and 3, team-B wins set 2 → 2-1
       const poolQuery = vi.fn()
         .mockResolvedValueOnce({ rows: [{ id: 'tournament-1', format: 'groups' }] })
         .mockResolvedValueOnce({
@@ -244,20 +281,20 @@ describe('StandingsCalculator', () => {
       const standings = await calculator.calculate('tournament-1');
 
       const teamA = standings.find(s => s.teamId === 'team-A')!;
-      expect(teamA.setsFor).toBe(2);      // won 2 sets
-      expect(teamA.setsAgainst).toBe(1);  // lost 1 set
+      expect(teamA.setsFor).toBe(2);
+      expect(teamA.setsAgainst).toBe(1);
       expect(teamA.wins).toBe(1);
-      expect(teamA.points).toBe(3);
+      expect(teamA.points).toBe(2);       // 2-1 win → 2 pts
 
       const teamB = standings.find(s => s.teamId === 'team-B')!;
       expect(teamB.setsFor).toBe(1);
       expect(teamB.setsAgainst).toBe(2);
       expect(teamB.wins).toBe(0);
-      expect(teamB.points).toBe(0);
+      expect(teamB.points).toBe(1);       // 2-1 loser → 1 pt
     });
 
-    it('should assign 0 points for a team with 0 wins', async () => {
-      // team-B beats team-A: team-A has 0 wins
+    it('should assign 0 points for a team that got swept (2-0)', async () => {
+      // team-B sweeps team-A 2-0 → team-A has 0 wins and 0 points
       const poolQuery = vi.fn()
         .mockResolvedValueOnce({ rows: [{ id: 'tournament-1', format: 'groups' }] })
         .mockResolvedValueOnce({
@@ -283,6 +320,72 @@ describe('StandingsCalculator', () => {
       const teamA = standings.find(s => s.teamId === 'team-A')!;
       expect(teamA.points).toBe(0);
       expect(teamA.wins).toBe(0);
+    });
+
+    it('should include teams from the fixture even if they have no completed matches yet', async () => {
+      // Only one match is completed; the other is 'upcoming' — but its teams
+      // should still appear in the standings with zeroed stats so organizers
+      // can see the full group roster on the public page.
+      const poolQuery = vi.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 'tournament-1', format: 'groups' }] })
+        .mockResolvedValueOnce({
+          rows: [
+            matchRow({
+              id: 'match-1',
+              team1_id: 'team-A',
+              team2_id: 'team-B',
+              score_team1: 2,
+              score_team2: 0,
+              group_name: 'A',
+              status: 'completed',
+            }),
+            matchRow({
+              id: 'match-2',
+              team1_id: 'team-C',
+              team2_id: 'team-D',
+              score_team1: 0,
+              score_team2: 0,
+              group_name: 'A',
+              status: 'upcoming',
+            }),
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const clientQuery = vi.fn().mockImplementation((sql: string, params?: unknown[]) => {
+        if (typeof sql === 'string' && sql.startsWith('INSERT INTO standings')) {
+          const row = standingsDbRow({
+            team_id: params![1],
+            group_name: params![2],
+            position: params![3],
+            played: params![4],
+            wins: params![5],
+            losses: params![6],
+            sets_for: params![7],
+            sets_against: params![8],
+            points: params![9],
+            is_qualified: params![10],
+          });
+          return Promise.resolve({ rows: [row] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      mockPoolWithClient(poolQuery, clientQuery);
+      const standings = await calculator.calculate('tournament-1');
+
+      // All 4 teams must appear — team-C and team-D with zeroed stats.
+      expect(standings).toHaveLength(4);
+      const teamC = standings.find(s => s.teamId === 'team-C')!;
+      expect(teamC).toBeDefined();
+      expect(teamC.played).toBe(0);
+      expect(teamC.wins).toBe(0);
+      expect(teamC.losses).toBe(0);
+      expect(teamC.points).toBe(0);
+      const teamD = standings.find(s => s.teamId === 'team-D')!;
+      expect(teamD).toBeDefined();
+      expect(teamD.played).toBe(0);
+      expect(teamD.points).toBe(0);
     });
   });
 
@@ -335,7 +438,11 @@ describe('StandingsCalculator', () => {
     }
 
     it('should sort by points descending (Req 7.4)', async () => {
-      // team-A: 2 wins (6 pts), team-B: 1 win (3 pts), team-C: 0 wins (0 pts)
+      // Volleyball points (2-0 = 3/0, 2-1 = 2/1):
+      //  m1: A beats B 2-1 → A +2, B +1
+      //  m2: A beats C 2-0 → A +3, C 0
+      //  m3: B beats C 2-1 → B +2, C +1
+      // Totals: A=5, B=3, C=1
       const standings = await calculateWithMatches([
         { id: 'm1', team1: 'team-A', team2: 'team-B', score1: 2, score2: 1 },
         { id: 'm2', team1: 'team-A', team2: 'team-C', score1: 2, score2: 0 },
@@ -343,7 +450,7 @@ describe('StandingsCalculator', () => {
       ]);
 
       expect(standings[0].teamId).toBe('team-A');
-      expect(standings[0].points).toBe(6);
+      expect(standings[0].points).toBe(5);
       expect(standings[0].position).toBe(1);
 
       expect(standings[1].teamId).toBe('team-B');
@@ -351,7 +458,7 @@ describe('StandingsCalculator', () => {
       expect(standings[1].position).toBe(2);
 
       expect(standings[2].teamId).toBe('team-C');
-      expect(standings[2].points).toBe(0);
+      expect(standings[2].points).toBe(1);
       expect(standings[2].position).toBe(3);
     });
 

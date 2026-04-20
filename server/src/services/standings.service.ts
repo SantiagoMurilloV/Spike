@@ -35,17 +35,20 @@ export class StandingsCalculator {
     }
     const format = tournamentResult.rows[0].format as string;
 
-    // Get all completed matches for this tournament
-    const matchesResult = await pool.query(
-      `SELECT m.id, m.team1_id, m.team2_id, m.score_team1, m.score_team2, m.group_name
+    // Get ALL matches for this tournament (any status) — so we can seed the
+    // standings with every team that belongs to a group, even if they haven't
+    // played yet. This makes the public group matrix show all teams with 0
+    // points instead of hiding the ones with no completed matches.
+    const allMatchesResult = await pool.query(
+      `SELECT m.id, m.team1_id, m.team2_id, m.score_team1, m.score_team2, m.group_name, m.status
        FROM matches m
-       WHERE m.tournament_id = $1 AND m.status = 'completed'`,
+       WHERE m.tournament_id = $1`,
       [tournamentId]
     );
 
-    // Get set scores for all completed matches
-    const matchIds = matchesResult.rows.map((r: Record<string, unknown>) => r.id as string);
-    let setsByMatch = new Map<string, Array<{ team1Points: number; team2Points: number }>>();
+    // Get set scores for all matches (we only use them for completed ones below)
+    const matchIds = allMatchesResult.rows.map((r: Record<string, unknown>) => r.id as string);
+    const setsByMatch = new Map<string, Array<{ team1Points: number; team2Points: number }>>();
 
     if (matchIds.length > 0) {
       const setsResult = await pool.query(
@@ -66,7 +69,38 @@ export class StandingsCalculator {
     // Aggregate stats per team
     const statsMap = new Map<string, TeamStats>();
 
-    for (const row of matchesResult.rows) {
+    // Helper: ensure a (team, group) entry exists with zeroed stats.
+    const ensureStats = (teamId: string, groupName: string | null) => {
+      const key = `${teamId}::${groupName ?? ''}`;
+      if (!statsMap.has(key)) {
+        statsMap.set(key, {
+          teamId,
+          groupName,
+          played: 0,
+          wins: 0,
+          losses: 0,
+          setsFor: 0,
+          setsAgainst: 0,
+          points: 0,
+        });
+      }
+      return statsMap.get(key)!;
+    };
+
+    // First pass: seed every team present in the fixture (regardless of status)
+    // so un-played teams still show up at the bottom of the group table.
+    for (const row of allMatchesResult.rows) {
+      const team1Id = row.team1_id as string;
+      const team2Id = row.team2_id as string;
+      const groupName = (row.group_name as string) || null;
+      if (team1Id) ensureStats(team1Id, groupName);
+      if (team2Id) ensureStats(team2Id, groupName);
+    }
+
+    // Second pass: only completed matches contribute to stats.
+    for (const row of allMatchesResult.rows) {
+      if ((row.status as string) !== 'completed') continue;
+
       const team1Id = row.team1_id as string;
       const team2Id = row.team2_id as string;
       const scoreTeam1 = (row.score_team1 as number) ?? 0;
@@ -92,19 +126,8 @@ export class StandingsCalculator {
       // Determine winner: team with more sets won
       const team1Won = setsWonByTeam1 > setsWonByTeam2;
 
-      // Build composite key: teamId + groupName for group-based standings
-      const key1 = `${team1Id}::${groupName ?? ''}`;
-      const key2 = `${team2Id}::${groupName ?? ''}`;
-
-      if (!statsMap.has(key1)) {
-        statsMap.set(key1, { teamId: team1Id, groupName, played: 0, wins: 0, losses: 0, setsFor: 0, setsAgainst: 0, points: 0 });
-      }
-      if (!statsMap.has(key2)) {
-        statsMap.set(key2, { teamId: team2Id, groupName, played: 0, wins: 0, losses: 0, setsFor: 0, setsAgainst: 0, points: 0 });
-      }
-
-      const stats1 = statsMap.get(key1)!;
-      const stats2 = statsMap.get(key2)!;
+      const stats1 = ensureStats(team1Id, groupName);
+      const stats2 = ensureStats(team2Id, groupName);
 
       stats1.played++;
       stats2.played++;
@@ -114,14 +137,27 @@ export class StandingsCalculator {
       stats2.setsFor += setsWonByTeam2;
       stats2.setsAgainst += setsWonByTeam1;
 
+      // Volleyball group-phase points (best-of-3):
+      //   2-0 sweep → 3 pts winner / 0 pts loser
+      //   2-1       → 2 pts winner / 1 pt  loser
       if (team1Won) {
         stats1.wins++;
-        stats1.points += 3;
         stats2.losses++;
+        if (setsWonByTeam2 === 0) {
+          stats1.points += 3;
+        } else {
+          stats1.points += 2;
+          stats2.points += 1;
+        }
       } else {
         stats2.wins++;
-        stats2.points += 3;
         stats1.losses++;
+        if (setsWonByTeam1 === 0) {
+          stats2.points += 3;
+        } else {
+          stats2.points += 2;
+          stats1.points += 1;
+        }
       }
     }
 
