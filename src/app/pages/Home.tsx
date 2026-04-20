@@ -796,52 +796,55 @@ export function Home() {
       </section>
 
       {/* Footer — club branding on the left, developer signature on the
-          right, contact + copyright strip below, all tied together with a
-          thin red rule so it reads as one elegant block. */}
-      <footer className="bg-black text-white pt-12 pb-10 border-t border-white/10">
-        <div className="max-w-[1600px] mx-auto px-6 md:px-12">
-          {/* Top row: club brand + dev signature */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
-            <div className="flex items-center gap-3">
+          right, contact + copyright strip below. Keeps the same horizontal
+          layout on phones (just scaled down a notch) so the composition
+          reads the same regardless of viewport. */}
+      <footer className="bg-black text-white pt-8 md:pt-12 pb-6 md:pb-10 border-t border-white/10">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-12">
+          {/* Top row: club brand + dev signature, horizontal at every size */}
+          <div className="flex flex-row items-center justify-between gap-3 sm:gap-6">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <img
                 src={spkLogo}
                 alt="SPK-CUP Logo"
-                className="w-16 h-16"
+                className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 flex-shrink-0"
               />
-              <div>
+              <div className="min-w-0">
                 <div
-                  className="text-xl font-bold tracking-tighter"
+                  className="text-base sm:text-lg md:text-xl font-bold tracking-tighter leading-tight"
                   style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
                 >
                   SPiKE
                 </div>
-                <div className="text-xs text-white/50">Club Deportivo Spike</div>
+                <div className="text-[10px] sm:text-xs text-white/50 truncate">
+                  Club Deportivo Spike
+                </div>
               </div>
             </div>
 
             {/* Developer signature — magazine-byline style (non-interactive).
-                Tiny red "DESARROLLADO POR" kicker above the name, `</>`
-                glyph + subtle vertical rule to the left, role beneath. */}
-            <div className="inline-flex items-center gap-3">
+                Scales down on narrow viewports so it keeps sharing the row
+                with the club mark. */}
+            <div className="inline-flex items-center gap-2 sm:gap-3 flex-shrink-0">
               <span
-                className="font-mono text-base text-spk-red/85"
+                className="font-mono text-sm sm:text-base text-spk-red/85"
                 aria-hidden="true"
               >
                 &lt;/&gt;
               </span>
-              <span className="w-px h-10 bg-white/10" aria-hidden="true" />
+              <span className="w-px h-8 sm:h-10 bg-white/10" aria-hidden="true" />
               <span className="flex flex-col leading-tight">
                 <span
-                  className="text-[9px] text-spk-red/80 uppercase"
+                  className="text-[8px] sm:text-[9px] text-spk-red/80 uppercase"
                   style={{
                     fontFamily: 'Barlow Condensed, sans-serif',
-                    letterSpacing: '0.28em',
+                    letterSpacing: '0.24em',
                   }}
                 >
                   Developed by
                 </span>
                 <span
-                  className="mt-0.5 text-sm text-white/85"
+                  className="mt-0.5 text-xs sm:text-sm text-white/85"
                   style={{
                     fontFamily: 'Barlow Condensed, sans-serif',
                     letterSpacing: '0.02em',
@@ -850,10 +853,10 @@ export function Home() {
                   Santiago Murillo Valencia
                 </span>
                 <span
-                  className="text-[10px] text-white/40 uppercase"
+                  className="text-[8px] sm:text-[10px] text-white/40 uppercase"
                   style={{
                     fontFamily: 'Barlow Condensed, sans-serif',
-                    letterSpacing: '0.22em',
+                    letterSpacing: '0.2em',
                   }}
                 >
                   Full-Stack Developer
@@ -862,29 +865,29 @@ export function Home() {
             </div>
           </div>
 
-          {/* Hairline rule — subtler than the red gradient we had before */}
-          <div className="mt-8 h-px w-full bg-white/[0.06]" />
+          {/* Hairline rule */}
+          <div className="mt-6 md:mt-8 h-px w-full bg-white/[0.06]" />
 
-          {/* Contact + copyright strip — plain text links, no icons, with a
-              thin middot between email and phone. */}
-          <div className="mt-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-xs text-white/45">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {/* Contact + copyright strip — same horizontal layout on mobile,
+              smaller font + tighter gaps so it still fits on one row. */}
+          <div className="mt-4 md:mt-6 flex flex-row items-center justify-between gap-3 text-[10px] sm:text-xs text-white/45">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink">
               <a
                 href="mailto:santiagomurilloval@gmail.com"
-                className="hover:text-white transition-colors"
+                className="hover:text-white transition-colors truncate"
               >
                 santiagomurilloval@gmail.com
               </a>
-              <span className="text-white/15" aria-hidden="true">·</span>
+              <span className="text-white/15 flex-shrink-0" aria-hidden="true">·</span>
               <a
                 href="tel:+573166275710"
-                className="hover:text-white transition-colors"
+                className="hover:text-white transition-colors whitespace-nowrap"
               >
                 +57 316 627 5710
               </a>
             </div>
             <div
-              className="text-[11px] uppercase tracking-[0.14em] text-white/35"
+              className="text-[9px] sm:text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.14em] text-white/35 text-right flex-shrink-0"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
               &copy; 2026 · All Rights Reserved to the Developer.
