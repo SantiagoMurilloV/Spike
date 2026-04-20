@@ -838,7 +838,7 @@ export function Home() {
                     letterSpacing: '0.28em',
                   }}
                 >
-                  Desarrollado por
+                  Developed by
                 </span>
                 <span
                   className="mt-0.5 text-sm text-white/85"
@@ -887,7 +887,7 @@ export function Home() {
               className="text-[11px] uppercase tracking-[0.14em] text-white/35"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
-              &copy; 2026 · All Rights Reserved to the Developer
+              &copy; 2026 · All Rights Reserved to the Developer.
             </div>
           </div>
         </div>
