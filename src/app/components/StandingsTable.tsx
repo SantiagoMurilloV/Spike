@@ -54,26 +54,38 @@ export function StandingsTable({ standings, groupName }: StandingsTableProps) {
             className="sticky top-0 z-10 bg-black text-white"
             style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
           >
-            <tr className="text-[11px] uppercase">
-              <th scope="col" className="px-4 py-3 text-left font-bold w-12">
+            <tr className="text-[10px] sm:text-[11px] uppercase">
+              <th scope="col" className="px-2 sm:px-4 py-3 text-left font-bold w-10 sm:w-12">
                 #
               </th>
-              <th scope="col" className="px-4 py-3 text-left font-bold">
+              <th scope="col" className="px-2 sm:px-4 py-3 text-left font-bold">
                 Equipo
               </th>
-              <th scope="col" className="px-2 py-3 text-right font-bold w-10" title="Partidos jugados">
+              <th
+                scope="col"
+                className="hidden sm:table-cell px-2 py-3 text-right font-bold w-10"
+                title="Partidos jugados"
+              >
                 PJ
               </th>
-              <th scope="col" className="px-2 py-3 text-right font-bold w-10" title="Partidos ganados">
+              <th scope="col" className="px-1.5 sm:px-2 py-3 text-right font-bold w-9 sm:w-10" title="Partidos ganados">
                 PG
               </th>
-              <th scope="col" className="px-2 py-3 text-right font-bold w-10" title="Partidos perdidos">
+              <th
+                scope="col"
+                className="hidden xs:table-cell sm:table-cell px-1.5 sm:px-2 py-3 text-right font-bold w-9 sm:w-10"
+                title="Partidos perdidos"
+              >
                 PP
               </th>
-              <th scope="col" className="px-2 py-3 text-right font-bold w-16" title="Sets a favor / en contra">
+              <th
+                scope="col"
+                className="hidden md:table-cell px-2 py-3 text-right font-bold w-16"
+                title="Sets a favor / en contra"
+              >
                 Sets
               </th>
-              <th scope="col" className="px-4 py-3 text-right font-bold w-12" title="Puntos">
+              <th scope="col" className="px-2 sm:px-4 py-3 text-right font-bold w-11 sm:w-12" title="Puntos">
                 Pts
               </th>
             </tr>
@@ -97,10 +109,10 @@ export function StandingsTable({ standings, groupName }: StandingsTableProps) {
                     borderLeft: row.isQualified ? '3px solid #E31E24' : '3px solid transparent',
                   }}
                 >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+                  <td className="px-2 sm:px-4 py-2.5 sm:py-3">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                       <span
-                        className="font-bold text-base tabular-nums"
+                        className="font-bold text-sm sm:text-base tabular-nums"
                         style={{
                           fontFamily: 'Barlow Condensed, sans-serif',
                           color: medalColor ?? (row.position <= 3 ? '#0F0F14' : 'rgba(0,0,0,0.6)'),
@@ -110,44 +122,53 @@ export function StandingsTable({ standings, groupName }: StandingsTableProps) {
                       </span>
                       {isPodium && (
                         <Trophy
-                          className="w-4 h-4 flex-shrink-0"
+                          className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0"
                           style={{ color: medalColor }}
                           aria-hidden="true"
                         />
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3 min-w-0">
+                  <td className="px-2 sm:px-4 py-2.5 sm:py-3">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                       <TeamAvatar team={row.team} size="sm" />
-                      <span
-                        className="font-bold text-sm uppercase truncate"
-                        style={{
-                          fontFamily: 'Barlow Condensed, sans-serif',
-                          letterSpacing: '0.02em',
-                        }}
-                      >
-                        {row.team.name}
-                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div
+                          className="font-bold text-xs sm:text-sm uppercase truncate"
+                          style={{
+                            fontFamily: 'Barlow Condensed, sans-serif',
+                            letterSpacing: '0.02em',
+                          }}
+                        >
+                          {row.team.name}
+                        </div>
+                        {/* On tiny screens, show PJ/PP/Sets as subline since columns are hidden */}
+                        <div
+                          className="sm:hidden text-[10px] text-black/50 mt-0.5 tabular-nums"
+                          style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.04em' }}
+                        >
+                          PJ {row.played} · PP {row.losses} · {row.setsFor}/{row.setsAgainst}
+                        </div>
+                      </div>
                     </div>
                   </td>
-                  <td className="px-2 py-3 text-right text-sm tabular-nums text-black/70">
+                  <td className="hidden sm:table-cell px-2 py-3 text-right text-sm tabular-nums text-black/70">
                     {row.played}
                   </td>
                   <td
-                    className="px-2 py-3 text-right text-sm font-bold tabular-nums"
+                    className="px-1.5 sm:px-2 py-2.5 sm:py-3 text-right text-xs sm:text-sm font-bold tabular-nums"
                     style={{ color: 'var(--feedback-win)' }}
                   >
                     {row.wins}
                   </td>
-                  <td className="px-2 py-3 text-right text-sm tabular-nums text-black/50">
+                  <td className="hidden xs:table-cell sm:table-cell px-1.5 sm:px-2 py-3 text-right text-sm tabular-nums text-black/50">
                     {row.losses}
                   </td>
-                  <td className="px-2 py-3 text-right text-xs tabular-nums text-black/60">
+                  <td className="hidden md:table-cell px-2 py-3 text-right text-xs tabular-nums text-black/60">
                     {row.setsFor}/{row.setsAgainst}
                   </td>
                   <td
-                    className="px-4 py-3 text-right font-bold text-xl tabular-nums"
+                    className="px-2 sm:px-4 py-2.5 sm:py-3 text-right font-bold text-lg sm:text-xl tabular-nums"
                     style={{ fontFamily: 'Barlow Condensed, sans-serif', color: '#0F0F14' }}
                   >
                     {row.points}

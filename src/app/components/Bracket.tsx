@@ -5,6 +5,7 @@ import confetti from 'canvas-confetti';
 import { BracketMatch, Match } from '../types';
 import { Trophy } from 'lucide-react';
 import { TeamAvatar } from './TeamAvatar';
+import { useIsMobile } from './ui/use-mobile';
 
 /**
  * Fires a celebratory confetti burst in brand colors.
@@ -81,14 +82,47 @@ function generateSeedLabels(groups: string[]): [string, string][] {
   return seeds;
 }
 
-// ── Dimensions (bigger, broadcast-scale) ─────────────────────────
-const MATCH_W = 280;           // match card width
-const MATCH_H = 96;             // match card height
-const COL_GAP = 72;             // horizontal gap between rounds
-const ROUND_W = MATCH_W + COL_GAP;
-const ROW_GAP = 20;             // vertical gap between match cards in a round
-const HEADER_H = 56;            // round header (black bar + red underline)
-const TEAM_COLOR_RAIL_W = 5;    // left-edge team color strip inside each slot
+// ── Dimensions ────────────────────────────────────────────────────
+//
+// Desktop gets the broadcast-scale layout; mobile gets a compressed version
+// so the bracket stays tappable and readable in a phone viewport. The SVG
+// still overflow-x-scrolls on mobile if the round count is high, but the
+// per-card footprint is ~60% of desktop so 4 rounds fit in ~800 px instead
+// of ~1400 px.
+const DIMENSIONS = {
+  desktop: {
+    MATCH_W: 280,
+    MATCH_H: 96,
+    COL_GAP: 72,
+    ROW_GAP: 20,
+    HEADER_H: 56,
+    TEAM_COLOR_RAIL_W: 5,
+    AVATAR_SIZE: 28,
+    TEAM_NAME_FONT: 15,
+    TEAM_INITIALS_FONT: 12,
+    SCORE_FONT: 22,
+    ROUND_LABEL_FONT: 13,
+    ROUND_COUNT_FONT: 10,
+    MAX_NAME_CHARS: 22,
+  },
+  mobile: {
+    MATCH_W: 200,
+    MATCH_H: 80,
+    COL_GAP: 36,
+    ROW_GAP: 14,
+    HEADER_H: 48,
+    TEAM_COLOR_RAIL_W: 4,
+    AVATAR_SIZE: 22,
+    TEAM_NAME_FONT: 12,
+    TEAM_INITIALS_FONT: 10,
+    SCORE_FONT: 18,
+    ROUND_LABEL_FONT: 11,
+    ROUND_COUNT_FONT: 9,
+    MAX_NAME_CHARS: 14,
+  },
+} as const;
+
+type BracketDims = typeof DIMENSIONS.desktop;
 
 function parseRound(round: string) {
   if (round.includes('|')) {
@@ -99,6 +133,9 @@ function parseRound(round: string) {
 }
 
 export function Bracket({ matches }: BracketProps) {
+  const isMobile = useIsMobile();
+  const dims = isMobile ? DIMENSIONS.mobile : DIMENSIONS.desktop;
+
   const categories = useMemo(() => {
     const map = new Map<string, BracketMatch[]>();
     for (const m of matches) {
@@ -130,12 +167,13 @@ export function Bracket({ matches }: BracketProps) {
   if (categories.length === 0) return null;
 
   return (
-    <div className="space-y-16">
+    <div className="space-y-10 sm:space-y-16">
       {categories.map(([category, catMatches]) => (
         <CategoryBracket
           key={category || '_'}
           category={category}
           bracketMatches={catMatches}
+          dims={dims}
         />
       ))}
     </div>
@@ -145,10 +183,14 @@ export function Bracket({ matches }: BracketProps) {
 function CategoryBracket({
   category,
   bracketMatches,
+  dims,
 }: {
   category: string;
   bracketMatches: BracketMatch[];
+  dims: BracketDims;
 }) {
+  const { MATCH_W, MATCH_H, COL_GAP, ROW_GAP, HEADER_H } = dims;
+  const ROUND_W = MATCH_W + COL_GAP;
   const standard = bracketMatches.filter((m) => !parseRound(m.round).name.includes('tercer'));
   const thirdPlace = bracketMatches.find((m) => parseRound(m.round).name.includes('tercer'));
 
@@ -175,7 +217,7 @@ function CategoryBracket({
     <div>
       {category && (
         <h2
-          className="text-3xl font-bold mb-5 pb-3 uppercase"
+          className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-5 pb-2 sm:pb-3 uppercase"
           style={{ ...FONT, letterSpacing: '-0.02em', borderBottom: '3px solid var(--brand-red)' }}
         >
           {category}
@@ -183,7 +225,7 @@ function CategoryBracket({
       )}
 
       <div
-        className="overflow-x-auto pb-6 rounded-sm"
+        className="overflow-x-auto pb-4 sm:pb-6 rounded-sm"
         style={{ background: 'linear-gradient(180deg, #F8F9FB 0%, #FFFFFF 100%)', border: '1px solid rgba(0,0,0,0.06)' }}
       >
         <svg
@@ -261,18 +303,26 @@ function CategoryBracket({
                   x={x + MATCH_W / 2}
                   y={28}
                   textAnchor="middle"
-                  className="fill-white text-[13px] font-bold uppercase"
-                  style={{ ...FONT, letterSpacing: '0.16em' }}
+                  className="fill-white font-bold uppercase"
+                  style={{
+                    ...FONT,
+                    letterSpacing: '0.16em',
+                    fontSize: dims.ROUND_LABEL_FONT,
+                  }}
                 >
                   {round.label.toUpperCase()}
                 </text>
                 {/* Match count pill */}
                 <text
                   x={x + MATCH_W / 2}
-                  y={50}
+                  y={dims.HEADER_H - 6}
                   textAnchor="middle"
-                  className="fill-black/40 text-[10px] font-bold uppercase"
-                  style={{ ...FONT, letterSpacing: '0.14em' }}
+                  className="fill-black/40 font-bold uppercase"
+                  style={{
+                    ...FONT,
+                    letterSpacing: '0.14em',
+                    fontSize: dims.ROUND_COUNT_FONT,
+                  }}
                 >
                   {matchCount} {matchCount === 1 ? 'Partido' : 'Partidos'}
                 </text>
@@ -321,6 +371,7 @@ function CategoryBracket({
                       match={match}
                       label1={label1}
                       label2={label2}
+                      dims={dims}
                     />
                   );
                 })}
@@ -353,13 +404,16 @@ function BracketMatchBox({
   match,
   label1,
   label2,
+  dims,
 }: {
   x: number;
   y: number;
   match: BracketMatch;
   label1?: string;
   label2?: string;
+  dims: BracketDims;
 }) {
+  const { MATCH_W, MATCH_H } = dims;
   const isLive = match.status === 'live';
   const isCompleted = match.status === 'completed';
   const hasWinner = match.winner !== undefined;
@@ -417,6 +471,7 @@ function BracketMatchBox({
         isWinner={t1Won}
         isLoser={isCompleted && !t1Won && hasWinner}
         label={label1}
+        dims={dims}
       />
       <BracketTeamSlot
         x={x}
@@ -426,6 +481,7 @@ function BracketMatchBox({
         isWinner={t2Won}
         isLoser={isCompleted && !t2Won && hasWinner}
         label={label2}
+        dims={dims}
       />
     </g>
   );
@@ -439,6 +495,7 @@ function BracketTeamSlot({
   isWinner,
   isLoser,
   label,
+  dims,
 }: {
   x: number;
   y: number;
@@ -447,19 +504,38 @@ function BracketTeamSlot({
   isWinner: boolean;
   isLoser: boolean;
   label?: string;
+  dims: BracketDims;
 }) {
+  const {
+    MATCH_W,
+    MATCH_H,
+    TEAM_COLOR_RAIL_W,
+    AVATAR_SIZE,
+    TEAM_NAME_FONT,
+    TEAM_INITIALS_FONT,
+    SCORE_FONT,
+    MAX_NAME_CHARS,
+  } = dims;
   const halfH = MATCH_H / 2;
   const cy = y + halfH / 2;
+  const avatarPadX = TEAM_COLOR_RAIL_W + 10;
+  const nameX = avatarPadX + AVATAR_SIZE + 8;
+  const scoreRightPad = 10;
+  const trophySize = 14;
 
   if (!team) {
     return (
       <g>
         <text
-          x={x + 20}
+          x={x + 16}
           y={cy}
           dominantBaseline="central"
-          className="fill-black/40 text-[13px] font-bold uppercase"
-          style={{ ...FONT, letterSpacing: '0.04em' }}
+          className="fill-black/40 font-bold uppercase"
+          style={{
+            ...FONT,
+            letterSpacing: '0.04em',
+            fontSize: TEAM_NAME_FONT - 1,
+          }}
         >
           {label || 'Por definir'}
         </text>
@@ -489,53 +565,67 @@ function BracketTeamSlot({
       )}
       {/* Team avatar (square with initials) */}
       <rect
-        x={x + TEAM_COLOR_RAIL_W + 12}
-        y={cy - 14}
-        width={28}
-        height={28}
+        x={x + avatarPadX}
+        y={cy - AVATAR_SIZE / 2}
+        width={AVATAR_SIZE}
+        height={AVATAR_SIZE}
         rx={4}
         fill={team.colors.primary}
       />
       <text
-        x={x + TEAM_COLOR_RAIL_W + 12 + 14}
+        x={x + avatarPadX + AVATAR_SIZE / 2}
         y={cy + 1}
         dominantBaseline="central"
         textAnchor="middle"
-        className="fill-white text-[12px] font-bold uppercase"
-        style={{ ...FONT, letterSpacing: '0.02em' }}
+        className="fill-white font-bold uppercase"
+        style={{
+          ...FONT,
+          letterSpacing: '0.02em',
+          fontSize: TEAM_INITIALS_FONT,
+        }}
       >
         {team.initials}
       </text>
       {/* Team name */}
       <text
-        x={x + TEAM_COLOR_RAIL_W + 50}
+        x={x + nameX}
         y={cy}
         dominantBaseline="central"
-        className={`text-[15px] font-bold uppercase ${
+        className={`font-bold uppercase ${
           isLoser ? 'fill-black/45' : isWinner ? 'fill-black' : 'fill-black/80'
         }`}
-        style={{ ...FONT, letterSpacing: '-0.01em' }}
+        style={{
+          ...FONT,
+          letterSpacing: '-0.01em',
+          fontSize: TEAM_NAME_FONT,
+        }}
       >
-        {team.name.length > 22 ? team.name.slice(0, 22) + '…' : team.name}
+        {team.name.length > MAX_NAME_CHARS
+          ? team.name.slice(0, MAX_NAME_CHARS) + '…'
+          : team.name}
       </text>
       {/* Score */}
       {score !== undefined && (
         <text
-          x={x + MATCH_W - 14}
+          x={x + MATCH_W - scoreRightPad}
           y={cy}
           dominantBaseline="central"
           textAnchor="end"
-          className={`text-[22px] font-bold tabular-nums ${
+          className={`font-bold tabular-nums ${
             isWinner ? 'fill-[#E31E24]' : isLoser ? 'fill-black/35' : 'fill-black/80'
           }`}
-          style={{ ...FONT, letterSpacing: '-0.02em' }}
+          style={{
+            ...FONT,
+            letterSpacing: '-0.02em',
+            fontSize: SCORE_FONT,
+          }}
         >
           {score}
         </text>
       )}
       {/* Trophy on winner */}
       {isWinner && (
-        <g transform={`translate(${x + MATCH_W - 44}, ${cy - 7})`}>
+        <g transform={`translate(${x + MATCH_W - scoreRightPad - 30}, ${cy - trophySize / 2})`}>
           <path
             d="M6 4h8l-1.3 10.7H7.3L6 4z M9 8h2 M2 6h2 M16 6h2"
             fill="none"

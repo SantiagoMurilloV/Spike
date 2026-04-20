@@ -2,16 +2,18 @@ import { motion, useScroll, useTransform } from 'motion/react';
 import { Trophy, Users, ArrowRight, Search, RefreshCw } from 'lucide-react';
 import { TournamentCard } from '../components/TournamentCard';
 import { MatchCard } from '../components/MatchCard';
+import { TeamAvatar } from '../components/TeamAvatar';
 import { TournamentCardSkeleton } from '../components/SkeletonLoaders';
 import { LiveBadge } from '../components/LiveBadge';
 import { useData } from '../context/DataContext';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import spkLogo from '../../imports/spk-cup-logo-v4-1.svg';
 import { useState, useEffect, useMemo } from 'react';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 
 export function Home() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { tournaments, teams, matches, loading, error, refreshTournaments } = useData();
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
@@ -30,6 +32,41 @@ export function Home() {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // React to MobileBottomNav query-param links:
+  //   ?filter=live     → scroll to #live-matches (or #tournaments fallback)
+  //   ?filter=ongoing  → set "En curso" filter + scroll to #tournaments
+  //   ?filter=upcoming → set "Próximos" filter + scroll to #tournaments
+  //   ?filter=completed→ set "Finalizados" filter + scroll to #tournaments
+  //   ?view=teams      → scroll to #teams
+  // Params are consumed on mount to avoid a sticky URL that keeps re-scrolling.
+  useEffect(() => {
+    const filter = searchParams.get('filter');
+    const view = searchParams.get('view');
+    if (!filter && !view) return;
+
+    if (filter === 'ongoing' || filter === 'upcoming' || filter === 'completed') {
+      setFilterStatus(filter);
+    }
+
+    // Defer scroll until the next tick so conditional sections (live-matches
+    // only mounts when there ARE live matches) have a chance to render.
+    const scrollTo = (id: string, fallbackId?: string) => {
+      requestAnimationFrame(() => {
+        const el =
+          document.getElementById(id) ||
+          (fallbackId ? document.getElementById(fallbackId) : null);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    };
+
+    if (filter === 'live') scrollTo('live-matches', 'tournaments');
+    else if (filter) scrollTo('tournaments');
+    else if (view === 'teams') scrollTo('teams');
+
+    // Clear the params so refreshing the page doesn't re-trigger the scroll.
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const filteredTournaments = tournaments.filter(tournament => {
     const matchesSearch = tournament.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -518,6 +555,90 @@ export function Home() {
                 Intenta con otros términos de búsqueda
               </p>
             </motion.div>
+          )}
+        </div>
+      </section>
+
+      {/* Teams directory — small roster of all clubs participating across
+          tournaments. Anchored so the MobileBottomNav "Equipos" button lands
+          here. On mobile we render as a single-column list, on desktop as a
+          multi-column card grid. */}
+      <section id="teams" className="bg-spk-black text-white py-16 md:py-24 scroll-mt-20">
+        <div className="max-w-[1600px] mx-auto px-6 md:px-12">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="mb-10"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <Users className="w-5 h-5 text-spk-red" />
+              <span
+                className="text-xs text-white/60 uppercase"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.12em' }}
+              >
+                {teams.length} {teams.length === 1 ? 'equipo' : 'equipos'} registrados
+              </span>
+            </div>
+            <h2
+              className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter uppercase"
+              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+            >
+              Equipos
+            </h2>
+            <div className="w-20 h-1 bg-spk-red mt-4" />
+          </motion.div>
+
+          {teams.length === 0 ? (
+            <p className="text-white/50 text-center py-12">
+              Aún no hay equipos registrados
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {teams.map((team, idx) => (
+                <motion.button
+                  key={team.id}
+                  type="button"
+                  onClick={() => navigate(`/team/${team.id}`)}
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: Math.min(idx * 0.03, 0.4), duration: 0.3 }}
+                  whileHover={{ y: -2, backgroundColor: 'rgba(255,255,255,0.08)' }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-sm text-left transition-colors"
+                >
+                  <TeamAvatar team={team} size="md" />
+                  <div className="flex-1 min-w-0">
+                    <div
+                      className="font-bold uppercase truncate"
+                      style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.01em' }}
+                    >
+                      {team.name}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-white/50 mt-0.5 flex-wrap">
+                      <span style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+                        {team.initials}
+                      </span>
+                      {team.category && (
+                        <>
+                          <span className="text-white/20">·</span>
+                          <span className="truncate">{team.category}</span>
+                        </>
+                      )}
+                      {team.city && (
+                        <>
+                          <span className="text-white/20">·</span>
+                          <span className="truncate">{team.city}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-white/40 flex-shrink-0" aria-hidden="true" />
+                </motion.button>
+              ))}
+            </div>
           )}
         </div>
       </section>
