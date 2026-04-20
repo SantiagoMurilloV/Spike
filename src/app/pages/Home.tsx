@@ -19,6 +19,10 @@ export function Home() {
   const [scrolled, setScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'ongoing' | 'upcoming' | 'completed'>('all');
+  const [teamSearch, setTeamSearch] = useState('');
+  // Main directory view: toggles the big white section between the tournaments
+  // list and the teams directory. Persisted via ?view=teams for deep links.
+  const [mainTab, setMainTab] = useState<'tournaments' | 'teams'>('tournaments');
   
   const heroOpacity = useTransform(scrollY, [0, 300], [1, 0]);
   const heroScale = useTransform(scrollY, [0, 300], [1, 1.2]);
@@ -33,13 +37,13 @@ export function Home() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // React to MobileBottomNav query-param links:
-  //   ?filter=live     → scroll to #live-matches (or #tournaments fallback)
-  //   ?filter=ongoing  → set "En curso" filter + scroll to #tournaments
-  //   ?filter=upcoming → set "Próximos" filter + scroll to #tournaments
-  //   ?filter=completed→ set "Finalizados" filter + scroll to #tournaments
-  //   ?view=teams      → scroll to #teams
-  // Params are consumed on mount to avoid a sticky URL that keeps re-scrolling.
+  // Deep-link handler:
+  //   ?filter=live      → scroll to #live-matches (or #directory fallback)
+  //   ?filter=ongoing   → tournaments tab + "En curso" filter + scroll
+  //   ?filter=upcoming  → tournaments tab + "Próximos" filter + scroll
+  //   ?filter=completed → tournaments tab + "Finalizados" filter + scroll
+  //   ?view=teams       → switch to the Equipos tab + scroll to #directory
+  // Params are consumed on mount so refreshing doesn't re-trigger the scroll.
   useEffect(() => {
     const filter = searchParams.get('filter');
     const view = searchParams.get('view');
@@ -47,10 +51,12 @@ export function Home() {
 
     if (filter === 'ongoing' || filter === 'upcoming' || filter === 'completed') {
       setFilterStatus(filter);
+      setMainTab('tournaments');
+    }
+    if (view === 'teams') {
+      setMainTab('teams');
     }
 
-    // Defer scroll until the next tick so conditional sections (live-matches
-    // only mounts when there ARE live matches) have a chance to render.
     const scrollTo = (id: string, fallbackId?: string) => {
       requestAnimationFrame(() => {
         const el =
@@ -60,11 +66,10 @@ export function Home() {
       });
     };
 
-    if (filter === 'live') scrollTo('live-matches', 'tournaments');
-    else if (filter) scrollTo('tournaments');
-    else if (view === 'teams') scrollTo('teams');
+    if (filter === 'live') scrollTo('live-matches', 'directory');
+    else if (filter) scrollTo('directory');
+    else if (view === 'teams') scrollTo('directory');
 
-    // Clear the params so refreshing the page doesn't re-trigger the scroll.
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -88,6 +93,17 @@ export function Home() {
     [matches],
   );
 
+  const filteredTeams = useMemo(() => {
+    const q = teamSearch.trim().toLowerCase();
+    if (!q) return teams;
+    return teams.filter((t) =>
+      t.name.toLowerCase().includes(q) ||
+      t.initials.toLowerCase().includes(q) ||
+      (t.category || '').toLowerCase().includes(q) ||
+      (t.city || '').toLowerCase().includes(q),
+    );
+  }, [teams, teamSearch]);
+
   /**
    * Scrolls the viewport to the live-matches section if any match is live;
    * otherwise falls back to the tournaments grid so the CTA never ends up
@@ -95,7 +111,7 @@ export function Home() {
    */
   const scrollToLiveOrTournaments = () => {
     const target = document.getElementById(
-      liveMatches.length > 0 ? 'live-matches' : 'tournaments',
+      liveMatches.length > 0 ? 'live-matches' : 'directory',
     );
     if (target) {
       target.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -415,8 +431,9 @@ export function Home() {
         </section>
       )}
 
-      {/* Main Content Section */}
-      <section id="tournaments" className="bg-white text-black py-20 md:py-32 scroll-mt-20">
+      {/* Main Directory Section — Torneos / Equipos tabs share this slot so
+          users switch between the two lists without losing hero context. */}
+      <section id="directory" className="bg-white text-black py-16 md:py-24 scroll-mt-20">
         <div className="max-w-[1600px] mx-auto px-6 md:px-12">
           {/* Section Header */}
           <motion.div
@@ -424,221 +441,267 @@ export function Home() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="mb-16"
+            className="mb-8 md:mb-12"
           >
             <h2
-              className="text-4xl sm:text-5xl md:text-7xl font-bold mb-6 tracking-tighter"
+              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 tracking-tighter"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
-              TODOS LOS TORNEOS
+              {mainTab === 'tournaments' ? 'TODOS LOS TORNEOS' : 'TODOS LOS EQUIPOS'}
             </h2>
             <div className="w-20 h-1 bg-spk-red" />
           </motion.div>
 
-          {/* Search and Filters */}
-          <div className="space-y-8 mb-16">
-            {/* Search Bar */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              className="relative max-w-2xl"
-            >
-              <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-6 h-6 text-black/40" />
-              <input
-                type="text"
-                placeholder="Buscar torneos..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-16 pr-6 py-5 bg-black/5 border-2 border-black/10 rounded-sm text-lg focus:outline-none focus:border-black transition-colors placeholder:text-black/40"
-              />
-            </motion.div>
-
-            {/* Filter Tabs */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.3 }}
-              className="flex gap-3 overflow-x-auto pb-2"
-            >
-              {[
-                { value: 'all', label: 'Todos', count: statusCounts.all },
-                { value: 'ongoing', label: 'En Curso', count: statusCounts.ongoing },
-                { value: 'upcoming', label: 'Próximos', count: statusCounts.upcoming },
-                { value: 'completed', label: 'Finalizados', count: statusCounts.completed }
-              ].map((filter) => (
-                <motion.button
-                  key={filter.value}
-                  whileHover={{ 
-                    y: -2,
-                    backgroundColor: filterStatus === filter.value 
-                      ? 'rgb(0, 0, 0)' 
-                      : 'rgba(0, 0, 0, 0.1)'
-                  }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setFilterStatus(filter.value as any)}
-                  className={`px-6 py-3 rounded-sm text-sm font-bold uppercase tracking-wide whitespace-nowrap transition-all ${
-                    filterStatus === filter.value
-                      ? 'text-white'
-                      : 'text-black/60'
+          {/* Main tab switcher — styled pills, sticky to this section. */}
+          <div
+            className="flex gap-2 mb-8 bg-black/5 p-1 rounded-sm w-fit"
+            role="tablist"
+            aria-label="Vista principal"
+          >
+            {([
+              { value: 'tournaments', label: 'Torneos', count: tournaments.length, Icon: Trophy },
+              { value: 'teams', label: 'Equipos', count: teams.length, Icon: Users },
+            ] as const).map((tab) => {
+              const TabIcon = tab.Icon;
+              const isActive = mainTab === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  role="tab"
+                  type="button"
+                  aria-selected={isActive}
+                  onClick={() => setMainTab(tab.value)}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-sm transition-all ${
+                    isActive
+                      ? 'bg-black text-white shadow-sm'
+                      : 'bg-transparent text-black/60 hover:text-black'
                   }`}
-                  style={{ 
-                    fontFamily: 'Barlow Condensed, sans-serif',
-                    backgroundColor: filterStatus === filter.value 
-                      ? 'rgb(0, 0, 0)' 
-                      : 'rgba(0, 0, 0, 0.05)'
-                  }}
+                  style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.06em' }}
                 >
-                  {filter.label} ({filter.count})
-                </motion.button>
-              ))}
-            </motion.div>
+                  <TabIcon className="w-4 h-4" aria-hidden="true" />
+                  <span className="font-bold uppercase text-sm">{tab.label}</span>
+                  <span
+                    className={`text-xs tabular-nums ${
+                      isActive ? 'text-white/70' : 'text-black/40'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Tournaments Grid */}
-          {loading.tournaments ? (
-            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <TournamentCardSkeleton key={i} />
-              ))}
-            </div>
-          ) : error.tournaments ? (
-            <div className="text-center py-20">
-              <div className="text-5xl mb-6">⚠️</div>
-              <h3 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                ERROR AL CARGAR TORNEOS
-              </h3>
-              <p className="text-black/60 mb-6">{error.tournaments}</p>
-              <button
-                onClick={() => refreshTournaments()}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-sm font-bold hover:bg-black/90 transition-colors"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Reintentar
-              </button>
-            </div>
-          ) : filteredTournaments.length > 0 ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              className="grid gap-8 md:grid-cols-2 lg:grid-cols-3"
-            >
-              {filteredTournaments.map((tournament, index) => (
+          {mainTab === 'tournaments' ? (
+            <>
+              {/* Search and Filters */}
+              <div className="space-y-6 mb-10">
                 <motion.div
-                  key={tournament.id}
-                  initial={{ opacity: 0, y: 30 }}
+                  initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ y: -8 }}
-                  onClick={() => navigate(`/tournament/${tournament.id}`)}
-                  className="cursor-pointer"
+                  transition={{ delay: 0.1 }}
+                  className="relative max-w-2xl"
                 >
-                  <TournamentCard tournament={tournament} />
+                  <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 sm:w-6 sm:h-6 text-black/40" />
+                  <input
+                    type="text"
+                    placeholder="Buscar torneos..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-12 sm:pl-14 pr-6 py-4 bg-black/5 border-2 border-black/10 rounded-sm text-base sm:text-lg focus:outline-none focus:border-black transition-colors placeholder:text-black/40"
+                  />
                 </motion.div>
-              ))}
-            </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center py-20"
-            >
-              <Search className="w-16 h-16 text-black/20 mx-auto mb-6" />
-              <h3 className="text-2xl font-bold mb-3" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                NO SE ENCONTRARON TORNEOS
-              </h3>
-              <p className="text-black/60">
-                Intenta con otros términos de búsqueda
-              </p>
-            </motion.div>
-          )}
-        </div>
-      </section>
 
-      {/* Teams directory — small roster of all clubs participating across
-          tournaments. Anchored so the MobileBottomNav "Equipos" button lands
-          here. On mobile we render as a single-column list, on desktop as a
-          multi-column card grid. */}
-      <section id="teams" className="bg-spk-black text-white py-16 md:py-24 scroll-mt-20">
-        <div className="max-w-[1600px] mx-auto px-6 md:px-12">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="mb-10"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <Users className="w-5 h-5 text-spk-red" />
-              <span
-                className="text-xs text-white/60 uppercase"
-                style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.12em' }}
-              >
-                {teams.length} {teams.length === 1 ? 'equipo' : 'equipos'} registrados
-              </span>
-            </div>
-            <h2
-              className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter uppercase"
-              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-            >
-              Equipos
-            </h2>
-            <div className="w-20 h-1 bg-spk-red mt-4" />
-          </motion.div>
-
-          {teams.length === 0 ? (
-            <p className="text-white/50 text-center py-12">
-              Aún no hay equipos registrados
-            </p>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {teams.map((team, idx) => (
-                <motion.button
-                  key={team.id}
-                  type="button"
-                  onClick={() => navigate(`/team/${team.id}`)}
-                  initial={{ opacity: 0, y: 10 }}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ delay: Math.min(idx * 0.03, 0.4), duration: 0.3 }}
-                  whileHover={{ y: -2, backgroundColor: 'rgba(255,255,255,0.08)' }}
-                  whileTap={{ scale: 0.98 }}
-                  className="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-sm text-left transition-colors"
+                  transition={{ delay: 0.15 }}
+                  className="flex gap-2 overflow-x-auto pb-1"
                 >
-                  <TeamAvatar team={team} size="md" />
-                  <div className="flex-1 min-w-0">
-                    <div
-                      className="font-bold uppercase truncate"
-                      style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.01em' }}
+                  {[
+                    { value: 'all', label: 'Todos', count: statusCounts.all },
+                    { value: 'ongoing', label: 'En Curso', count: statusCounts.ongoing },
+                    { value: 'upcoming', label: 'Próximos', count: statusCounts.upcoming },
+                    { value: 'completed', label: 'Finalizados', count: statusCounts.completed },
+                  ].map((filter) => (
+                    <motion.button
+                      key={filter.value}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setFilterStatus(filter.value as any)}
+                      className={`px-4 sm:px-5 py-2 rounded-sm text-sm font-bold uppercase tracking-wide whitespace-nowrap transition-colors ${
+                        filterStatus === filter.value
+                          ? 'bg-black text-white'
+                          : 'bg-black/5 text-black/60 hover:bg-black/10'
+                      }`}
+                      style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
                     >
-                      {team.name}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-white/50 mt-0.5 flex-wrap">
-                      <span style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                        {team.initials}
-                      </span>
-                      {team.category && (
-                        <>
-                          <span className="text-white/20">·</span>
-                          <span className="truncate">{team.category}</span>
-                        </>
-                      )}
-                      {team.city && (
-                        <>
-                          <span className="text-white/20">·</span>
-                          <span className="truncate">{team.city}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-white/40 flex-shrink-0" aria-hidden="true" />
-                </motion.button>
-              ))}
-            </div>
+                      {filter.label} ({filter.count})
+                    </motion.button>
+                  ))}
+                </motion.div>
+              </div>
+
+              {loading.tournaments ? (
+                <div className="grid gap-6 md:gap-8 md:grid-cols-2 lg:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <TournamentCardSkeleton key={i} />
+                  ))}
+                </div>
+              ) : error.tournaments ? (
+                <div className="text-center py-20">
+                  <div className="text-5xl mb-6">⚠️</div>
+                  <h3
+                    className="text-2xl font-bold mb-3"
+                    style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                  >
+                    ERROR AL CARGAR TORNEOS
+                  </h3>
+                  <p className="text-black/60 mb-6">{error.tournaments}</p>
+                  <button
+                    onClick={() => refreshTournaments()}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-sm font-bold hover:bg-black/90 transition-colors"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Reintentar
+                  </button>
+                </div>
+              ) : filteredTournaments.length > 0 ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  whileInView={{ opacity: 1 }}
+                  viewport={{ once: true }}
+                  className="grid gap-6 md:gap-8 md:grid-cols-2 lg:grid-cols-3"
+                >
+                  {filteredTournaments.map((tournament, index) => (
+                    <motion.div
+                      key={tournament.id}
+                      initial={{ opacity: 0, y: 30 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: index * 0.08 }}
+                      whileHover={{ y: -6 }}
+                      onClick={() => navigate(`/tournament/${tournament.id}`)}
+                      className="cursor-pointer"
+                    >
+                      <TournamentCard tournament={tournament} />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center py-20"
+                >
+                  <Search className="w-16 h-16 text-black/20 mx-auto mb-6" />
+                  <h3
+                    className="text-2xl font-bold mb-3"
+                    style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                  >
+                    NO SE ENCONTRARON TORNEOS
+                  </h3>
+                  <p className="text-black/60">Intenta con otros términos de búsqueda</p>
+                </motion.div>
+              )}
+            </>
+          ) : (
+            // ── Equipos tab ─────────────────────────────────────────
+            <>
+              <div className="mb-8">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.1 }}
+                  className="relative max-w-2xl"
+                >
+                  <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 sm:w-6 sm:h-6 text-black/40" />
+                  <input
+                    type="text"
+                    placeholder="Buscar equipos, ciudades, categorías..."
+                    value={teamSearch}
+                    onChange={(e) => setTeamSearch(e.target.value)}
+                    className="w-full pl-12 sm:pl-14 pr-6 py-4 bg-black/5 border-2 border-black/10 rounded-sm text-base sm:text-lg focus:outline-none focus:border-black transition-colors placeholder:text-black/40"
+                  />
+                </motion.div>
+              </div>
+
+              {loading.teams && teams.length === 0 ? (
+                <p className="text-black/50 text-center py-12">Cargando equipos…</p>
+              ) : filteredTeams.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center py-20"
+                >
+                  <Users className="w-16 h-16 text-black/20 mx-auto mb-6" />
+                  <h3
+                    className="text-2xl font-bold mb-3"
+                    style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                  >
+                    {teams.length === 0 ? 'AÚN NO HAY EQUIPOS' : 'NO SE ENCONTRARON EQUIPOS'}
+                  </h3>
+                  <p className="text-black/60">
+                    {teams.length === 0
+                      ? 'Los equipos aparecerán acá cuando se registren'
+                      : 'Probá con otro nombre, categoría o ciudad'}
+                  </p>
+                </motion.div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {filteredTeams.map((team, idx) => (
+                    <motion.button
+                      key={team.id}
+                      type="button"
+                      onClick={() => navigate(`/team/${team.id}`)}
+                      initial={{ opacity: 0, y: 10 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: Math.min(idx * 0.03, 0.4), duration: 0.3 }}
+                      whileHover={{ y: -2 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex items-center gap-3 p-4 bg-white border-2 border-black/10 hover:border-black rounded-sm text-left transition-colors"
+                    >
+                      <TeamAvatar team={team} size="md" />
+                      <div className="flex-1 min-w-0">
+                        <div
+                          className="font-bold uppercase truncate"
+                          style={{
+                            fontFamily: 'Barlow Condensed, sans-serif',
+                            letterSpacing: '-0.01em',
+                          }}
+                        >
+                          {team.name}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-black/50 mt-0.5 flex-wrap">
+                          <span style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+                            {team.initials}
+                          </span>
+                          {team.category && (
+                            <>
+                              <span className="text-black/20">·</span>
+                              <span className="truncate">{team.category}</span>
+                            </>
+                          )}
+                          {team.city && (
+                            <>
+                              <span className="text-black/20">·</span>
+                              <span className="truncate">{team.city}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <ArrowRight
+                        className="w-4 h-4 text-black/30 flex-shrink-0"
+                        aria-hidden="true"
+                      />
+                    </motion.button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>
