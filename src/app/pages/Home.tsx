@@ -819,17 +819,12 @@ export function Home() {
               </div>
             </div>
 
-            {/* Developer signature — magazine-byline style: tiny red
-                "DESARROLLADO POR" kicker above the name, `</>` glyph +
-                subtle vertical rule to the left, role beneath the name.
-                The whole thing is a mailto link; the name brightens on
-                hover. */}
-            <a
-              href="mailto:santiagomurilloval@gmail.com"
-              className="group inline-flex items-center gap-3"
-            >
+            {/* Developer signature — magazine-byline style (non-interactive).
+                Tiny red "DESARROLLADO POR" kicker above the name, `</>`
+                glyph + subtle vertical rule to the left, role beneath. */}
+            <div className="inline-flex items-center gap-3">
               <span
-                className="font-mono text-base text-spk-red/85 group-hover:text-spk-red transition-colors"
+                className="font-mono text-base text-spk-red/85"
                 aria-hidden="true"
               >
                 &lt;/&gt;
@@ -846,7 +841,7 @@ export function Home() {
                   Desarrollado por
                 </span>
                 <span
-                  className="mt-0.5 text-sm text-white/85 group-hover:text-white transition-colors"
+                  className="mt-0.5 text-sm text-white/85"
                   style={{
                     fontFamily: 'Barlow Condensed, sans-serif',
                     letterSpacing: '0.02em',
@@ -864,7 +859,7 @@ export function Home() {
                   Full-Stack Developer
                 </span>
               </span>
-            </a>
+            </div>
           </div>
 
           {/* Hairline rule — subtler than the red gradient we had before */}
@@ -892,7 +887,7 @@ export function Home() {
               className="text-[11px] uppercase tracking-[0.14em] text-white/35"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
-              &copy; 2026 Santiago Murillo Valencia · Todos los derechos reservados
+              &copy; 2026 Santiago Murillo Valencia · All Rights Reserved
             </div>
           </div>
         </div>
