@@ -5,7 +5,7 @@ import { MatchCard } from '../components/MatchCard';
 import { TeamAvatar } from '../components/TeamAvatar';
 import { TournamentCardSkeleton } from '../components/SkeletonLoaders';
 import { LiveBadge } from '../components/LiveBadge';
-import { VolleyballShowroom } from '../components/VolleyballShowroom';
+import { SpikeHero3D } from '../components/SpikeHero3D';
 import { useData } from '../context/DataContext';
 import { useNavigate, useSearchParams } from 'react-router';
 import spkLogo from '../../imports/spk-cup-logo-v4-1.svg';
@@ -177,11 +177,19 @@ export function Home() {
       </motion.header>
 
       {/* Hero Section - Full Screen slideshow */}
-      {/* Hero — 360° volleyball showroom replaces the old Unsplash
-          slideshow. The component owns its own title, drag controls,
-          dots and captions, so Home just mounts it and lets the header
-          float on top. */}
-      <VolleyballShowroom />
+      {/* Hero — 3D-styled scene with a looped serve/spike simulation and
+          a parallaxed copy block. Shares the black stage with the rest of
+          the page so the handoff to content stays continuous. */}
+      <SpikeHero3D
+        liveCount={statusCounts.ongoing}
+        tournamentCount={statusCounts.all}
+        teamCount={teams.length}
+        onPrimaryAction={() => {
+          const el = document.getElementById('directory');
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }}
+        onSecondaryAction={scrollToLiveOrTournaments}
+      />
 
       {/* Live Matches — only rendered when there's live action, anchored so
           the hero CTA can scroll here. Uses the dark broadcast treatment to
@@ -243,9 +251,23 @@ export function Home() {
       )}
 
       {/* Main Directory Section — Torneos / Equipos tabs share this slot so
-          users switch between the two lists without losing hero context. */}
-      <section id="directory" className="bg-white text-black py-16 md:py-24 scroll-mt-20">
-        <div className="max-w-[1600px] mx-auto px-6 md:px-12">
+          users switch between the two lists without losing hero context.
+          Dark-themed to match the hero / live-matches bands so the whole
+          page reads as one continuous stage. */}
+      <section
+        id="directory"
+        className="relative bg-[#050505] text-white py-16 md:py-24 scroll-mt-20"
+      >
+        {/* Subtle radial accent so the section isn't flat black */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          aria-hidden="true"
+          style={{
+            background:
+              'radial-gradient(ellipse 70% 50% at 20% 0%, rgba(227,30,36,0.08), transparent 70%), radial-gradient(ellipse 70% 50% at 80% 100%, rgba(0,48,135,0.08), transparent 70%)',
+          }}
+        />
+        <div className="relative max-w-[1600px] mx-auto px-6 md:px-12">
           {/* Section Header */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -255,7 +277,7 @@ export function Home() {
             className="mb-8 md:mb-12"
           >
             <h2
-              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 tracking-tighter"
+              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 tracking-tighter text-white"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
               {mainTab === 'tournaments' ? 'TODOS LOS TORNEOS' : 'TODOS LOS EQUIPOS'}
@@ -264,10 +286,9 @@ export function Home() {
           </motion.div>
 
           {/* Main tab switcher — segmented control with an animated sliding
-              indicator. The active pill is a black block that slides between
-              tabs via motion's `layoutId`, so switching feels physical. */}
+              indicator. Dark-glass shell, red active pill. */}
           <div
-            className="inline-flex items-center gap-1 mb-8 p-1.5 bg-black/[0.04] border border-black/10 rounded-sm"
+            className="inline-flex items-center gap-1 mb-8 p-1.5 bg-white/[0.04] border border-white/10 rounded-sm backdrop-blur-sm"
             role="tablist"
             aria-label="Vista principal"
           >
@@ -290,21 +311,21 @@ export function Home() {
                   {isActive && (
                     <motion.span
                       layoutId="home-main-tab"
-                      className="absolute inset-0 bg-spk-black rounded-sm shadow-[0_4px_12px_rgba(0,0,0,0.14)]"
+                      className="absolute inset-0 bg-spk-red rounded-sm shadow-[0_6px_22px_rgba(227,30,36,0.35)]"
                       transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                       aria-hidden="true"
                     />
                   )}
                   <span
                     className={`relative z-10 transition-colors ${
-                      isActive ? 'text-white' : 'text-black/55 group-hover:text-black'
+                      isActive ? 'text-white' : 'text-white/55'
                     }`}
                   >
                     <TabIcon className="w-4 h-4" aria-hidden="true" />
                   </span>
                   <span
                     className={`relative z-10 font-bold uppercase text-sm transition-colors ${
-                      isActive ? 'text-white' : 'text-black/70'
+                      isActive ? 'text-white' : 'text-white/70'
                     }`}
                   >
                     {tab.label}
@@ -312,8 +333,8 @@ export function Home() {
                   <span
                     className={`relative z-10 min-w-[22px] h-[22px] inline-flex items-center justify-center px-1.5 rounded-full text-[10px] font-bold tabular-nums transition-colors ${
                       isActive
-                        ? 'bg-spk-red text-white'
-                        : 'bg-black/10 text-black/60'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-white/10 text-white/60'
                     }`}
                     style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
                   >
@@ -337,20 +358,20 @@ export function Home() {
                   transition={{ delay: 0.1 }}
                   className="relative max-w-2xl group"
                 >
-                  <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40 group-focus-within:text-spk-red transition-colors" />
+                  <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-spk-red transition-colors" />
                   <input
                     type="text"
                     placeholder="Buscar torneos por nombre o club…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-11 pr-12 py-3.5 bg-white border border-black/15 rounded-sm text-sm sm:text-base focus:outline-none focus:border-spk-red focus:ring-2 focus:ring-spk-red/15 transition-all placeholder:text-black/35"
+                    className="w-full pl-11 pr-12 py-3.5 bg-white/[0.04] border border-white/10 rounded-sm text-sm sm:text-base text-white focus:outline-none focus:border-spk-red focus:ring-2 focus:ring-spk-red/25 transition-all placeholder:text-white/35 backdrop-blur-sm"
                   />
                   {searchQuery && (
                     <button
                       type="button"
                       onClick={() => setSearchQuery('')}
                       aria-label="Limpiar búsqueda"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-sm text-black/40 hover:text-spk-red hover:bg-spk-red/10 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-sm text-white/40 hover:text-spk-red hover:bg-spk-red/15 transition-colors"
                     >
                       <span aria-hidden="true" className="text-lg leading-none">×</span>
                     </button>
@@ -378,8 +399,8 @@ export function Home() {
                         onClick={() => setFilterStatus(filter.value as any)}
                         className={`relative inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-sm text-xs sm:text-sm font-bold uppercase whitespace-nowrap border transition-all ${
                           isActive
-                            ? 'bg-spk-black text-white border-spk-black'
-                            : 'bg-white text-black/65 border-black/10 hover:border-black/25 hover:text-black'
+                            ? 'bg-spk-red text-white border-spk-red shadow-[0_6px_18px_rgba(227,30,36,0.35)]'
+                            : 'bg-white/[0.04] text-white/65 border-white/10 hover:border-white/25 hover:text-white backdrop-blur-sm'
                         }`}
                         style={{
                           fontFamily: 'Barlow Condensed, sans-serif',
@@ -388,14 +409,14 @@ export function Home() {
                       >
                         {isActive && filter.value === 'ongoing' && (
                           <span
-                            className="w-1.5 h-1.5 rounded-full bg-spk-red spk-live-dot"
+                            className="w-1.5 h-1.5 rounded-full bg-white spk-live-dot"
                             aria-hidden="true"
                           />
                         )}
                         <span>{filter.label}</span>
                         <span
                           className={`tabular-nums text-[10px] px-1.5 py-0.5 rounded-full ${
-                            isActive ? 'bg-white/15 text-white' : 'bg-black/[0.06] text-black/50'
+                            isActive ? 'bg-white/20 text-white' : 'bg-white/[0.08] text-white/50'
                           }`}
                         >
                           {filter.count}
@@ -416,15 +437,15 @@ export function Home() {
                 <div className="text-center py-20">
                   <div className="text-5xl mb-6">⚠️</div>
                   <h3
-                    className="text-2xl font-bold mb-3"
+                    className="text-2xl font-bold mb-3 text-white"
                     style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
                   >
                     ERROR AL CARGAR TORNEOS
                   </h3>
-                  <p className="text-black/60 mb-6">{error.tournaments}</p>
+                  <p className="text-white/60 mb-6">{error.tournaments}</p>
                   <button
                     onClick={() => refreshTournaments()}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-sm font-bold hover:bg-black/90 transition-colors"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-spk-red text-white rounded-sm font-bold hover:bg-spk-red-dark transition-colors"
                   >
                     <RefreshCw className="w-4 h-4" />
                     Reintentar
@@ -458,14 +479,14 @@ export function Home() {
                   animate={{ opacity: 1 }}
                   className="text-center py-20"
                 >
-                  <Search className="w-16 h-16 text-black/20 mx-auto mb-6" />
+                  <Search className="w-16 h-16 text-white/20 mx-auto mb-6" />
                   <h3
-                    className="text-2xl font-bold mb-3"
+                    className="text-2xl font-bold mb-3 text-white"
                     style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
                   >
                     NO SE ENCONTRARON TORNEOS
                   </h3>
-                  <p className="text-black/60">Intenta con otros términos de búsqueda</p>
+                  <p className="text-white/60">Intenta con otros términos de búsqueda</p>
                 </motion.div>
               )}
             </>
@@ -480,20 +501,20 @@ export function Home() {
                   transition={{ delay: 0.1 }}
                   className="relative max-w-2xl group"
                 >
-                  <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40 group-focus-within:text-spk-red transition-colors" />
+                  <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-spk-red transition-colors" />
                   <input
                     type="text"
                     placeholder="Buscar equipos, ciudades, categorías…"
                     value={teamSearch}
                     onChange={(e) => setTeamSearch(e.target.value)}
-                    className="w-full pl-11 pr-12 py-3.5 bg-white border border-black/15 rounded-sm text-sm sm:text-base focus:outline-none focus:border-spk-red focus:ring-2 focus:ring-spk-red/15 transition-all placeholder:text-black/35"
+                    className="w-full pl-11 pr-12 py-3.5 bg-white/[0.04] border border-white/10 rounded-sm text-sm sm:text-base text-white focus:outline-none focus:border-spk-red focus:ring-2 focus:ring-spk-red/25 transition-all placeholder:text-white/35 backdrop-blur-sm"
                   />
                   {teamSearch && (
                     <button
                       type="button"
                       onClick={() => setTeamSearch('')}
                       aria-label="Limpiar búsqueda"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-sm text-black/40 hover:text-spk-red hover:bg-spk-red/10 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-sm text-white/40 hover:text-spk-red hover:bg-spk-red/15 transition-colors"
                     >
                       <span aria-hidden="true" className="text-lg leading-none">×</span>
                     </button>
@@ -502,21 +523,21 @@ export function Home() {
               </div>
 
               {loading.teams && teams.length === 0 ? (
-                <p className="text-black/50 text-center py-12">Cargando equipos…</p>
+                <p className="text-white/50 text-center py-12">Cargando equipos…</p>
               ) : filteredTeams.length === 0 ? (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="text-center py-20"
                 >
-                  <Users className="w-16 h-16 text-black/20 mx-auto mb-6" />
+                  <Users className="w-16 h-16 text-white/20 mx-auto mb-6" />
                   <h3
-                    className="text-2xl font-bold mb-3"
+                    className="text-2xl font-bold mb-3 text-white"
                     style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
                   >
                     {teams.length === 0 ? 'AÚN NO HAY EQUIPOS' : 'NO SE ENCONTRARON EQUIPOS'}
                   </h3>
-                  <p className="text-black/60">
+                  <p className="text-white/60">
                     {teams.length === 0
                       ? 'Los equipos aparecerán acá cuando se registren'
                       : 'Probá con otro nombre, categoría o ciudad'}
@@ -529,18 +550,18 @@ export function Home() {
                       key={team.id}
                       type="button"
                       onClick={() => navigate(`/team/${team.id}`)}
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={{ opacity: 0, y: 16 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       viewport={{ once: true }}
-                      transition={{ delay: Math.min(idx * 0.03, 0.4), duration: 0.3 }}
-                      whileHover={{ y: -2 }}
+                      transition={{ delay: Math.min(idx * 0.03, 0.4), duration: 0.35 }}
+                      whileHover={{ y: -3, backgroundColor: 'rgba(255,255,255,0.06)' }}
                       whileTap={{ scale: 0.98 }}
-                      className="flex items-center gap-3 p-4 bg-white border-2 border-black/10 hover:border-black rounded-sm text-left transition-colors"
+                      className="flex items-center gap-3 p-4 bg-white/[0.03] border border-white/10 hover:border-spk-red/50 rounded-sm text-left transition-colors backdrop-blur-sm"
                     >
                       <TeamAvatar team={team} size="md" />
                       <div className="flex-1 min-w-0">
                         <div
-                          className="font-bold uppercase truncate"
+                          className="font-bold uppercase truncate text-white"
                           style={{
                             fontFamily: 'Barlow Condensed, sans-serif',
                             letterSpacing: '-0.01em',
@@ -548,26 +569,26 @@ export function Home() {
                         >
                           {team.name}
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-black/50 mt-0.5 flex-wrap">
+                        <div className="flex items-center gap-2 text-xs text-white/50 mt-0.5 flex-wrap">
                           <span style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
                             {team.initials}
                           </span>
                           {team.category && (
                             <>
-                              <span className="text-black/20">·</span>
+                              <span className="text-white/20">·</span>
                               <span className="truncate">{team.category}</span>
                             </>
                           )}
                           {team.city && (
                             <>
-                              <span className="text-black/20">·</span>
+                              <span className="text-white/20">·</span>
                               <span className="truncate">{team.city}</span>
                             </>
                           )}
                         </div>
                       </div>
                       <ArrowRight
-                        className="w-4 h-4 text-black/30 flex-shrink-0"
+                        className="w-4 h-4 text-white/30 flex-shrink-0"
                         aria-hidden="true"
                       />
                     </motion.button>
