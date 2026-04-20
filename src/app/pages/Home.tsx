@@ -1,4 +1,4 @@
-import { motion, useScroll, useTransform, AnimatePresence } from 'motion/react';
+import { motion, useScroll, useTransform } from 'motion/react';
 import { Trophy, Users, ArrowRight, Search, RefreshCw } from 'lucide-react';
 import { TournamentCard } from '../components/TournamentCard';
 import { MatchCard } from '../components/MatchCard';
@@ -12,25 +12,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 
 /**
- * Hero slideshow — crossfaded volleyball action shots with a slow Ken-Burns
- * zoom so the background feels like it's moving with the game. Each slide
- * holds for ~5.5s with a 1.4s crossfade, and the zoom is linear-timed to
- * the slide duration so the reset happens while the image is fully faded
- * out (no pop).
- *
- * All URLs are landscape Unsplash photos tagged volleyball / action.
- * ImageWithFallback catches any 404 so a broken image just becomes the
- * gradient background instead of a white flash.
+ * Hero background — single static volleyball action shot from Unsplash.
+ * Rendered with a slow parallax scale + scroll-driven opacity so it still
+ * feels alive without cycling between frames.
  */
-const HERO_IMAGES = [
-  'https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?auto=format&fit=crop&w=1920&q=80',
-  'https://images.unsplash.com/photo-1534158914592-062992fbe900?auto=format&fit=crop&w=1920&q=80',
-  'https://images.unsplash.com/photo-1599474918935-1d1fc5de9ab8?auto=format&fit=crop&w=1920&q=80',
-  'https://images.unsplash.com/photo-1593341646782-e0b495cff86d?auto=format&fit=crop&w=1920&q=80',
-  'https://images.unsplash.com/photo-1765109260914-de67ccbbcab3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1920',
-];
-
-const HERO_SLIDE_MS = 5500;
+const HERO_IMAGE =
+  'https://images.unsplash.com/photo-1765109260914-de67ccbbcab3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1920';
 
 export function Home() {
   const navigate = useNavigate();
@@ -44,8 +31,7 @@ export function Home() {
   // Main directory view: toggles the big white section between the tournaments
   // list and the teams directory. Persisted via ?view=teams for deep links.
   const [mainTab, setMainTab] = useState<'tournaments' | 'teams'>('tournaments');
-  const [heroIndex, setHeroIndex] = useState(0);
-  
+
   const heroOpacity = useTransform(scrollY, [0, 300], [1, 0]);
   const heroScale = useTransform(scrollY, [0, 300], [1, 1.2]);
   const heroY = useTransform(scrollY, [0, 300], [0, 100]);
@@ -57,36 +43,6 @@ export function Home() {
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // Auto-advance the hero slideshow. Paused automatically when the tab is
-  // hidden so we don't burn cycles / animations while backgrounded.
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    // Respect users who ask for less motion — freeze on the first slide.
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-    let id: ReturnType<typeof setInterval> | null = null;
-    const start = () => {
-      id = setInterval(() => {
-        setHeroIndex((i) => (i + 1) % HERO_IMAGES.length);
-      }, HERO_SLIDE_MS);
-    };
-    const stop = () => {
-      if (id) {
-        clearInterval(id);
-        id = null;
-      }
-    };
-    start();
-    const onVisibility = () => {
-      if (document.hidden) stop();
-      else if (!id) start();
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      stop();
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
   }, []);
 
   // Deep-link handler:
@@ -234,82 +190,31 @@ export function Home() {
 
       {/* Hero Section - Full Screen slideshow */}
       <section className="relative h-screen overflow-hidden">
-        {/* Slideshow stack with parallax. Each image cross-fades and does a
-            slow Ken-Burns zoom so the background feels alive. Fixed black
-            gradient + animated brand-color wash sit on top so the text stays
-            readable regardless of which shot is current. */}
+        {/* Single static hero image with a slow parallax scale / drift so it
+            still feels cinematic without cycling between shots. Fixed dark
+            gradient + animated brand-color wash keep the copy readable. */}
         <motion.div
           style={{ scale: heroScale, y: heroY }}
           className="absolute inset-0"
         >
-          <div className="relative w-full h-full bg-spk-black">
-            <AnimatePresence>
-              {HERO_IMAGES.map((src, idx) =>
-                idx === heroIndex ? (
-                  <motion.div
-                    key={src}
-                    className="absolute inset-0"
-                    initial={{ opacity: 0, scale: 1.02 }}
-                    animate={{ opacity: 1, scale: 1.12 }}
-                    exit={{ opacity: 0, scale: 1.18 }}
-                    transition={{
-                      opacity: { duration: 1.4, ease: 'easeInOut' },
-                      scale: { duration: (HERO_SLIDE_MS + 1400) / 1000, ease: 'linear' },
-                    }}
-                  >
-                    <ImageWithFallback
-                      src={src}
-                      alt=""
-                      className="w-full h-full object-cover opacity-65"
-                    />
-                  </motion.div>
-                ) : null,
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Fixed dark gradient — keeps hero copy readable on any slide */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black z-10" />
+          <ImageWithFallback
+            src={HERO_IMAGE}
+            alt="Volleyball action"
+            className="w-full h-full object-cover opacity-60"
+          />
 
           {/* Animated brand-color wash */}
           <motion.div
-            className="absolute inset-0 z-10"
+            className="absolute inset-0"
             style={{
               background:
-                'linear-gradient(to right, rgba(227, 30, 36, 0.22), transparent, rgba(0, 48, 135, 0.22))',
+                'linear-gradient(to right, rgba(227, 30, 36, 0.2), transparent, rgba(0, 48, 135, 0.2))',
             }}
-            animate={{ opacity: [0.3, 0.55, 0.3] }}
+            animate={{ opacity: [0.3, 0.5, 0.3] }}
             transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
           />
         </motion.div>
-
-        {/* Slide indicator — tappable dots so spectators can jump to any shot.
-            Positioned bottom-right on desktop, bottom-center on mobile. */}
-        <div className="absolute bottom-24 md:bottom-8 right-1/2 translate-x-1/2 md:right-12 md:translate-x-0 z-30 flex items-center gap-2">
-          {HERO_IMAGES.map((_, idx) => {
-            const isActive = idx === heroIndex;
-            return (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setHeroIndex(idx)}
-                aria-label={`Mostrar imagen ${idx + 1} de ${HERO_IMAGES.length}`}
-                className="group relative h-1.5 overflow-hidden rounded-full bg-white/20 hover:bg-white/40 transition-colors"
-                style={{ width: isActive ? 34 : 14 }}
-              >
-                {isActive && (
-                  <motion.span
-                    className="absolute inset-y-0 left-0 bg-spk-red"
-                    initial={{ width: '0%' }}
-                    animate={{ width: '100%' }}
-                    transition={{ duration: HERO_SLIDE_MS / 1000, ease: 'linear' }}
-                    key={`progress-${idx}-${heroIndex}`}
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
 
         {/* Hero Content */}
         <motion.div
