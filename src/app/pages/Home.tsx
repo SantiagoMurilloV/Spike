@@ -268,10 +268,8 @@ export function Home() {
             </AnimatePresence>
           </div>
 
-          {/* Fixed dark gradient — keeps hero copy readable on any slide.
-              The bottom 25% fades gently so the floating panel below blends
-              into the hero instead of cutting hard into a solid black edge. */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/45 to-black/85 z-10" />
+          {/* Fixed dark gradient — keeps hero copy readable on any slide */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black z-10" />
 
           {/* Animated brand-color wash */}
           <motion.div
@@ -458,7 +456,7 @@ export function Home() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.5 }}
-          className="absolute bottom-24 md:bottom-28 left-1/2 -translate-x-1/2 z-20"
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20"
         >
           <motion.div
             animate={{ y: [0, 10, 0] }}
@@ -475,18 +473,12 @@ export function Home() {
       </section>
 
       {/* Live Matches — only rendered when there's live action, anchored so
-          the hero CTA can scroll here. Floats up over the hero with rounded
-          top corners + a soft white glow along its top edge so there's no
-          hard black-to-black seam between the hero and this panel. */}
+          the hero CTA can scroll here. Uses the dark broadcast treatment to
+          stand apart from the white tournaments section below. */}
       {liveMatches.length > 0 && (
         <section
           id="live-matches"
-          className="relative z-30 -mt-10 md:-mt-14 bg-spk-black text-white pt-14 md:pt-20 pb-16 md:pb-24 scroll-mt-20 rounded-t-[28px] md:rounded-t-[40px] shadow-[0_-14px_40px_rgba(0,0,0,0.45)]"
-          style={{
-            // extra top highlight so the rounded edge reads as a subtle glow
-            backgroundImage:
-              'radial-gradient(120% 40px at 50% 0%, rgba(255,255,255,0.08), transparent 70%)',
-          }}
+          className="bg-spk-black text-white py-16 md:py-24 scroll-mt-20"
         >
           <div className="max-w-[1600px] mx-auto px-6 md:px-12">
             <motion.div
@@ -540,14 +532,8 @@ export function Home() {
       )}
 
       {/* Main Directory Section — Torneos / Equipos tabs share this slot so
-          users switch between the two lists without losing hero context.
-          Floats over whatever sits above (hero or live-matches) with
-          rounded top corners + soft shadow so color changes never feel like
-          a hard cut — the white panel rises out of the dark section. */}
-      <section
-        id="directory"
-        className="relative z-30 -mt-10 md:-mt-14 bg-white text-black pt-14 md:pt-20 pb-16 md:pb-24 scroll-mt-20 rounded-t-[28px] md:rounded-t-[40px] shadow-[0_-18px_48px_rgba(0,0,0,0.2)]"
-      >
+          users switch between the two lists without losing hero context. */}
+      <section id="directory" className="bg-white text-black py-16 md:py-24 scroll-mt-20">
         <div className="max-w-[1600px] mx-auto px-6 md:px-12">
           {/* Section Header */}
           <motion.div
@@ -882,17 +868,8 @@ export function Home() {
         </div>
       </section>
 
-      {/* Footer — floats up over the white directory with a soft glow along
-          its rounded top edge, so the white-to-black transition stays
-          seamless and matches the floating language of the rest of the
-          page. */}
-      <footer
-        className="relative z-30 -mt-10 md:-mt-14 bg-spk-black text-white pt-16 md:pt-20 pb-12 rounded-t-[28px] md:rounded-t-[40px] shadow-[0_-14px_40px_rgba(0,0,0,0.35)]"
-        style={{
-          backgroundImage:
-            'radial-gradient(120% 40px at 50% 0%, rgba(255,255,255,0.05), transparent 70%)',
-        }}
-      >
+      {/* Footer */}
+      <footer className="bg-black text-white py-12 border-t border-white/10">
         <div className="max-w-[1600px] mx-auto px-6 md:px-12">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
