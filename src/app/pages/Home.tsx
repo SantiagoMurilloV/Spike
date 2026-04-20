@@ -868,38 +868,14 @@ export function Home() {
           {/* Hairline rule */}
           <div className="mt-6 md:mt-8 h-px w-full bg-white/[0.06]" />
 
-          {/* Contact + copyright strip — same horizontal layout on mobile,
-              smaller font + tighter gaps so it still fits on one row. */}
-          <div className="mt-4 md:mt-6 flex flex-row items-center justify-between gap-3 text-[10px] sm:text-xs text-white/45">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink">
-              <a
-                href="mailto:santiagomurilloval@gmail.com"
-                className="hover:text-white transition-colors truncate"
-              >
-                santiagomurilloval@gmail.com
-              </a>
-              <span className="text-white/15 flex-shrink-0" aria-hidden="true">·</span>
-              <a
-                href="tel:+573166275710"
-                className="hover:text-white transition-colors whitespace-nowrap"
-              >
-                +57 316 627 5710
-              </a>
-            </div>
-            {/* Full copyright on tablet+ ; the email takes most of the row on
-                phones, so the mobile version drops "to the Developer." */}
-            <div
-              className="hidden sm:block text-[11px] uppercase tracking-[0.14em] text-white/35 text-right flex-shrink-0"
-              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-            >
-              &copy; 2026 · All Rights Reserved to the Developer.
-            </div>
-            <div
-              className="sm:hidden text-[9px] uppercase tracking-[0.12em] text-white/35 text-right flex-shrink-0 whitespace-nowrap"
-              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-            >
-              &copy; 2026 · All Rights Reserved
-            </div>
+          {/* Centered copyright — contact strip was removed so this line
+              gets its own row and sits quietly in the middle. */}
+          <div
+            className="mt-4 md:mt-6 text-center text-[9px] sm:text-[11px] uppercase tracking-[0.14em] text-white/35"
+            style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+          >
+            &copy; 2026 · All Rights Reserved to the Developer.
+          </div>
           </div>
         </div>
       </footer>
