@@ -242,11 +242,19 @@ export function TeamDetail() {
                 animate={{ opacity: 1, y: 0 }}
                 className="mb-4 md:mb-8"
               >
-                <div 
-                  className="w-16 h-16 md:w-24 md:h-24 lg:w-32 lg:h-32 rounded-sm border-2 md:border-4 border-white/20 overflow-hidden flex-shrink-0"
-                >
+                <div className="w-16 h-16 md:w-24 md:h-24 lg:w-32 lg:h-32 rounded-sm border-2 md:border-4 border-white/20 overflow-hidden flex-shrink-0 bg-white/5 flex items-center justify-center">
                   {team.logo ? (
-                    <img src={team.logo} alt={team.initials} className="w-full h-full object-cover" />
+                    // Hero avatar uses object-contain so uploads with
+                    // transparent padding (common for club logos) keep
+                    // their framing instead of being hard-cropped.
+                    <img
+                      src={team.logo}
+                      alt={team.initials}
+                      className="w-full h-full object-contain p-1 md:p-2"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
                   ) : (
                     <div
                       className="w-full h-full flex items-center justify-center text-white font-bold text-3xl md:text-5xl lg:text-6xl"

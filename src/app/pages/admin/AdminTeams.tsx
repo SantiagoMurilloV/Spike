@@ -2,6 +2,7 @@ import { Plus, Search, Filter, Edit, Trash2, Users, Loader2 } from 'lucide-react
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useData } from '../../context/DataContext';
+import { TeamAvatar } from '../../components/TeamAvatar';
 import { TeamFormModal } from '../../components/admin/TeamFormModal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Team } from '../../types';
@@ -193,20 +194,7 @@ export function AdminTeams() {
                   <tr key={team.id} className="hover:bg-black/5 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        {team.logo ? (
-                          <img
-                            src={team.logo}
-                            alt={team.name}
-                            className="w-10 h-10 rounded-sm object-cover border-2 border-black/10"
-                          />
-                        ) : (
-                          <div
-                            className="w-10 h-10 rounded-sm flex items-center justify-center text-white font-bold text-sm"
-                            style={{ backgroundColor: team.colors.primary, fontFamily: 'Barlow Condensed, sans-serif' }}
-                          >
-                            {team.initials}
-                          </div>
-                        )}
+                        <TeamAvatar team={team} size="md" />
                         <span className="font-medium">{team.name}</span>
                       </div>
                     </td>
@@ -267,23 +255,8 @@ export function AdminTeams() {
                 key={team.id}
                 className="bg-white border-2 border-black/10 rounded-sm p-4 flex items-center gap-3"
               >
-                {team.logo ? (
-                  <img
-                    src={team.logo}
-                    alt={team.name}
-                    className="w-12 h-12 rounded-sm object-cover border-2 border-black/10 flex-shrink-0"
-                  />
-                ) : (
-                  <div
-                    className="w-12 h-12 rounded-sm flex items-center justify-center text-white font-bold flex-shrink-0"
-                    style={{
-                      backgroundColor: team.colors.primary,
-                      fontFamily: 'Barlow Condensed, sans-serif',
-                    }}
-                  >
-                    {team.initials}
-                  </div>
-                )}
+                <TeamAvatar team={team} size="lg" />
+
 
                 <div className="flex-1 min-w-0">
                   <div
