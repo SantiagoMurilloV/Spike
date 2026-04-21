@@ -139,6 +139,47 @@ export function DataProvider({ children }: { children: ReactNode }) {
     loadInitialData();
   }, [refreshTeams, refreshTournaments, refreshMatches]);
 
+  // Polling for live updates. Refreshes matches every 25s when the tab is
+  // visible so the notification hook below sees score / status changes
+  // coming from the backend without requiring a full page reload. Paused
+  // when the tab is hidden to save bandwidth (the Page Visibility event
+  // triggers a one-shot refresh when the user comes back).
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      if (intervalId) return;
+      intervalId = setInterval(() => {
+        refreshMatches();
+      }, 25_000);
+    };
+    const stop = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+    const onVisibility = () => {
+      if (document.hidden) {
+        stop();
+      } else {
+        refreshMatches();
+        start();
+      }
+    };
+    start();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [refreshMatches]);
+
+  // Wire browser notifications to the matches feed. The hook handles the
+  // no-op case when permission hasn't been granted yet, so it's safe to
+  // call unconditionally.
+  useMatchNotifications(matches);
+
   // ── Tournament CRUD ────────────────────────────────────────────
 
   const addTournament = useCallback(

@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router';
 import { InstallPrompt } from './InstallPrompt';
+import { NotificationPrompt } from './NotificationPrompt';
 
 /**
  * Layout — public-facing shell for spectator routes.
@@ -13,6 +14,7 @@ export function Layout() {
     <div className="min-h-screen bg-background">
       <Outlet />
       <InstallPrompt />
+      <NotificationPrompt />
     </div>
   );
 }

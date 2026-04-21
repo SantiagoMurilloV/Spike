@@ -1,6 +1,7 @@
 import { Outlet, useNavigate } from 'react-router';
 import { LogOut, Radio } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { NotificationPrompt } from './NotificationPrompt';
 
 /**
  * JudgeLayout — minimal shell for the judge role. Shows the SPK-CUP mark, the
@@ -50,6 +51,7 @@ export function JudgeLayout() {
       <main className="flex-1">
         <Outlet />
       </main>
+      <NotificationPrompt />
     </div>
   );
 }
