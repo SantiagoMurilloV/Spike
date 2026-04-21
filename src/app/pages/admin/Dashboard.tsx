@@ -268,62 +268,6 @@ export function AdminDashboard() {
             <p className="text-black/40 text-center py-8">No hay torneos activos actualmente</p>
           )}
         </motion.div>
-
-        {/* Quick Actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-          className="bg-black text-white p-6 sm:p-8 md:p-12 rounded-sm"
-        >
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tighter mb-6 sm:mb-8" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-            ACCIONES RÁPIDAS
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-            <motion.button
-              whileHover={{ scale: 1.02, y: -4, backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/admin/tournaments')}
-              className="p-6 border border-white/20 rounded-sm text-left transition-all group"
-              style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
-            >
-              <Trophy className="w-8 h-8 mb-4 text-spk-gold" />
-              <h3 className="text-xl font-bold mb-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>GESTIONAR TORNEOS</h3>
-              <p className="text-sm text-white/60 mb-4">Crea, edita y administra torneos</p>
-              <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                Ir a torneos <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.02, y: -4, backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/admin/matches')}
-              className="p-6 border border-white/20 rounded-sm text-left transition-all group"
-              style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
-            >
-              <Calendar className="w-8 h-8 mb-4 text-spk-blue" />
-              <h3 className="text-xl font-bold mb-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>GESTIONAR PARTIDOS</h3>
-              <p className="text-sm text-white/60 mb-4">Programa y actualiza partidos</p>
-              <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                Ir a partidos <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.02, y: -4, backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/admin/teams')}
-              className="p-6 border border-white/20 rounded-sm text-left transition-all group"
-              style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
-            >
-              <Users className="w-8 h-8 mb-4 text-spk-win" />
-              <h3 className="text-xl font-bold mb-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>GESTIONAR EQUIPOS</h3>
-              <p className="text-sm text-white/60 mb-4">Administra equipos y jugadores</p>
-              <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                Ir a equipos <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </motion.button>
-          </div>
-        </motion.div>
       </div>
     </div>
   );
