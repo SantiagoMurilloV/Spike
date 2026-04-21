@@ -7,6 +7,7 @@ import {
   remove,
   getMatches,
   getStandings,
+  recalculateStandings,
   getBracket,
   getEnrolledTeams,
   enrollTeam,
@@ -31,6 +32,7 @@ router.delete('/:id', remove);
 // Tournament sub-resources
 router.get('/:id/matches', getMatches);
 router.get('/:id/standings', getStandings);
+router.post('/:id/standings/recalculate', recalculateStandings);
 router.get('/:id/bracket', getBracket);
 
 // Team enrollment

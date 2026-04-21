@@ -3,6 +3,7 @@ import { tournamentService } from '../services/tournament.service';
 import { enrollmentService } from '../services/enrollment.service';
 import { fixtureGenerator } from '../services/fixture.service';
 import { bracketGenerator } from '../services/bracket.service';
+import { standingsCalculator } from '../services/standings.service';
 import { validateUUID } from '../middleware/validation';
 import { ValidationError } from '../middleware/errorHandler';
 
@@ -73,6 +74,27 @@ export async function getStandings(req: Request, res: Response, next: NextFuncti
     const id = req.params.id as string;
     validateUUID(id, 'ID de torneo');
     const standings = await tournamentService.getStandings(id);
+    res.json(standings);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Force-recalculate and persist the standings for a tournament. Used by the
+ * admin UI's "Recalcular tabla" button when a rule change shipped (e.g. the
+ * new volleyball point system) or when standings data got out of sync with
+ * the underlying matches.
+ */
+export async function recalculateStandings(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const id = req.params.id as string;
+    validateUUID(id, 'ID de torneo');
+    const standings = await standingsCalculator.recalculate(id);
     res.json(standings);
   } catch (error) {
     next(error);

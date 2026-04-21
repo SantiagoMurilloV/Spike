@@ -485,6 +485,18 @@ export const api = {
     return data.map(toFrontendStandingsRow);
   },
 
+  /**
+   * Force the backend to recompute and persist standings for a tournament.
+   * Use after a scoring-rule change or when the UI shows stale numbers.
+   */
+  async recalculateStandings(id: string): Promise<StandingsRow[]> {
+    const data = await request<BackendStandingsRow[]>(
+      `/tournaments/${id}/standings/recalculate`,
+      { method: 'POST' },
+    );
+    return data.map(toFrontendStandingsRow);
+  },
+
   async getTournamentBracket(id: string): Promise<BracketMatch[]> {
     const data = await request<BackendBracketMatch[]>(`/tournaments/${id}/bracket`);
     return data.map(toFrontendBracketMatch);

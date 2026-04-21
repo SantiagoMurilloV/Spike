@@ -15,6 +15,7 @@ import {
   Edit,
   Clock,
   Trash2,
+  RefreshCw,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import type { ScoreUpdate } from '../../services/api';
@@ -138,6 +139,21 @@ export function AdminTournamentDetail() {
   const [showAutoSchedule, setShowAutoSchedule] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
+
+  const handleRecalculateStandings = useCallback(async () => {
+    if (!id) return;
+    setRecalculating(true);
+    try {
+      const fresh = await api.recalculateStandings(id);
+      setStandings(fresh);
+      toast.success('Tabla recalculada');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo recalcular la tabla');
+    } finally {
+      setRecalculating(false);
+    }
+  }, [id]);
 
   // Match filters
   const [phaseFilter, setPhaseFilter] = useState<string>('all');
@@ -930,6 +946,22 @@ export function AdminTournamentDetail() {
                       <Trophy className="w-4 h-4" />
                     )}
                     Definir Eliminación Directa
+                  </Button>
+                )}
+                {(matches.length > 0 || bracketMatches.length > 0) && (
+                  <Button
+                    onClick={handleRecalculateStandings}
+                    disabled={recalculating}
+                    variant="outline"
+                    className="border-spk-blue text-spk-blue hover:bg-spk-blue/10 w-full sm:w-auto"
+                    title="Fuerza un recálculo de la tabla con la lógica actual"
+                  >
+                    {recalculating ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4" />
+                    )}
+                    Recalcular Tabla
                   </Button>
                 )}
                 {(matches.length > 0 || bracketMatches.length > 0) && (
