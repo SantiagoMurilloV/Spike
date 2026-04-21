@@ -429,6 +429,15 @@ export const api = {
     });
   },
 
+  // ── Admin destructive ops ──────────────────────────────────────
+  /**
+   * Wipe every torneo / equipo / partido / bracket / clasificación while
+   * preserving users, push subscriptions and VAPID config. Admin-only.
+   */
+  async resetData(): Promise<void> {
+    await request<void>('/admin/reset-data', { method: 'POST' });
+  },
+
   // ── Push notifications ─────────────────────────────────────────
   async getVapidPublicKey(): Promise<{ publicKey: string }> {
     return request<{ publicKey: string }>('/push/vapid-public-key');
