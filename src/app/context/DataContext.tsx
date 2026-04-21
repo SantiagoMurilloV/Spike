@@ -17,6 +17,7 @@ import {
   type CreateMatchDto,
   type UpdateMatchDto,
 } from '../services/api';
+import { useMatchNotifications } from '../hooks/useMatchNotifications';
 
 interface LoadingState {
   tournaments: boolean;
