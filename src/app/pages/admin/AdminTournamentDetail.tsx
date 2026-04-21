@@ -22,6 +22,7 @@ import type { ScoreUpdate } from '../../services/api';
 import { Tournament, Team, Match, BracketMatch, FixtureResult, StandingsRow } from '../../types';
 import { TeamAvatar } from '../../components/TeamAvatar';
 import { GroupMatrix } from '../../components/GroupMatrix';
+import { CategorySection } from '../../components/admin/CategorySection';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -849,7 +850,10 @@ export function AdminTournamentDetail() {
                 </Button>
               </div>
 
-              {/* Teams grouped by category */}
+              {/* Teams grouped by category — each category is a
+                  collapsible accordion so the page doesn't grow into an
+                  endless scroll when a tournament has many divisions.
+                  First category opens by default; the rest start folded. */}
               {teamsByCategory.length === 0 ? (
                 <div className="text-center py-12">
                   <Users className="w-12 h-12 text-black/20 mx-auto mb-3" />
@@ -859,18 +863,15 @@ export function AdminTournamentDetail() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {teamsByCategory.map(([category, teams]) => (
-                    <div key={category}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <h3
-                          className="text-lg font-bold"
-                          style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                        >
-                          {category}
-                        </h3>
-                        <Badge variant="secondary">{teams.length}</Badge>
-                      </div>
+                <div className="space-y-3">
+                  {teamsByCategory.map(([category, teams], idx) => (
+                    <CategorySection
+                      key={category}
+                      title={category}
+                      count={teams.length}
+                      subtitle={`${teams.length} ${teams.length === 1 ? 'equipo' : 'equipos'}`}
+                      defaultOpen={idx === 0}
+                    >
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                         {teams.map((team) => (
                           <div
@@ -899,7 +900,7 @@ export function AdminTournamentDetail() {
                           </div>
                         ))}
                       </div>
-                    </div>
+                    </CategorySection>
                   ))}
                 </div>
               )}
@@ -1000,7 +1001,10 @@ export function AdminTournamentDetail() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Group matrices — organized by category */}
+                  {/* Group matrices — organized by category. Each category
+                      collapses into an accordion (single-category
+                      tournaments skip the wrapper). First one opens by
+                      default. */}
                   {groupNames.length > 0 && (
                     (() => {
                       const categoryMap = new Map<string, string[]>();
@@ -1010,20 +1014,38 @@ export function AdminTournamentDetail() {
                         categoryMap.get(category)!.push(gName);
                       }
                       const categories = [...categoryMap.entries()].sort(([a], [b]) => a.localeCompare(b));
-                      const hasMultipleCategories = categories.length > 1 || (categories.length === 1 && categories[0][0] !== '');
+                      const hasMultipleCategories =
+                        categories.length > 1 ||
+                        (categories.length === 1 && categories[0][0] !== '');
+
+                      if (!hasMultipleCategories) {
+                        // Single category (or none) → skip the accordion
+                        // and render groups inline, same as before.
+                        const catGroupNames = categories[0]?.[1] ?? [];
+                        return (
+                          <div className="space-y-6">
+                            {catGroupNames.map((gName) => (
+                              <GroupMatrix
+                                key={gName}
+                                groupName={gName}
+                                matches={matchesByGroup[gName] || []}
+                                standings={standingsByGroup[gName] || []}
+                              />
+                            ))}
+                          </div>
+                        );
+                      }
 
                       return (
-                        <div className="space-y-6">
-                          {categories.map(([category, catGroupNames]) => (
-                            <div key={category || '_default'}>
-                              {hasMultipleCategories && category && (
-                                <h3
-                                  className="text-xl font-bold mb-4 pb-2 border-b-2 border-spk-red"
-                                  style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                                >
-                                  {category.toUpperCase()}
-                                </h3>
-                              )}
+                        <div className="space-y-3">
+                          {categories.map(([category, catGroupNames], idx) => (
+                            <CategorySection
+                              key={category || '_default'}
+                              title={category || 'Sin categoría'}
+                              count={catGroupNames.length}
+                              subtitle={`${catGroupNames.length} ${catGroupNames.length === 1 ? 'grupo' : 'grupos'}`}
+                              defaultOpen={idx === 0}
+                            >
                               <div className="space-y-6">
                                 {catGroupNames.map((gName) => (
                                   <GroupMatrix
@@ -1034,7 +1056,7 @@ export function AdminTournamentDetail() {
                                   />
                                 ))}
                               </div>
-                            </div>
+                            </CategorySection>
                           ))}
                         </div>
                       );
@@ -1086,7 +1108,9 @@ export function AdminTournamentDetail() {
                     </div>
                   ))}
 
-                  {/* Bracket matches — organized by category */}
+                  {/* Bracket matches — organized by category. Collapsed
+                      into an accordion per-category when there's more than
+                      one so the page stays scannable. */}
                   {bracketMatches.length > 0 && (
                     (() => {
                       const categoryMap = new Map<string, BracketMatch[]>();
@@ -1096,22 +1120,17 @@ export function AdminTournamentDetail() {
                         categoryMap.get(category)!.push(bm);
                       }
                       const categories = [...categoryMap.entries()].sort(([a], [b]) => a.localeCompare(b));
-                      const hasMultipleCategories = categories.length > 1 || (categories.length === 1 && categories[0][0] !== '');
+                      const hasMultipleCategories =
+                        categories.length > 1 ||
+                        (categories.length === 1 && categories[0][0] !== '');
 
-                      return (
-                        <div className="space-y-6">
-                          {categories.map(([category, catBracketMatches]) => (
-                            <div key={category || '_default_bracket'}>
-                              <h3
-                                className="text-lg font-bold mb-3"
-                                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                              >
-                                Bracket de Eliminación{hasMultipleCategories && category ? ` — ${category}` : ''}
-                              </h3>
-                              <div className="space-y-2">
-                                {catBracketMatches.map((bm) => {
-                                  const displayRound = bm.round.includes('|') ? bm.round.split('|').slice(1).join('|') : bm.round;
-                                  return (
+                      const renderBracket = (catBracketMatches: BracketMatch[]) => (
+                        <div className="space-y-2">
+                          {catBracketMatches.map((bm) => {
+                            const displayRound = bm.round.includes('|')
+                              ? bm.round.split('|').slice(1).join('|')
+                              : bm.round;
+                            return (
                           <div
                             key={bm.id}
                             className="p-3 bg-white border border-black/10 rounded-sm"
@@ -1257,10 +1276,40 @@ export function AdminTournamentDetail() {
                               )
                             )}
                           </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
+                            );
+                          })}
+                        </div>
+                      );
+
+                      if (!hasMultipleCategories) {
+                        // Single-category bracket → render inline with a
+                        // plain header instead of an accordion.
+                        const catBracketMatches = categories[0]?.[1] ?? [];
+                        return (
+                          <div>
+                            <h3
+                              className="text-lg font-bold mb-3"
+                              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                            >
+                              Bracket de Eliminación
+                            </h3>
+                            {renderBracket(catBracketMatches)}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="space-y-3">
+                          {categories.map(([category, catBracketMatches], idx) => (
+                            <CategorySection
+                              key={category || '_default_bracket'}
+                              title={`Bracket · ${category}`}
+                              count={catBracketMatches.length}
+                              subtitle={`${catBracketMatches.length} ${catBracketMatches.length === 1 ? 'partido' : 'partidos'}`}
+                              defaultOpen={idx === 0}
+                            >
+                              {renderBracket(catBracketMatches)}
+                            </CategorySection>
                           ))}
                         </div>
                       );
