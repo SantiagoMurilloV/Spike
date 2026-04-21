@@ -15,6 +15,7 @@ import teamRoutes from './routes/team.routes';
 import matchRoutes from './routes/match.routes';
 import settingsRoutes from './routes/settings.routes';
 import userRoutes from './routes/user.routes';
+import pushRoutes from './routes/push.routes';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
@@ -181,6 +182,7 @@ app.use('/api/teams', teamRoutes);
 app.use('/api/matches', matchRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/push', pushRoutes);
 
 // Error handler — must be last. Registering it up here (outside startServer)
 // ensures it catches errors even if boot-time migration fails.

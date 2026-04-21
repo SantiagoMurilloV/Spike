@@ -11,6 +11,36 @@ import { NotFoundError, ValidationError } from '../middleware/errorHandler';
 import { validate } from '../middleware/validation';
 import { standingsCalculator } from './standings.service';
 import { bracketGenerator } from './bracket.service';
+import { pushService, getVapidPublicKey } from './push.service';
+
+/**
+ * Fire-and-forget helper that builds the two-team label used in push
+ * titles. Falls back to "Partido de voley" when we couldn't join the team
+ * rows (shouldn't happen but a push should never fail a match write).
+ */
+async function matchHeadline(matchId: string): Promise<{ title: string; url: string }> {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT m.id, m.tournament_id,
+            t1.name AS t1_name, t1.initials AS t1_initials,
+            t2.name AS t2_name, t2.initials AS t2_initials
+     FROM matches m
+     LEFT JOIN teams t1 ON m.team1_id = t1.id
+     LEFT JOIN teams t2 ON m.team2_id = t2.id
+     WHERE m.id = $1`,
+    [matchId],
+  );
+  if (result.rows.length === 0) {
+    return { title: 'Partido de voley', url: '/' };
+  }
+  const row = result.rows[0];
+  const team1 = (row.t1_name as string) || (row.t1_initials as string) || 'Equipo 1';
+  const team2 = (row.t2_name as string) || (row.t2_initials as string) || 'Equipo 2';
+  return {
+    title: `${team1} vs ${team2}`,
+    url: `/match/${matchId}`,
+  };
+}
 
 /**
  * Recalculate standings and re-resolve any bracket placeholders for a
@@ -210,6 +240,29 @@ export class MatchService {
       await refreshTournamentState(tournamentId);
     }
 
+    // Fire a push when the admin flips a match into 'live' from here.
+    // Score corrections from the admin form skip the score-push flow —
+    // that belongs to the referee console where the judge drives scoring.
+    // Skip entirely when VAPID isn't configured (unit tests, dev without
+    // keys) so we don't issue needless DB lookups.
+    if (
+      getVapidPublicKey() &&
+      data.status === 'live' &&
+      existing.status !== 'live'
+    ) {
+      matchHeadline(id)
+        .then(({ title, url }) =>
+          pushService.sendToAll({
+            title: `${title} · En vivo`,
+            body: '¡El partido acaba de comenzar!',
+            url,
+            tag: `match-live-${id}`,
+            data: { matchId: id, type: 'match-live' },
+          }),
+        )
+        .catch((err) => console.warn('[push] match-live dispatch failed', err));
+    }
+
     return mapRow(result.rows[0]);
   }
 
@@ -306,6 +359,60 @@ export class MatchService {
       score.status !== undefined;
     if (scoreTouched) {
       await refreshTournamentState(existing.tournamentId);
+    }
+
+    // Push dispatch (fire-and-forget):
+    //   - status transitions to 'live'   → "En vivo" notification
+    //   - a new set just got closed      → current score notification
+    //   - status transitions to 'completed' → "Final" notification
+    // The match.sets array that arrives in the ScoreUpdate is the source
+    // of truth — we compare its length against the previous sets count to
+    // detect a set closure.
+    const becameLive = score.status === 'live' && existing.status !== 'live';
+    const becameCompleted = score.status === 'completed' && existing.status !== 'completed';
+    const previousSetCount = existing.sets?.length ?? 0;
+    const newSetCount = score.sets?.length ?? previousSetCount;
+    const setJustClosed = newSetCount > previousSetCount;
+
+    if (getVapidPublicKey() && (becameLive || becameCompleted || setJustClosed)) {
+      const notify = async () => {
+        const { title, url } = await matchHeadline(id);
+        if (becameCompleted) {
+          const setsH = (score.sets ?? []).filter((s) => s.team1Points > s.team2Points).length;
+          const setsA = (score.sets ?? []).filter((s) => s.team2Points > s.team1Points).length;
+          await pushService.sendToAll({
+            title: `${title} · Final`,
+            body: `Resultado ${setsH}–${setsA}. Tocá para ver el detalle.`,
+            url,
+            tag: `match-final-${id}`,
+            data: { matchId: id, type: 'match-completed' },
+          });
+          return;
+        }
+        if (setJustClosed && score.sets) {
+          const last = score.sets[score.sets.length - 1];
+          const setsH = score.sets.filter((s) => s.team1Points > s.team2Points).length;
+          const setsA = score.sets.filter((s) => s.team2Points > s.team1Points).length;
+          await pushService.sendToAll({
+            title: `${title} · Set ${score.sets.length} cerrado`,
+            body: `${last.team1Points}–${last.team2Points} · Sets ${setsH}–${setsA}`,
+            url,
+            tag: `match-score-${id}`,
+            data: { matchId: id, type: 'set-closed' },
+          });
+          return;
+        }
+        if (becameLive) {
+          await pushService.sendToAll({
+            title: `${title} · En vivo`,
+            body: '¡El partido acaba de comenzar!',
+            url,
+            tag: `match-live-${id}`,
+            data: { matchId: id, type: 'match-live' },
+          });
+        }
+      };
+      notify().catch((err) => console.warn('[push] match dispatch failed', err));
     }
 
     return this.getById(id);

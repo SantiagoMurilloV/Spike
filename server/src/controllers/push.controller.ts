@@ -1,0 +1,59 @@
+import { Request, Response, NextFunction } from 'express';
+import { pushService, getVapidPublicKey, StoredSubscription } from '../services/push.service';
+import { ValidationError } from '../middleware/errorHandler';
+
+/** Expose the VAPID public key so the browser can register a subscription. */
+export function vapidPublicKey(_req: Request, res: Response): void {
+  const key = getVapidPublicKey();
+  if (!key) {
+    res.status(503).json({ message: 'Push notifications no están configuradas' });
+    return;
+  }
+  res.json({ publicKey: key });
+}
+
+/** Persist a browser subscription — called right after the user grants permission. */
+export async function subscribe(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const body = req.body as {
+      subscription?: StoredSubscription;
+      role?: string;
+    };
+    const sub = body.subscription;
+    if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
+      throw new ValidationError('Subscripción inválida');
+    }
+    await pushService.save({
+      endpoint: sub.endpoint,
+      keys: sub.keys,
+      userId: req.user?.userId ?? null,
+      role: body.role ?? req.user?.role ?? null,
+      userAgent: (req.headers['user-agent'] as string) ?? null,
+    });
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** Remove a subscription — called when the browser revokes or unsubscribes. */
+export async function unsubscribe(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { endpoint } = req.body as { endpoint?: string };
+    if (!endpoint) {
+      throw new ValidationError('Falta el endpoint');
+    }
+    await pushService.remove(endpoint);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}

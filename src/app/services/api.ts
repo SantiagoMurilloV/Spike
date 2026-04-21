@@ -429,6 +429,25 @@ export const api = {
     });
   },
 
+  // ── Push notifications ─────────────────────────────────────────
+  async getVapidPublicKey(): Promise<{ publicKey: string }> {
+    return request<{ publicKey: string }>('/push/vapid-public-key');
+  },
+
+  async subscribePush(subscription: PushSubscription): Promise<void> {
+    await request<void>('/push/subscribe', {
+      method: 'POST',
+      body: JSON.stringify({ subscription: subscription.toJSON() }),
+    });
+  },
+
+  async unsubscribePush(endpoint: string): Promise<void> {
+    await request<void>('/push/unsubscribe', {
+      method: 'POST',
+      body: JSON.stringify({ endpoint }),
+    });
+  },
+
   // ── Upload ─────────────────────────────────────────────────────
   async uploadLogo(file: File): Promise<string> {
     const formData = new FormData();

@@ -11,7 +11,18 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      // InjectManifest lets us ship our own service worker (src/sw.ts) that
+      // adds `push` + `notificationclick` listeners on top of the Workbox
+      // precache. That's what enables real push notifications on Android
+      // Chrome / desktop Firefox and iOS 16.4+ (installed PWA).
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'prompt',
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,ttf,eot}'],
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+      },
       includeAssets: ['icon-192.png', 'icon-512.png', 'spk-cup-logo-v4.svg', 'spk-cup-logo-horizontal.svg'],
       manifest: {
         name: 'SPK-CUP — Sistema de Torneos',
@@ -46,26 +57,6 @@ export default defineConfig({
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
-          },
-        ],
-      },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,ttf,eot}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https?:\/\/[^/]+\/api\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24, // 24 hours
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-              networkTimeoutSeconds: 5,
-            },
           },
         ],
       },

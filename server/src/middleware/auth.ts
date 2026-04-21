@@ -28,6 +28,26 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     return next();
   }
 
+  // Public push (un)subscribe — spectators without accounts still need to
+  // opt into live-match notifications. The endpoints are anonymous-safe:
+  // they only persist the browser's own subscription and can't disclose
+  // anything. We still best-effort decode the token so authed users get
+  // their `userId` / `role` attached to the subscription row.
+  if (
+    req.method === 'POST' &&
+    (req.path === '/api/push/subscribe' || req.path === '/api/push/unsubscribe')
+  ) {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        req.user = authService.verifyToken(authHeader.substring(7));
+      } catch {
+        // token is bad — fine, we still let them subscribe anonymously
+      }
+    }
+    return next();
+  }
+
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

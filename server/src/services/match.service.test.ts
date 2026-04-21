@@ -22,6 +22,18 @@ vi.mock('./bracket.service', () => ({
   },
 }));
 
+// Mock the push service so unit tests don't try to issue real HTTP pushes
+// to Google/Firefox endpoints — and don't consume extra pool.query mocks
+// via the matchHeadline lookup inside dispatch.
+vi.mock('./push.service', () => ({
+  pushService: {
+    sendToAll: vi.fn().mockResolvedValue(undefined),
+    save: vi.fn().mockResolvedValue(undefined),
+    remove: vi.fn().mockResolvedValue(undefined),
+  },
+  getVapidPublicKey: () => '',
+}));
+
 import { getPool } from '../config/database';
 import { standingsCalculator } from './standings.service';
 

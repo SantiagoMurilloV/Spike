@@ -1,26 +1,31 @@
 import { useEffect, useState } from 'react';
 import { Bell, BellOff, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { api } from '../services/api';
 
 type NotificationStatus = 'unsupported' | 'default' | 'granted' | 'denied';
 
 const DISMISS_KEY = 'spk.notifications.dismissed';
 
 /**
- * NotificationPrompt — lightweight opt-in for browser notifications.
+ * NotificationPrompt — opt-in for real Web Push notifications.
  *
- * Appears as a dismissable floating card the first time a user visits with
- * notifications in the `default` state. Tapping "Activar" triggers the
- * platform permission prompt. If the user dismisses with × we remember the
- * choice in localStorage so we don't nag them on every page load.
+ * Flow when the user hits "Activar":
+ *   1. Request Notification permission from the browser.
+ *   2. Ask the SW for a PushSubscription using the VAPID public key
+ *      fetched from /api/push/vapid-public-key.
+ *   3. POST the subscription to /api/push/subscribe so the backend can
+ *      later push "match live" / "set closed" / "final" events.
  *
- * Hidden on iOS Safari before 16.4 (no Notification API) and inside the
- * admin shell (the admin already has the match CRUD open, and the
- * notifications target spectators / judges).
+ * On iOS this only works when the PWA is installed to the Home Screen on
+ * iOS 16.4+. In the browser (Safari on iPhone without Home Screen), the
+ * permission request succeeds but no SW push is delivered — we still show
+ * the prompt because the user might install the PWA next.
  */
 export function NotificationPrompt() {
   const [status, setStatus] = useState<NotificationStatus>('default');
   const [visible, setVisible] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -41,14 +46,32 @@ export function NotificationPrompt() {
     }
   }, []);
 
+  // Kick off the subscribe flow if the user previously granted permission
+  // but we don't yet have a stored subscription (e.g. cleared browser data
+  // or a fresh PWA install). Idempotent on the backend (upsert).
+  useEffect(() => {
+    if (status === 'granted') {
+      subscribeToPush().catch(() => {
+        // silent — we'll retry next time they visit
+      });
+    }
+  }, [status]);
+
   const request = async () => {
+    if (busy) return;
+    setBusy(true);
     try {
       const res = await Notification.requestPermission();
       setStatus(res as NotificationStatus);
+      if (res === 'granted') {
+        await subscribeToPush();
+      }
       if (res !== 'default') setVisible(false);
     } catch {
       setStatus('denied');
       setVisible(false);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -106,11 +129,12 @@ export function NotificationPrompt() {
                   <button
                     type="button"
                     onClick={request}
-                    className="inline-flex items-center gap-2 bg-spk-red hover:bg-spk-red-dark text-white text-xs font-bold uppercase px-3 py-2 rounded-sm transition-colors"
+                    disabled={busy}
+                    className="inline-flex items-center gap-2 bg-spk-red hover:bg-spk-red-dark text-white text-xs font-bold uppercase px-3 py-2 rounded-sm transition-colors disabled:opacity-60"
                     style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
                   >
                     <Bell className="w-3.5 h-3.5" />
-                    Activar
+                    {busy ? 'Conectando…' : 'Activar'}
                   </button>
                   <button
                     type="button"
@@ -129,4 +153,42 @@ export function NotificationPrompt() {
       )}
     </AnimatePresence>
   );
+}
+
+/**
+ * Register the browser with the push server.
+ *
+ * Call only AFTER the user has granted Notification permission. Idempotent —
+ * if a subscription already exists for this browser we just re-send it to
+ * the backend (in case the server lost it) without going through the full
+ * pushManager.subscribe flow, which can prompt on some platforms.
+ */
+async function subscribeToPush(): Promise<void> {
+  if (typeof navigator === 'undefined') return;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+  const { publicKey } = await api.getVapidPublicKey();
+  if (!publicKey) return;
+
+  const registration = await navigator.serviceWorker.ready;
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+  }
+  await api.subscribePush(subscription);
+}
+
+/** Convert the VAPID base64url public key into the Uint8Array subscribe expects. */
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) {
+    out[i] = raw.charCodeAt(i);
+  }
+  return out;
 }
