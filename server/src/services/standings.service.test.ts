@@ -643,6 +643,64 @@ describe('StandingsCalculator', () => {
       expect(standings[0].setsFor).toBe(3);
       expect(standings[1].setsFor).toBe(3);
     });
+
+    it('should number positions PER GROUP, not globally across the tournament', async () => {
+      // Regression: with two groups (A and B) and four teams each, every
+      // group's standings must be 1–4 locally. A global 1–8 numbering
+      // would break both the public group table AND the bracket
+      // placeholder resolution ("1|A" has to match team_id at position=1
+      // in group 'A'; if that slot holds position=5 it stops resolving).
+      //
+      // Group A: team-A beats team-B 2-0, team-C beats team-D 2-1
+      // Group B: team-E beats team-F 2-0, team-G beats team-H 2-0
+      const poolQuery = vi.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 'tournament-1', format: 'groups+knockout' }] })
+        .mockResolvedValueOnce({
+          rows: [
+            matchRow({ id: 'm1', team1_id: 'team-A', team2_id: 'team-B', score_team1: 2, score_team2: 0, group_name: 'A' }),
+            matchRow({ id: 'm2', team1_id: 'team-C', team2_id: 'team-D', score_team1: 2, score_team2: 1, group_name: 'A' }),
+            matchRow({ id: 'm3', team1_id: 'team-E', team2_id: 'team-F', score_team1: 2, score_team2: 0, group_name: 'B' }),
+            matchRow({ id: 'm4', team1_id: 'team-G', team2_id: 'team-H', score_team1: 2, score_team2: 0, group_name: 'B' }),
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const clientQuery = vi.fn().mockImplementation((sql: string, params?: unknown[]) => {
+        if (typeof sql === 'string' && sql.startsWith('INSERT INTO standings')) {
+          const row = standingsDbRow({
+            team_id: params![1],
+            group_name: params![2],
+            position: params![3],
+            played: params![4],
+            wins: params![5],
+            losses: params![6],
+            sets_for: params![7],
+            sets_against: params![8],
+            points: params![9],
+            is_qualified: params![10],
+          });
+          return Promise.resolve({ rows: [row] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      mockPoolWithClient(poolQuery, clientQuery);
+      const standings = await calculator.calculate('tournament-1');
+
+      // Grab each group's list and check positions are 1..N per group.
+      const groupA = standings.filter(s => s.groupName === 'A').sort((a, b) => a.position - b.position);
+      const groupB = standings.filter(s => s.groupName === 'B').sort((a, b) => a.position - b.position);
+
+      expect(groupA.map(s => s.position)).toEqual([1, 2, 3, 4]);
+      expect(groupB.map(s => s.position)).toEqual([1, 2, 3, 4]);
+
+      // Sanity: group A's top team has more points than any other group A
+      // team, but the same principle applies independently to group B.
+      const topA = groupA[0];
+      const topB = groupB[0];
+      expect(topA.points).toBeGreaterThanOrEqual(groupA[1].points);
+      expect(topB.points).toBeGreaterThanOrEqual(groupB[1].points);
+    });
   });
 
   // =========================================================================

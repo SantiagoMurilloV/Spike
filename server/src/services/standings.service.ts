@@ -177,19 +177,46 @@ export class StandingsCalculator {
       }
     }
 
-    // Sort teams: points DESC, set difference DESC, setsFor DESC
-    const sorted = Array.from(statsMap.values()).sort((a, b) => {
-      // First by points descending
+    // Sort + position assignment has to happen PER GROUP, not globally.
+    // The bracket resolution uses placeholders like "1|Sub-14|A" to mean
+    // "1st place of group A", and the public group table renders these
+    // positions next to each team. Numbering globally (1, 2, 3 … across
+    // the whole tournament) breaks both uses — every group should start
+    // its own ranking at 1.
+    //
+    // Tournaments with no groups (league / pure knockout) all share the
+    // single synthetic group key '' here, so they still rank 1..N across
+    // the full field, which is what we want.
+    const sortComparator = (a: TeamStats, b: TeamStats) => {
       if (b.points !== a.points) return b.points - a.points;
-      // Then by set difference descending
       const diffA = a.setsFor - a.setsAgainst;
       const diffB = b.setsFor - b.setsAgainst;
       if (diffB !== diffA) return diffB - diffA;
-      // Then by setsFor descending
       return b.setsFor - a.setsFor;
-    });
+    };
 
-    // Determine how many teams qualify
+    const teamsByGroup = new Map<string, TeamStats[]>();
+    for (const stats of statsMap.values()) {
+      const key = stats.groupName ?? '';
+      if (!teamsByGroup.has(key)) teamsByGroup.set(key, []);
+      teamsByGroup.get(key)!.push(stats);
+    }
+
+    // Flatten the groups back into one list, each team tagged with its
+    // local (within-group) position so we can persist it directly.
+    const sorted: Array<TeamStats & { groupPosition: number }> = [];
+    for (const [, teams] of teamsByGroup) {
+      teams.sort(sortComparator);
+      teams.forEach((t, idx) => {
+        sorted.push({ ...t, groupPosition: idx + 1 });
+      });
+    }
+
+    // "qualifyCount" is the number of teams that advance from EACH group
+    // (e.g. top 4 of each group for groups+knockout). Applying it globally
+    // would only mark a handful of teams in the top group as qualified
+    // and none from the rest, which doesn't match how the admin sets up
+    // elimination crossings.
     const qualifyCount = this.getQualifyCount(format);
 
     // Delete existing standings for this tournament and insert new ones
@@ -201,7 +228,7 @@ export class StandingsCalculator {
       const standings: StandingsRow[] = [];
       for (let i = 0; i < sorted.length; i++) {
         const stats = sorted[i];
-        const position = i + 1;
+        const position = stats.groupPosition;
         const isQualified = position <= qualifyCount;
 
         const result = await client.query(
