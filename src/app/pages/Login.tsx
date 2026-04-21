@@ -7,9 +7,19 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { ApiError } from '../services/api';
 
+/**
+ * Map a user role to the landing page for that role so a judge doesn't end
+ * up staring at the admin chrome. Falls back to /admin for any unknown role
+ * (today only 'admin' and 'judge' are wired, but new roles default safely).
+ */
+function homeForRole(role: string | undefined): string {
+  if (role === 'judge') return '/judge';
+  return '/admin';
+}
+
 export function Login() {
   const navigate = useNavigate();
-  const { login, isAuthenticated, sessionMessage } = useAuth();
+  const { login, isAuthenticated, sessionMessage, user } = useAuth();
   const { tournaments, teams, matches } = useData();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -26,9 +36,9 @@ export function Login() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/admin', { replace: true });
+      navigate(homeForRole(user?.role), { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, user?.role, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,8 +46,8 @@ export function Login() {
     setIsLoading(true);
 
     try {
-      await login(username, password);
-      navigate('/admin');
+      const session = await login(username, password);
+      navigate(homeForRole(session.user.role));
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

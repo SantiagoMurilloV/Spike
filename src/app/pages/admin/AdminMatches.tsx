@@ -1,4 +1,4 @@
-import { Plus, Search, Edit, Trash2, Loader2, Radio } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -213,17 +213,11 @@ export function AdminMatches() {
               organizer, so we don't navigate on card click here.
             */}
             <MatchCard match={match} />
-            {/* Action Buttons Overlay */}
+            {/* Action Buttons Overlay — admins only edit metadata and
+                correct scores here. The live-scoring console belongs to
+                the Judge role (/judge), so we don't surface a referee
+                shortcut in this list anymore. */}
             <div className="absolute top-2 right-2 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); navigate(`/admin/referee/${match.id}`); }}
-                aria-label={`Puntuar partido ${match.team1.name} vs ${match.team2.name}`}
-                title="Abrir consola de árbitro"
-                className="p-2 bg-spk-red text-white rounded-sm shadow-lg hover:bg-spk-red-dark transition-all"
-              >
-                <Radio className="w-4 h-4" aria-hidden="true" />
-              </button>
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); handleEdit(match); }}

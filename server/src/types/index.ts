@@ -169,9 +169,11 @@ export interface ScoreUpdate {
 
 // === Auth ===
 
+export type AppRole = 'admin' | 'judge';
+
 export interface JwtPayload {
   userId: string;
-  role: 'admin';
+  role: AppRole | string;
   iat: number;
   exp: number;
 }

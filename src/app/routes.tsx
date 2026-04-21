@@ -3,6 +3,7 @@ import { createBrowserRouter } from 'react-router';
 import { Loader2 } from 'lucide-react';
 import { Layout } from './components/Layout';
 import { AdminLayout } from './components/AdminLayout';
+import { JudgeLayout } from './components/JudgeLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 // Keep Home eager: it's the landing page and already critical-path.
@@ -33,6 +34,9 @@ const AdminMatches = lazy(() =>
 const AdminTeams = lazy(() =>
   import('./pages/admin/AdminTeams').then((m) => ({ default: m.AdminTeams })),
 );
+const AdminJudges = lazy(() =>
+  import('./pages/admin/AdminJudges').then((m) => ({ default: m.AdminJudges })),
+);
 const AdminSettings = lazy(() =>
   import('./pages/admin/AdminSettings').then((m) => ({ default: m.AdminSettings })),
 );
@@ -41,6 +45,14 @@ const AdminTournamentDetail = lazy(() =>
     default: m.AdminTournamentDetail,
   })),
 );
+
+const JudgeDashboard = lazy(() =>
+  import('./pages/judge/JudgeDashboard').then((m) => ({ default: m.JudgeDashboard })),
+);
+
+// RefereeScore is now a shared screen: both /admin/referee/:matchId (legacy)
+// and /judge/match/:matchId mount it. Admin users lost the entry point from
+// the admin matches page but the route still works for deep-links.
 const RefereeScore = lazy(() =>
   import('./pages/admin/RefereeScore').then((m) => ({ default: m.RefereeScore })),
 );
@@ -77,11 +89,20 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    // Referee score console is full-bleed (no admin chrome) so it sits
-    // outside AdminLayout but still requires auth.
+    // Referee score console is full-bleed (no admin/judge chrome). Both
+    // admins and judges can reach it — admins via deep-link, judges via
+    // their dashboard card.
     path: '/admin/referee/:matchId',
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={['admin', 'judge']}>
+        {withSuspense(<RefereeScore />)}
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/judge/match/:matchId',
+    element: (
+      <ProtectedRoute allowedRoles={['admin', 'judge']}>
         {withSuspense(<RefereeScore />)}
       </ProtectedRoute>
     ),
@@ -89,7 +110,7 @@ export const router = createBrowserRouter([
   {
     path: '/admin',
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute allowedRoles={['admin']}>
         <AdminLayout />
       </ProtectedRoute>
     ),
@@ -99,7 +120,17 @@ export const router = createBrowserRouter([
       { path: 'tournaments/:id', element: withSuspense(<AdminTournamentDetail />) },
       { path: 'matches', element: withSuspense(<AdminMatches />) },
       { path: 'teams', element: withSuspense(<AdminTeams />) },
+      { path: 'judges', element: withSuspense(<AdminJudges />) },
       { path: 'settings', element: withSuspense(<AdminSettings />) },
     ],
+  },
+  {
+    path: '/judge',
+    element: (
+      <ProtectedRoute allowedRoles={['judge']}>
+        <JudgeLayout />
+      </ProtectedRoute>
+    ),
+    children: [{ index: true, element: withSuspense(<JudgeDashboard />) }],
   },
 ]);

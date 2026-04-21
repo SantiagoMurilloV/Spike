@@ -9,6 +9,7 @@ import {
   X,
   Home,
   Calendar,
+  UserCog,
 } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -25,6 +26,7 @@ export function AdminLayout() {
     { icon: Trophy, label: 'Torneos', path: '/admin/tournaments' },
     { icon: Calendar, label: 'Partidos', path: '/admin/matches' },
     { icon: Users, label: 'Equipos', path: '/admin/teams' },
+    { icon: UserCog, label: 'Jueces', path: '/admin/judges' },
     { icon: Settings, label: 'Configuración', path: '/admin/settings' },
   ];
 

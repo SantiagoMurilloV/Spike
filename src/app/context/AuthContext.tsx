@@ -14,11 +14,17 @@ interface AuthUser {
   role: string;
 }
 
+interface LoginResult {
+  token: string;
+  user: AuthUser;
+}
+
 interface AuthContextType {
   isAuthenticated: boolean;
   user: AuthUser | null;
   token: string | null;
-  login: (username: string, password: string) => Promise<void>;
+  /** Resolves with the session on success so callers can route by role. */
+  login: (username: string, password: string) => Promise<LoginResult>;
   logout: (message?: string) => void;
   isLoading: boolean;
   sessionMessage: string | null;
@@ -80,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [logout]);
 
   const login = useCallback(
-    async (username: string, password: string) => {
+    async (username: string, password: string): Promise<LoginResult> => {
       setSessionMessage(null);
       const response = await api.login(username, password);
 
@@ -89,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthToken(response.token);
       localStorage.setItem(TOKEN_KEY, response.token);
       localStorage.setItem(USER_KEY, JSON.stringify(response.user));
+      return { token: response.token, user: response.user };
     },
     [],
   );

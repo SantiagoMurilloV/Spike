@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
+import { useAuth } from '../../context/AuthContext';
 import {
   ArrowLeft,
   ArrowRight,
@@ -37,6 +38,10 @@ const FIFTH_SET_TARGET = 15;
 export function RefereeScore() {
   const { matchId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // Judges land back at their dashboard when the match is finalized;
+  // admins return to the tournament detail they came from.
+  const postFinalizeTarget = user?.role === 'judge' ? '/judge' : null;
 
   const [match, setMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
@@ -245,7 +250,7 @@ export function RefereeScore() {
         })),
       });
       toast.success('Partido finalizado');
-      navigate(`/admin/tournaments/${match.tournamentId}`);
+      navigate(postFinalizeTarget ?? `/admin/tournaments/${match.tournamentId}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al finalizar');
     }

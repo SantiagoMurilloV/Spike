@@ -84,6 +84,15 @@ export interface LoginResponse {
   user: { id: string; username: string; role: string };
 }
 
+export interface Judge {
+  id: string;
+  username: string;
+  role: string;
+  displayName?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // ── Backend response shapes (raw from API) ─────────────────────────
 
 interface BackendTeam {
@@ -618,6 +627,29 @@ export const api = {
 
   async deleteMatch(id: string): Promise<void> {
     await request<void>(`/matches/${id}`, { method: 'DELETE' });
+  },
+
+  // ── Users (judges) ─────────────────────────────────────────────
+  async listJudges(): Promise<Judge[]> {
+    return request<Judge[]>('/users/judges');
+  },
+
+  async createJudge(data: { username: string; password: string; displayName?: string }): Promise<Judge> {
+    return request<Judge>('/users/judges', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteJudge(id: string): Promise<void> {
+    await request<void>(`/users/judges/${id}`, { method: 'DELETE' });
+  },
+
+  async resetJudgePassword(id: string, password: string): Promise<void> {
+    await request<void>(`/users/judges/${id}/password`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
   },
 
   // ── Settings ───────────────────────────────────────────────────
