@@ -71,6 +71,7 @@ export function AdminTournaments() {
         format: tournament.format,
         courts: tournament.courts,
         courtLocations: tournament.courtLocations,
+        categories: tournament.categories,
       };
       await updateTournament(editingTournament.id, dto);
       toast.success('Torneo actualizado correctamente');
@@ -89,6 +90,7 @@ export function AdminTournaments() {
         format: tournament.format,
         courts: tournament.courts,
         courtLocations: tournament.courtLocations,
+        categories: tournament.categories,
       };
       await addTournament(dto);
       toast.success('Torneo creado correctamente');

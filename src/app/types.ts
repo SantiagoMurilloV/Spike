@@ -75,6 +75,12 @@ export interface Tournament {
   courts: string[];
   /** Mapa opcional { nombreCancha: ubicación } (dirección o referencia). */
   courtLocations?: Record<string, string>;
+  /**
+   * Divisions accepted by the tournament (e.g. `["Sub-14 Femenino"]`). When
+   * non-empty the enrolment UI filters the team dropdown to teams whose
+   * `category` matches one of these values. Empty / undefined → no filter.
+   */
+  categories?: string[];
 }
 
 export interface BracketMatch {

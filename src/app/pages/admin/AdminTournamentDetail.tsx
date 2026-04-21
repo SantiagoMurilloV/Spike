@@ -216,10 +216,20 @@ export function AdminTournamentDetail() {
 
   const enrolledIds = useMemo(() => new Set(enrolledTeams.map((t) => t.id)), [enrolledTeams]);
 
-  const availableTeams = useMemo(
-    () => allTeams.filter((t) => !enrolledIds.has(t.id)),
-    [allTeams, enrolledIds],
-  );
+  const availableTeams = useMemo(() => {
+    // Filter out already-enrolled teams first, then apply the
+    // tournament's category whitelist (if set). Empty list = no filter,
+    // which preserves the legacy behaviour for tournaments created before
+    // this feature shipped.
+    const notEnrolled = allTeams.filter((t) => !enrolledIds.has(t.id));
+    const allowed = tournament?.categories ?? [];
+    if (allowed.length === 0) return notEnrolled;
+    const normalize = (s: string) => s.trim().toLowerCase();
+    const allowedSet = new Set(allowed.map(normalize));
+    return notEnrolled.filter(
+      (t) => t.category && allowedSet.has(normalize(t.category)),
+    );
+  }, [allTeams, enrolledIds, tournament?.categories]);
 
   const teamsByCategory = useMemo(() => {
     const groups: Record<string, Team[]> = {};

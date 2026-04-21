@@ -104,9 +104,29 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
     teamsCount: 8,
     format: 'groups+knockout' as 'groups' | 'knockout' | 'groups+knockout' | 'league',
     courts: [...DEFAULT_COURTS] as CourtEntry[],
+    categories: [] as string[],
   });
+  const [categoryDraft, setCategoryDraft] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
+
+  const addCategory = () => {
+    const value = categoryDraft.trim();
+    if (!value) return;
+    if (formData.categories.some((c) => c.toLowerCase() === value.toLowerCase())) {
+      setCategoryDraft('');
+      return;
+    }
+    setFormData({ ...formData, categories: [...formData.categories, value] });
+    setCategoryDraft('');
+  };
+
+  const removeCategory = (value: string) => {
+    setFormData({
+      ...formData,
+      categories: formData.categories.filter((c) => c !== value),
+    });
+  };
 
   // Cover image — uploaded to the backend (base64 in DB now, so it
   // survives redeploys) and stored on the tournament row. `coverFile`
@@ -136,6 +156,7 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
         teamsCount: tournament.teamsCount,
         format: tournament.format,
         courts,
+        categories: tournament.categories ? [...tournament.categories] : [],
       });
       setCoverFile(null);
       setCoverPreview(tournament.coverImage ?? null);
@@ -228,6 +249,7 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
       courts: courtNames,
       courtLocations,
       coverImage: coverImageUrl,
+      categories: formData.categories,
     };
 
     try {
@@ -246,6 +268,7 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
           teamsCount: 8,
           format: 'groups+knockout',
           courts: [...DEFAULT_COURTS],
+          categories: [],
         });
       }
     } catch (err) {
@@ -349,6 +372,72 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
           {/* Cover image — optional. Persisted as a base64 data URL so it
               survives Railway redeploys and the frontend loads it without
               a separate request. 10 MB cap enforced client-side. */}
+
+          {/* Categories — tag input. Admin types a category name and hits
+              Enter / clicks "Añadir". These drive the enrolment filter in
+              AdminTournamentDetail (only teams matching one of the tags
+              appear in the dropdown). Leaving the list empty is explicit
+              "no filter — any team can be enrolled". */}
+          <div>
+            <label
+              className="block text-sm font-bold mb-2"
+              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+            >
+              Categorías
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={categoryDraft}
+                onChange={(e) => setCategoryDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addCategory();
+                  }
+                }}
+                placeholder="Ej: Sub-14 Femenino"
+                className="flex-1 px-4 py-2 bg-white border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
+              />
+              <button
+                type="button"
+                onClick={addCategory}
+                className="px-4 py-2 bg-black text-white hover:bg-black/80 rounded-sm font-medium text-sm"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.06em' }}
+              >
+                Añadir
+              </button>
+            </div>
+            {formData.categories.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {formData.categories.map((c) => (
+                  <span
+                    key={c}
+                    className="inline-flex items-center gap-2 px-3 py-1 bg-spk-red/10 text-spk-red border border-spk-red/30 rounded-full text-xs font-bold uppercase"
+                    style={{
+                      fontFamily: 'Barlow Condensed, sans-serif',
+                      letterSpacing: '0.06em',
+                    }}
+                  >
+                    {c}
+                    <button
+                      type="button"
+                      onClick={() => removeCategory(c)}
+                      aria-label={`Quitar ${c}`}
+                      className="text-spk-red hover:text-spk-red-dark"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <p className="mt-2 text-xs text-black/50">
+              Al inscribir equipos solo vas a poder elegir los que pertenezcan
+              a una de estas categorías. Dejalo vacío si no querés filtro.
+            </p>
+          </div>
+
           <div>
             <label
               className="block text-sm font-bold mb-2"

@@ -29,6 +29,7 @@ function mapRow(row: Record<string, unknown>): Tournament {
     format: row.format as Tournament['format'],
     courts: row.courts as string[],
     courtLocations: rawLocations && typeof rawLocations === 'object' ? rawLocations : {},
+    categories: (row.categories as string[] | null | undefined) ?? [],
     createdAt: row.created_at as string | undefined,
     updatedAt: row.updated_at as string | undefined,
   };
@@ -124,8 +125,8 @@ export class TournamentService {
     this.validateData(data);
     const pool = getPool();
     const result = await pool.query(
-      `INSERT INTO tournaments (name, sport, club, start_date, end_date, description, cover_image, logo, status, teams_count, format, courts, court_locations)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      `INSERT INTO tournaments (name, sport, club, start_date, end_date, description, cover_image, logo, status, teams_count, format, courts, court_locations, categories)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
         data.name,
@@ -141,6 +142,7 @@ export class TournamentService {
         data.format,
         data.courts || [],
         JSON.stringify(data.courtLocations || {}),
+        data.categories ?? [],
       ]
     );
     return mapRow(result.rows[0]);
@@ -176,6 +178,7 @@ export class TournamentService {
       format: 'format',
       courts: 'courts',
       courtLocations: 'court_locations',
+      categories: 'categories',
     };
 
     for (const [key, column] of Object.entries(columnMap)) {

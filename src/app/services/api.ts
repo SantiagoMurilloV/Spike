@@ -25,6 +25,8 @@ export interface CreateTournamentDto {
   courts: string[];
   /** Mapa opcional { nombreCancha: ubicación }. */
   courtLocations?: Record<string, string>;
+  /** Divisions accepted by the tournament; empty = no filter. */
+  categories?: string[];
 }
 
 export type UpdateTournamentDto = Partial<CreateTournamentDto>;
@@ -122,6 +124,7 @@ interface BackendTournament {
   format: 'groups' | 'knockout' | 'groups+knockout' | 'league';
   courts: string[];
   courtLocations?: Record<string, string>;
+  categories?: string[];
 }
 
 interface BackendEnrolledTeam {
@@ -319,6 +322,7 @@ function toFrontendTournament(t: BackendTournament): Tournament {
     format: t.format,
     courts: t.courts ?? [],
     courtLocations: t.courtLocations ?? {},
+    categories: t.categories ?? [],
   };
 }
 

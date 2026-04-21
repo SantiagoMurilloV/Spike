@@ -16,6 +16,11 @@ export interface Tournament {
   courts: string[];
   /** Mapa opcional { nombreCancha: ubicación } (dirección o descripción). */
   courtLocations?: Record<string, string>;
+  /**
+   * Divisions the tournament accepts (e.g. ["Sub-14 Femenino"]). Empty /
+   * omitted means "no filter" — every team is enrollable.
+   */
+  categories?: string[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -123,6 +128,11 @@ export interface CreateTournamentDto {
   courts: string[];
   /** Mapa opcional { nombreCancha: ubicación } (dirección o descripción). */
   courtLocations?: Record<string, string>;
+  /**
+   * Divisions the tournament accepts (e.g. ["Sub-14 Femenino"]). Empty /
+   * omitted disables the enrolment category filter.
+   */
+  categories?: string[];
 }
 
 export type UpdateTournamentDto = Partial<CreateTournamentDto>;
