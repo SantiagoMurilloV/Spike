@@ -145,9 +145,16 @@ export function AdminTournamentDetail() {
     if (!id) return;
     setRecalculating(true);
     try {
-      const fresh = await api.recalculateStandings(id);
+      // The backend recalc also re-resolves any bracket placeholders from
+      // the fresh standings, so we refetch both streams here to update the
+      // UI in a single shot.
+      const [fresh, bracket] = await Promise.all([
+        api.recalculateStandings(id),
+        api.getTournamentBracket(id),
+      ]);
       setStandings(fresh);
-      toast.success('Tabla recalculada');
+      setBracketMatches(bracket);
+      toast.success('Tabla y bracket actualizados');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo recalcular la tabla');
     } finally {
@@ -961,7 +968,7 @@ export function AdminTournamentDetail() {
                     ) : (
                       <RefreshCw className="w-4 h-4" />
                     )}
-                    Recalcular Tabla
+                    Recalcular Tabla y Bracket
                   </Button>
                 )}
                 {(matches.length > 0 || bracketMatches.length > 0) && (

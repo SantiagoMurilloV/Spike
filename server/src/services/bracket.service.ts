@@ -322,6 +322,92 @@ export class BracketGenerator {
 
     return result.rows.map(mapBracketRow);
   }
+
+  /**
+   * Populate bracket_matches.team1_id / team2_id from group-phase standings.
+   *
+   * Each first-round bracket slot carries a `team*_placeholder` in the
+   * format `"{position}|{groupName}"` (e.g. `"1|Sub-14 Masc|A"` meaning the
+   * 1st-place team of group A in "Sub-14 Masc"). This method reads the
+   * current `standings` table and, for every slot that has a placeholder,
+   * re-resolves it to the actual team id — always overwriting the existing
+   * value so the bracket stays in sync if standings change.
+   *
+   * Returns the number of slots that had their team assignment updated.
+   */
+  async resolveBracketFromStandings(tournamentId: string): Promise<number> {
+    const pool = getPool();
+
+    // Fetch the current standings snapshot.
+    const standingsResult = await pool.query(
+      'SELECT team_id, group_name, position FROM standings WHERE tournament_id = $1',
+      [tournamentId],
+    );
+    const standings = standingsResult.rows as Array<{
+      team_id: string;
+      group_name: string | null;
+      position: number;
+    }>;
+
+    const resolvePlaceholder = (placeholder: string | null): string | null => {
+      if (!placeholder) return null;
+      const firstPipe = placeholder.indexOf('|');
+      if (firstPipe === -1) return null;
+      const pos = parseInt(placeholder.substring(0, firstPipe), 10);
+      const groupName = placeholder.substring(firstPipe + 1);
+      if (Number.isNaN(pos)) return null;
+      const found = standings.find(
+        (s) => s.group_name === groupName && s.position === pos,
+      );
+      return found ? found.team_id : null;
+    };
+
+    // Only load matches that have at least one placeholder — team-advanced
+    // rounds (semifinals, finals) don't need re-resolution from standings.
+    const bmResult = await pool.query(
+      `SELECT id, team1_id, team2_id, team1_placeholder, team2_placeholder
+       FROM bracket_matches
+       WHERE tournament_id = $1
+         AND (team1_placeholder IS NOT NULL OR team2_placeholder IS NOT NULL)`,
+      [tournamentId],
+    );
+
+    if (bmResult.rows.length === 0) return 0;
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      let updated = 0;
+
+      for (const bm of bmResult.rows) {
+        // When a placeholder is present, trust it as the source of truth
+        // and always re-resolve. Slots without a placeholder (e.g. admin
+        // seeded directly, or filled by advanceWinner) keep their team id.
+        const newTeam1Id = bm.team1_placeholder
+          ? resolvePlaceholder(bm.team1_placeholder)
+          : bm.team1_id;
+        const newTeam2Id = bm.team2_placeholder
+          ? resolvePlaceholder(bm.team2_placeholder)
+          : bm.team2_id;
+
+        if (newTeam1Id !== bm.team1_id || newTeam2Id !== bm.team2_id) {
+          await client.query(
+            `UPDATE bracket_matches SET team1_id = $1, team2_id = $2 WHERE id = $3`,
+            [newTeam1Id, newTeam2Id, bm.id],
+          );
+          updated++;
+        }
+      }
+
+      await client.query('COMMIT');
+      return updated;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
 }
 
 export const bracketGenerator = new BracketGenerator();

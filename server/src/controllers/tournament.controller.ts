@@ -81,10 +81,10 @@ export async function getStandings(req: Request, res: Response, next: NextFuncti
 }
 
 /**
- * Force-recalculate and persist the standings for a tournament. Used by the
- * admin UI's "Recalcular tabla" button when a rule change shipped (e.g. the
- * new volleyball point system) or when standings data got out of sync with
- * the underlying matches.
+ * Force-recalculate and persist the standings for a tournament, then re-
+ * resolve any bracket slots that reference group positions so the knockout
+ * bracket stays in sync with the freshly computed table. Used by the admin
+ * UI's "Recalcular tabla" button.
  */
 export async function recalculateStandings(
   req: Request,
@@ -95,6 +95,14 @@ export async function recalculateStandings(
     const id = req.params.id as string;
     validateUUID(id, 'ID de torneo');
     const standings = await standingsCalculator.recalculate(id);
+    // Best-effort: if the tournament doesn't have a bracket yet or has no
+    // placeholders to resolve, this is a no-op. Failures here shouldn't
+    // prevent the caller from getting the fresh standings.
+    try {
+      await bracketGenerator.resolveBracketFromStandings(id);
+    } catch {
+      // swallow: the standings update is the primary response
+    }
     res.json(standings);
   } catch (error) {
     next(error);
@@ -263,60 +271,7 @@ export async function resolveBracket(req: Request, res: Response, next: NextFunc
   try {
     const id = req.params.id as string;
     validateUUID(id, 'ID de torneo');
-
-    const pool = (await import('../config/database')).getPool();
-
-    // Fetch standings
-    const standingsResult = await pool.query(
-      'SELECT team_id, group_name, position FROM standings WHERE tournament_id = $1',
-      [id]
-    );
-    const standings = standingsResult.rows;
-
-    // Helper to resolve placeholder (format "{position}|{groupName}")
-    const resolvePlaceholder = (placeholder: string | null) => {
-      if (!placeholder) return null;
-      const firstPipe = placeholder.indexOf('|');
-      if (firstPipe === -1) return null; // Invalid format
-      const pos = parseInt(placeholder.substring(0, firstPipe), 10);
-      const groupName = placeholder.substring(firstPipe + 1);
-
-      const found = standings.find((s) => s.group_name === groupName && s.position === pos);
-      return found ? found.team_id : null;
-    };
-
-    // Fetch unresolved bracket matches
-    const bmResult = await pool.query(
-      `SELECT * FROM bracket_matches WHERE tournament_id = $1 AND (team1_placeholder IS NOT NULL OR team2_placeholder IS NOT NULL)`,
-      [id]
-    );
-
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      let updatedCount = 0;
-
-      for (const bm of bmResult.rows) {
-        const newTeam1Id = bm.team1_id || resolvePlaceholder(bm.team1_placeholder);
-        const newTeam2Id = bm.team2_id || resolvePlaceholder(bm.team2_placeholder);
-
-        if (newTeam1Id !== bm.team1_id || newTeam2Id !== bm.team2_id) {
-          await client.query(
-            `UPDATE bracket_matches SET team1_id = $1, team2_id = $2 WHERE id = $3`,
-            [newTeam1Id, newTeam2Id, bm.id]
-          );
-          updatedCount++;
-        }
-      }
-      await client.query('COMMIT');
-    } catch (e) {
-      await client.query('ROLLBACK');
-      throw e;
-    } finally {
-      client.release();
-    }
-
-    // Return the updated bracket
+    await bracketGenerator.resolveBracketFromStandings(id);
     const bracket = await bracketGenerator.getBracket(id);
     res.json(bracket);
   } catch (error) {

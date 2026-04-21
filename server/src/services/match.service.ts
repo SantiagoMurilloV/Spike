@@ -10,6 +10,23 @@ import {
 import { NotFoundError, ValidationError } from '../middleware/errorHandler';
 import { validate } from '../middleware/validation';
 import { standingsCalculator } from './standings.service';
+import { bracketGenerator } from './bracket.service';
+
+/**
+ * Recalculate standings and re-resolve any bracket placeholders for a
+ * tournament. Called after every match mutation that could affect either.
+ * Bracket re-resolution is wrapped in try/catch because it's best-effort:
+ * tournaments without a bracket, or with bracket matches that have no
+ * placeholders, should still succeed on the standings side.
+ */
+async function refreshTournamentState(tournamentId: string): Promise<void> {
+  await standingsCalculator.recalculate(tournamentId);
+  try {
+    await bracketGenerator.resolveBracketFromStandings(tournamentId);
+  } catch {
+    // swallow — bracket refresh is best-effort
+  }
+}
 
 function mapRow(row: Record<string, unknown>): Match {
   return {
@@ -190,7 +207,7 @@ export class MatchService {
     );
     if (needsRecalc) {
       const tournamentId = (data.tournamentId ?? existing.tournamentId) as string;
-      await standingsCalculator.recalculate(tournamentId);
+      await refreshTournamentState(tournamentId);
     }
 
     return mapRow(result.rows[0]);
@@ -288,7 +305,7 @@ export class MatchService {
       score.scoreTeam2 !== undefined ||
       score.status !== undefined;
     if (scoreTouched) {
-      await standingsCalculator.recalculate(existing.tournamentId);
+      await refreshTournamentState(existing.tournamentId);
     }
 
     return this.getById(id);
@@ -301,7 +318,7 @@ export class MatchService {
     const pool = getPool();
     // set_scores are deleted via CASCADE
     await pool.query('DELETE FROM matches WHERE id = $1', [id]);
-    await standingsCalculator.recalculate(existing.tournamentId);
+    await refreshTournamentState(existing.tournamentId);
   }
 
   async validateData(data: CreateMatchDto): Promise<ValidationResult> {

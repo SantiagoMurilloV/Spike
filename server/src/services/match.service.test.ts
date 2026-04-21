@@ -14,6 +14,14 @@ vi.mock('./standings.service', () => ({
   },
 }));
 
+// Mock bracket.service too — the service now calls resolveBracketFromStandings
+// after every standings recalc so the bracket stays in sync.
+vi.mock('./bracket.service', () => ({
+  bracketGenerator: {
+    resolveBracketFromStandings: vi.fn().mockResolvedValue(0),
+  },
+}));
+
 import { getPool } from '../config/database';
 import { standingsCalculator } from './standings.service';
 
