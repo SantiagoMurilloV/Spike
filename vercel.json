@@ -11,6 +11,10 @@
     {
       "source": "/uploads/:path*",
       "destination": "https://spike-production-6ba4.up.railway.app/uploads/:path*"
+    },
+    {
+      "source": "/((?!api|uploads).*)",
+      "destination": "/index.html"
     }
   ]
 }
