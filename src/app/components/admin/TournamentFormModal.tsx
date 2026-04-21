@@ -4,6 +4,7 @@ import { Tournament } from '../../types';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { api, ApiError } from '../../services/api';
+import { CATEGORIES } from '../../lib/categories';
 
 interface TournamentFormModalProps {
   isOpen: boolean;
@@ -106,26 +107,20 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
     courts: [...DEFAULT_COURTS] as CourtEntry[],
     categories: [] as string[],
   });
-  const [categoryDraft, setCategoryDraft] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
-  const addCategory = () => {
-    const value = categoryDraft.trim();
-    if (!value) return;
-    if (formData.categories.some((c) => c.toLowerCase() === value.toLowerCase())) {
-      setCategoryDraft('');
-      return;
-    }
-    setFormData({ ...formData, categories: [...formData.categories, value] });
-    setCategoryDraft('');
-  };
-
-  const removeCategory = (value: string) => {
-    setFormData({
-      ...formData,
-      categories: formData.categories.filter((c) => c !== value),
-    });
+  /**
+   * Toggle a category in the selection. We keep them in the same order as
+   * the canonical CATEGORIES list so the UI doesn't shuffle around when
+   * users click.
+   */
+  const toggleCategory = (value: string) => {
+    const selected = formData.categories.includes(value);
+    const next = selected
+      ? formData.categories.filter((c) => c !== value)
+      : CATEGORIES.filter((c) => c === value || formData.categories.includes(c));
+    setFormData({ ...formData, categories: next });
   };
 
   // Cover image — uploaded to the backend (base64 in DB now, so it
@@ -373,11 +368,12 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
               survives Railway redeploys and the frontend loads it without
               a separate request. 10 MB cap enforced client-side. */}
 
-          {/* Categories — tag input. Admin types a category name and hits
-              Enter / clicks "Añadir". These drive the enrolment filter in
-              AdminTournamentDetail (only teams matching one of the tags
-              appear in the dropdown). Leaving the list empty is explicit
-              "no filter — any team can be enrolled". */}
+          {/* Categories — checkbox grid driven by the canonical CATEGORIES
+              list (src/app/lib/categories.ts). Same options the Team /
+              Player modals show, so enrolment filtering in
+              AdminTournamentDetail can match team.category exactly against
+              tournament.categories. Leaving all unchecked means "no
+              filter — any team can be enrolled". */}
           <div>
             <label
               className="block text-sm font-bold mb-2"
@@ -385,56 +381,32 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
             >
               Categorías
             </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={categoryDraft}
-                onChange={(e) => setCategoryDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addCategory();
-                  }
-                }}
-                placeholder="Ej: Sub-14 Femenino"
-                className="flex-1 px-4 py-2 bg-white border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
-              />
-              <button
-                type="button"
-                onClick={addCategory}
-                className="px-4 py-2 bg-black text-white hover:bg-black/80 rounded-sm font-medium text-sm"
-                style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.06em' }}
-              >
-                Añadir
-              </button>
-            </div>
-            {formData.categories.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-3">
-                {formData.categories.map((c) => (
-                  <span
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-black/[0.02] border-2 border-black/10 rounded-sm">
+              {CATEGORIES.map((c) => {
+                const checked = formData.categories.includes(c);
+                return (
+                  <label
                     key={c}
-                    className="inline-flex items-center gap-2 px-3 py-1 bg-spk-red/10 text-spk-red border border-spk-red/30 rounded-full text-xs font-bold uppercase"
-                    style={{
-                      fontFamily: 'Barlow Condensed, sans-serif',
-                      letterSpacing: '0.06em',
-                    }}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-sm cursor-pointer border transition-colors ${
+                      checked
+                        ? 'bg-spk-red/10 border-spk-red/40 text-spk-red'
+                        : 'bg-white border-black/10 hover:border-black/20'
+                    }`}
                   >
-                    {c}
-                    <button
-                      type="button"
-                      onClick={() => removeCategory(c)}
-                      aria-label={`Quitar ${c}`}
-                      className="text-spk-red hover:text-spk-red-dark"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleCategory(c)}
+                      className="w-4 h-4 accent-spk-red"
+                    />
+                    <span className="text-sm font-medium">{c}</span>
+                  </label>
+                );
+              })}
+            </div>
             <p className="mt-2 text-xs text-black/50">
               Al inscribir equipos solo vas a poder elegir los que pertenezcan
-              a una de estas categorías. Dejalo vacío si no querés filtro.
+              a una de estas categorías. Dejalo sin marcar si no querés filtro.
             </p>
           </div>
 

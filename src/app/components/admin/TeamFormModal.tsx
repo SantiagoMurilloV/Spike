@@ -4,6 +4,7 @@ import { Team } from '../../types';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { ApiError, api } from '../../services/api';
+import { CATEGORIES } from '../../lib/categories';
 
 interface TeamFormModalProps {
   isOpen: boolean;
@@ -339,19 +340,9 @@ export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModal
               className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red bg-white"
             >
               <option value="">Seleccionar categoría...</option>
-              <option value="Sub-14 Masculino">Sub-14 Masculino</option>
-              <option value="Sub-14 Femenino">Sub-14 Femenino</option>
-              <option value="Sub-16 Masculino">Sub-16 Masculino</option>
-              <option value="Sub-16 Femenino">Sub-16 Femenino</option>
-              <option value="Sub-18 Masculino">Sub-18 Masculino</option>
-              <option value="Sub-18 Femenino">Sub-18 Femenino</option>
-              <option value="Sub-21 Masculino">Sub-21 Masculino</option>
-              <option value="Sub-21 Femenino">Sub-21 Femenino</option>
-              <option value="Mayores Masculino">Mayores Masculino</option>
-              <option value="Mayores Femenino">Mayores Femenino</option>
-              <option value="Senior Masculino">Senior Masculino</option>
-              <option value="Senior Femenino">Senior Femenino</option>
-              <option value="Mixto">Mixto</option>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
             </select>
           </div>
 

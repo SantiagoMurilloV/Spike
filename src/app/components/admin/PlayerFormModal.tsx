@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import type { Player } from '../../types';
 import { ApiError, api, type CreatePlayerDto, type UpdatePlayerDto } from '../../services/api';
+import { CATEGORIES } from '../../lib/categories';
 
 interface PlayerFormModalProps {
   isOpen: boolean;
@@ -32,22 +33,6 @@ const DOCUMENT_TYPES: { value: string; label: string }[] = [
   { value: 'CE', label: 'CE — Cédula de Extranjería' },
   { value: 'RC', label: 'RC — Registro Civil' },
   { value: 'PA', label: 'PA — Pasaporte' },
-];
-
-const CATEGORIES: string[] = [
-  'Sub-14 Masculino',
-  'Sub-14 Femenino',
-  'Sub-16 Masculino',
-  'Sub-16 Femenino',
-  'Sub-18 Masculino',
-  'Sub-18 Femenino',
-  'Sub-21 Masculino',
-  'Sub-21 Femenino',
-  'Mayores Masculino',
-  'Mayores Femenino',
-  'Senior Masculino',
-  'Senior Femenino',
-  'Mixto',
 ];
 
 const POSITIONS: string[] = [
