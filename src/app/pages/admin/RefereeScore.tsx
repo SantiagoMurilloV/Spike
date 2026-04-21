@@ -140,10 +140,17 @@ export function RefereeScore() {
       try {
         setSync('syncing');
         const minutes = Math.max(1, Math.round(seconds / 60));
+        // `scoreTeam1/2` in matches table stores SETS WON, not the points
+        // in the current (in-progress) set. Sending the live point count
+        // here used to pollute the standings: the recalculator falls back
+        // to scoreTeam1/2 when set_scores are missing, and it'd count a
+        // live 22–18 score as a "22–18 sweep" for standings purposes.
+        const setsWonH = sets.filter((s) => s.team1 > s.team2).length;
+        const setsWonA = sets.filter((s) => s.team2 > s.team1).length;
         const payload: Parameters<typeof api.updateMatchScore>[1] = {
           status: 'live',
-          scoreTeam1: scoreH,
-          scoreTeam2: scoreA,
+          scoreTeam1: setsWonH,
+          scoreTeam2: setsWonA,
           sets: sets.map((s, i) => ({
             setNumber: i + 1,
             team1Points: s.team1,
@@ -216,18 +223,27 @@ export function RefereeScore() {
   }, [scoreH, scoreA, setTarget]);
 
   const closeSet = () => {
+    // Tied 0-0 doesn't actually close anything — blocking that keeps the
+    // button from creating phantom 0-0 sets on accidental taps.
+    if (scoreH === 0 && scoreA === 0) {
+      toast.info('Marcá al menos un punto antes de cerrar el set');
+      return;
+    }
+    // The 25-points-with-2-of-ventaja rule used to be enforced here, which
+    // blocked the judge from closing a set early (forfeit, retirement,
+    // time-cap, etc.). We soft-warn instead so the judge stays in control.
     if (!setIsDecidable) {
       toast.warning(
-        `Aún no se puede cerrar el set — hay que llegar a ${setTarget} con 2 de ventaja`,
+        `Set ${currentSetNumber} cerrado antes de ${setTarget} — revisa el marcador`,
       );
-      return;
+    } else {
+      toast.success(`Set ${currentSetNumber} cerrado`);
     }
     pushUndo();
     setSets([...sets, { team1: scoreH, team2: scoreA }]);
     setScoreH(0);
     setScoreA(0);
     markDirty();
-    toast.success(`Set ${currentSetNumber} cerrado`);
   };
 
   const finishMatch = async () => {
@@ -422,9 +438,13 @@ export function RefereeScore() {
           </button>
           <button
             onClick={closeSet}
-            disabled={!setIsDecidable}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-sm text-xs font-bold uppercase disabled:opacity-40 disabled:hover:bg-white/5"
+            className="inline-flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-sm text-xs font-bold uppercase"
             style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
+            title={
+              setIsDecidable
+                ? 'Cerrar el set con el marcador actual'
+                : 'Forzar cierre (válido para abandonos / forfeits)'
+            }
           >
             Cerrar set ({currentSetNumber})
           </button>

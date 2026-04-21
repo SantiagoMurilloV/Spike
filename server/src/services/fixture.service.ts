@@ -208,11 +208,28 @@ export interface ScheduleConfig {
 }
 
 /**
- * Calculates sequential date/time/court assignments for matches.
- * With N courts, N matches can run simultaneously in the same time slot.
+ * Assign date / time / court slots to a list of fixtures while making
+ * sure no team plays two matches simultaneously.
+ *
+ * Algorithm: sweep through time slots. For each slot, iterate the courts
+ * and pick the first unscheduled fixture whose teams aren't already busy
+ * at that slot. If nothing fits, leave the court empty and move on. This
+ * drops the previous "fill every court sequentially" approach which
+ * produced the bug the user hit: the same team ending up in two courts at
+ * the same hour because both of its matches landed next to each other in
+ * the fixture list.
+ *
+ * Output has the same shape as the old implementation — one entry per
+ * input fixture, in the same order — so the caller can just zip it back
+ * with the fixtures array.
  */
-function calculateMatchTimes(
-  matchCount: number,
+interface FixtureShape {
+  team1Id: string;
+  team2Id: string;
+}
+
+function calculateMatchTimes<T extends FixtureShape>(
+  fixtures: T[],
   startDate: string,
   courts: string[],
   config?: ScheduleConfig,
@@ -223,7 +240,6 @@ function calculateMatchTimes(
   const breakDuration = config?.breakDuration || 15;
   const courtCount = config?.courtCount || courts.length || 1;
 
-  // Build court names: use tournament courts if available, otherwise "Cancha 1", "Cancha 2"...
   const courtNames: string[] = [];
   for (let i = 0; i < courtCount; i++) {
     courtNames.push(courts[i] || `Cancha ${i + 1}`);
@@ -234,23 +250,29 @@ function calculateMatchTimes(
   const dayStartMinutes = startH * 60 + startM;
   const dayEndMinutes = endH * 60 + endM;
 
-  const results: Array<{ date: string; time: string; court: string }> = [];
+  // Track assigned slot per original fixture index; callers need output in
+  // the same order they passed in, so we fill a pre-sized array.
+  const results: Array<{ date: string; time: string; court: string } | null> = new Array(
+    fixtures.length,
+  ).fill(null);
+
+  const unscheduled = fixtures.map((f, idx) => ({ ...f, __idx: idx }));
+
   let currentDate = new Date(startDate + 'T00:00:00');
   let currentMinutes = dayStartMinutes;
-  let courtIndex = 0;
+  // Safety cap so a pathological input can't loop forever. 500 days of
+  // scheduling is absurd but finite.
+  const maxIterations = 500 * Math.max(1, courtCount);
+  let iterations = 0;
 
-  for (let i = 0; i < matchCount; i++) {
-    // If we've filled all courts for this time slot, advance to next slot
-    if (courtIndex >= courtCount) {
-      courtIndex = 0;
-      currentMinutes += matchDuration + breakDuration;
-    }
+  while (unscheduled.length > 0 && iterations < maxIterations) {
+    iterations++;
 
-    // If this slot exceeds end time, move to next day
+    // Roll to next day if this slot can't fit a full match
     if (currentMinutes + matchDuration > dayEndMinutes) {
       currentDate.setDate(currentDate.getDate() + 1);
       currentMinutes = dayStartMinutes;
-      courtIndex = 0;
+      continue;
     }
 
     const hours = Math.floor(currentMinutes / 60);
@@ -258,11 +280,65 @@ function calculateMatchTimes(
     const timeStr = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
     const dateStr = currentDate.toISOString().split('T')[0];
 
-    results.push({ date: dateStr, time: timeStr, court: courtNames[courtIndex] });
-    courtIndex++;
+    const busyTeams = new Set<string>();
+    let assignedInSlot = 0;
+
+    for (let c = 0; c < courtCount && unscheduled.length > 0; c++) {
+      // Find the first fixture whose teams aren't yet busy in this slot
+      const candidateIdx = unscheduled.findIndex(
+        (f) => !busyTeams.has(f.team1Id) && !busyTeams.has(f.team2Id),
+      );
+      if (candidateIdx === -1) break; // no unique-team fixture left for this slot
+
+      const candidate = unscheduled.splice(candidateIdx, 1)[0];
+      busyTeams.add(candidate.team1Id);
+      busyTeams.add(candidate.team2Id);
+      results[candidate.__idx] = {
+        date: dateStr,
+        time: timeStr,
+        court: courtNames[c],
+      };
+      assignedInSlot++;
+    }
+
+    // Always advance to the next slot after we try — even if no court
+    // could be filled (happens when all remaining fixtures share one of
+    // the last-placed teams and we need to let them cool off).
+    currentMinutes += matchDuration + breakDuration;
+
+    // If the slot was completely empty *and* there were still matches to
+    // place, bump to the next day so we don't spin endlessly through
+    // packed-tournament dead-ends.
+    if (assignedInSlot === 0 && unscheduled.length > 0) {
+      currentDate.setDate(currentDate.getDate() + 1);
+      currentMinutes = dayStartMinutes;
+    }
   }
 
-  return results;
+  // Final safety: if anything stayed unassigned (shouldn't happen under
+  // the cap), fall back to sequential placement so the caller still gets
+  // a non-null slot for every fixture.
+  if (results.some((r) => r === null)) {
+    let fallbackMinutes = dayStartMinutes;
+    let fallbackDate = new Date(startDate + 'T00:00:00');
+    for (let i = 0; i < results.length; i++) {
+      if (results[i]) continue;
+      if (fallbackMinutes + matchDuration > dayEndMinutes) {
+        fallbackDate.setDate(fallbackDate.getDate() + 1);
+        fallbackMinutes = dayStartMinutes;
+      }
+      const hours = Math.floor(fallbackMinutes / 60);
+      const mins = fallbackMinutes % 60;
+      results[i] = {
+        date: fallbackDate.toISOString().split('T')[0],
+        time: `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`,
+        court: courtNames[0],
+      };
+      fallbackMinutes += matchDuration + breakDuration;
+    }
+  }
+
+  return results as Array<{ date: string; time: string; court: string }>;
 }
 
 const MIN_TEAMS: Record<Tournament['format'], number> = {
@@ -401,7 +477,12 @@ export class FixtureGenerator {
         ? new Date(tournament.start_date).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0];
       const tournamentCourts = tournament.courts || [];
-      const matchTimes = calculateMatchTimes(matchFixtures.length, tournamentStartDate, tournamentCourts, schedule);
+      const matchTimes = calculateMatchTimes(
+        matchFixtures,
+        tournamentStartDate,
+        tournamentCourts,
+        schedule,
+      );
       for (let i = 0; i < matchFixtures.length; i++) {
         const fixture = matchFixtures[i];
         const { date, time, court } = matchTimes[i];
@@ -603,7 +684,12 @@ export class FixtureGenerator {
         ? new Date(tournament.start_date).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0];
       const manualCourts = tournament.courts || [];
-      const manualMatchTimes = calculateMatchTimes(matchFixtures.length, manualStartDate, manualCourts, options.schedule);
+      const manualMatchTimes = calculateMatchTimes(
+        matchFixtures,
+        manualStartDate,
+        manualCourts,
+        options.schedule,
+      );
       for (let i = 0; i < matchFixtures.length; i++) {
         const fixture = matchFixtures[i];
         const { date, time, court } = manualMatchTimes[i];

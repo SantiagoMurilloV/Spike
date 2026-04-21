@@ -50,9 +50,9 @@ const JudgeDashboard = lazy(() =>
   import('./pages/judge/JudgeDashboard').then((m) => ({ default: m.JudgeDashboard })),
 );
 
-// RefereeScore is now a shared screen: both /admin/referee/:matchId (legacy)
-// and /judge/match/:matchId mount it. Admin users lost the entry point from
-// the admin matches page but the route still works for deep-links.
+// RefereeScore is the live-scoring console. ONLY judges can open it — admins
+// use the match-edit form for corrections. Keeping the /admin/referee path
+// as a no-op redirect for any legacy bookmark so a stale link doesn't 404.
 const RefereeScore = lazy(() =>
   import('./pages/admin/RefereeScore').then((m) => ({ default: m.RefereeScore })),
 );
@@ -89,12 +89,12 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    // Referee score console is full-bleed (no admin/judge chrome). Both
-    // admins and judges can reach it — admins via deep-link, judges via
-    // their dashboard card.
+    // Judge-only live scoring console. Admins lost access entirely; the old
+    // /admin/referee path is kept as a route so bookmarks don't 404, but
+    // ProtectedRoute will bounce admin users back to /admin.
     path: '/admin/referee/:matchId',
     element: (
-      <ProtectedRoute allowedRoles={['admin', 'judge']}>
+      <ProtectedRoute allowedRoles={['judge']}>
         {withSuspense(<RefereeScore />)}
       </ProtectedRoute>
     ),
@@ -102,7 +102,7 @@ export const router = createBrowserRouter([
   {
     path: '/judge/match/:matchId',
     element: (
-      <ProtectedRoute allowedRoles={['admin', 'judge']}>
+      <ProtectedRoute allowedRoles={['judge']}>
         {withSuspense(<RefereeScore />)}
       </ProtectedRoute>
     ),

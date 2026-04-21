@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { X, Loader2, Plus, Trash2, MapPin } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Loader2, Plus, Trash2, MapPin, Image as ImageIcon } from 'lucide-react';
 import { Tournament } from '../../types';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
-import { ApiError } from '../../services/api';
+import { api, ApiError } from '../../services/api';
 
 interface TournamentFormModalProps {
   isOpen: boolean;
@@ -108,6 +108,15 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
+  // Cover image — uploaded to the backend (base64 in DB now, so it
+  // survives redeploys) and stored on the tournament row. `coverFile`
+  // holds the file waiting to be sent; `coverPreview` is whatever we
+  // show on screen (either a local object URL or the persisted URL).
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (tournament) {
       const courts: CourtEntry[] = tournament.courts.length > 0
@@ -128,6 +137,8 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
         format: tournament.format,
         courts,
       });
+      setCoverFile(null);
+      setCoverPreview(tournament.coverImage ?? null);
     }
   }, [tournament]);
 
@@ -136,8 +147,29 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
     if (isOpen) {
       setErrors({});
       setSubmitting(false);
+      if (!tournament) {
+        setCoverFile(null);
+        setCoverPreview(null);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, tournament]);
+
+  const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('La imagen no puede superar 10MB');
+      return;
+    }
+    setCoverFile(file);
+    setCoverPreview(URL.createObjectURL(file));
+  };
+
+  const clearCover = () => {
+    setCoverFile(null);
+    setCoverPreview(null);
+    if (coverInputRef.current) coverInputRef.current.value = '';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,6 +193,27 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
       if (loc) courtLocations[name] = loc;
     }
 
+    // Upload a fresh cover (if the admin picked a new one) before we hand
+    // the tournament to the parent. `coverPreview` without a `coverFile`
+    // means the admin kept the existing saved cover untouched.
+    let coverImageUrl = tournament?.coverImage;
+    if (coverFile) {
+      try {
+        setUploadingCover(true);
+        coverImageUrl = await api.uploadLogo(coverFile);
+      } catch {
+        toast.error('Error al subir la imagen de portada');
+        setSubmitting(false);
+        setUploadingCover(false);
+        return;
+      } finally {
+        setUploadingCover(false);
+      }
+    } else if (coverPreview === null) {
+      // Admin hit the clear button — persist that as "no cover".
+      coverImageUrl = undefined;
+    }
+
     const newTournament: Tournament = {
       id: tournament?.id || `tournament-${Date.now()}`,
       name: formData.name,
@@ -174,6 +227,7 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
       format: formData.format,
       courts: courtNames,
       courtLocations,
+      coverImage: coverImageUrl,
     };
 
     try {
@@ -290,6 +344,60 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
               placeholder="Describe el torneo..."
             />
             {errors.description && <p className="mt-1 text-sm text-red-500">{errors.description}</p>}
+          </div>
+
+          {/* Cover image — optional. Persisted as a base64 data URL so it
+              survives Railway redeploys and the frontend loads it without
+              a separate request. 10 MB cap enforced client-side. */}
+          <div>
+            <label
+              className="block text-sm font-bold mb-2"
+              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+            >
+              Imagen del Torneo (opcional)
+            </label>
+            <div className="flex items-center gap-3">
+              <div className="relative w-24 h-24 rounded-sm border-2 border-black/10 overflow-hidden bg-black/5 flex items-center justify-center flex-shrink-0">
+                {coverPreview ? (
+                  <img
+                    src={coverPreview}
+                    alt="Portada del torneo"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <ImageIcon className="w-7 h-7 text-black/25" aria-hidden="true" />
+                )}
+              </div>
+              <div className="flex-1 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => coverInputRef.current?.click()}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-black/5 hover:bg-black/10 text-black rounded-sm font-medium text-sm"
+                >
+                  {coverPreview ? 'Cambiar imagen' : 'Subir imagen'}
+                </button>
+                {coverPreview && (
+                  <button
+                    type="button"
+                    onClick={clearCover}
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-black/10 hover:border-spk-red hover:text-spk-red text-black rounded-sm font-medium text-sm"
+                  >
+                    Quitar
+                  </button>
+                )}
+                <input
+                  ref={coverInputRef}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={handleCoverSelect}
+                />
+                <p className="w-full text-xs text-black/50 mt-1">
+                  JPG, PNG, WEBP, HEIC o GIF — hasta 10 MB. Usá una imagen
+                  horizontal para que no se recorte en las tarjetas.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Dates */}
@@ -471,8 +579,10 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
               className="flex-1 px-4 py-3 bg-spk-red text-white hover:bg-spk-red-dark font-bold rounded-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {tournament ? 'Guardar Cambios' : 'Crear Torneo'}
+              {(submitting || uploadingCover) && <Loader2 className="w-4 h-4 animate-spin" />}
+              {uploadingCover
+                ? 'Subiendo imagen…'
+                : tournament ? 'Guardar Cambios' : 'Crear Torneo'}
             </button>
           </div>
         </form>

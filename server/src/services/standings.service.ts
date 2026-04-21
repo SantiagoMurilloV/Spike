@@ -131,12 +131,24 @@ export class StandingsCalculator {
         setsWonByTeam2 = scoreTeam2;
       }
 
-      // Did this match produce a clear winner?
-      const hasDecidedOutcome = setsWonByTeam1 !== setsWonByTeam2;
+      // Did this match produce a valid volleyball result?
+      //
+      // Volleyball is best-of-3, so the winner needs AT LEAST 2 sets won.
+      // A 1-0 state (one set played) is an in-progress match, not a win,
+      // and was previously being counted as a "1-0 sweep" every time the
+      // judge closed the first set — that's the source of the "los puntos
+      // están en desfase" reports. We now require a proper majority:
+      //   - max(setsWon) >= 2       → best-of-3 / 5 majority reached
+      //   - setsWon differ           → the match wasn't a tie
+      // If the admin flipped status to 'completed' manually with score
+      // fields (e.g. a 2-0 walkover) the fallback path still catches it
+      // because max(2,0) >= 2.
+      const majorityReached = Math.max(setsWonByTeam1, setsWonByTeam2) >= 2;
+      const hasDecidedOutcome = majorityReached && setsWonByTeam1 !== setsWonByTeam2;
       const isCompleted = status === 'completed';
       if (!isCompleted && !hasDecidedOutcome) continue;
-      // Edge case: completed match with 0-0 score (shouldn't happen but
-      // skip to avoid phantom played counts).
+      // Completed match without a proper result is a phantom — skip so it
+      // doesn't inflate the played counter.
       if (isCompleted && !hasDecidedOutcome) continue;
 
       // Determine winner: team with more sets won

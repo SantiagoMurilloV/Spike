@@ -65,6 +65,7 @@ export function AdminTournaments() {
         startDate: tournament.startDate.toISOString().split('T')[0],
         endDate: tournament.endDate.toISOString().split('T')[0],
         description: tournament.description,
+        coverImage: tournament.coverImage,
         status: tournament.status,
         teamsCount: tournament.teamsCount,
         format: tournament.format,
