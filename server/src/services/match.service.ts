@@ -101,11 +101,10 @@ export class MatchService {
 
   async update(id: string, data: UpdateMatchDto): Promise<Match> {
     // Ensure match exists
-    await this.getById(id);
+    const existing = await this.getById(id);
 
     // If updating team references, validate them
     if (data.team1Id !== undefined || data.team2Id !== undefined || data.tournamentId !== undefined) {
-      const existing = await this.getById(id);
       const mergedTeam1 = data.team1Id ?? existing.team1Id;
       const mergedTeam2 = data.team2Id ?? existing.team2Id;
       const mergedTournament = data.tournamentId ?? existing.tournamentId;
@@ -173,6 +172,27 @@ export class MatchService {
 
     const query = `UPDATE matches SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`;
     const result = await pool.query(query, values);
+
+    // Recalculate standings if any field that affects them changed.
+    // This catches admin edits that save scores / flip status / move a match
+    // to a different group, none of which previously triggered the recalc.
+    const standingsAffectingFields = [
+      'status',
+      'scoreTeam1',
+      'scoreTeam2',
+      'team1Id',
+      'team2Id',
+      'groupName',
+      'tournamentId',
+    ];
+    const needsRecalc = standingsAffectingFields.some(
+      (f) => (data as Record<string, unknown>)[f] !== undefined,
+    );
+    if (needsRecalc) {
+      const tournamentId = (data.tournamentId ?? existing.tournamentId) as string;
+      await standingsCalculator.recalculate(tournamentId);
+    }
+
     return mapRow(result.rows[0]);
   }
 
@@ -257,9 +277,17 @@ export class MatchService {
       }
     }
 
-    // When match status changes to "completed", trigger standings recalculation
-    const previousStatus = existing.status;
-    if (score.status === 'completed' && previousStatus !== 'completed') {
+    // Recalculate standings whenever a score update touches anything that
+    // affects them — set changes, score_team1/2 changes, status changes,
+    // or any other field the referee / admin might edit. Previously we
+    // only recalculated on the upcoming→completed transition, which meant
+    // subsequent score corrections didn't update the table.
+    const scoreTouched =
+      score.sets !== undefined ||
+      score.scoreTeam1 !== undefined ||
+      score.scoreTeam2 !== undefined ||
+      score.status !== undefined;
+    if (scoreTouched) {
       await standingsCalculator.recalculate(existing.tournamentId);
     }
 
@@ -267,11 +295,13 @@ export class MatchService {
   }
 
   async delete(id: string): Promise<void> {
-    // Ensure match exists
-    await this.getById(id);
+    // Snapshot the tournament id before the row is gone so we can
+    // recalculate the standings once the match is out of the picture.
+    const existing = await this.getById(id);
     const pool = getPool();
     // set_scores are deleted via CASCADE
     await pool.query('DELETE FROM matches WHERE id = $1', [id]);
+    await standingsCalculator.recalculate(existing.tournamentId);
   }
 
   async validateData(data: CreateMatchDto): Promise<ValidationResult> {

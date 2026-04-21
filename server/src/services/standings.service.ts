@@ -97,18 +97,25 @@ export class StandingsCalculator {
       if (team2Id) ensureStats(team2Id, groupName);
     }
 
-    // Second pass: only completed matches contribute to stats.
+    // Second pass: a match contributes to stats if it has a decided score
+    // — either it's explicitly marked 'completed', or its score_team1 /
+    // score_team2 record a non-tied outcome, or it has set_scores with a
+    // decided result. This way the admin can fill scores without also
+    // flipping status and the table still adds up (previously the service
+    // silently skipped those matches and the group table read as 0 pts
+    // even though the cross-table clearly showed a winner).
     for (const row of allMatchesResult.rows) {
-      if ((row.status as string) !== 'completed') continue;
-
       const team1Id = row.team1_id as string;
       const team2Id = row.team2_id as string;
-      const scoreTeam1 = (row.score_team1 as number) ?? 0;
-      const scoreTeam2 = (row.score_team2 as number) ?? 0;
+      const scoreTeam1Raw = row.score_team1 as number | null;
+      const scoreTeam2Raw = row.score_team2 as number | null;
+      const scoreTeam1 = scoreTeam1Raw ?? 0;
+      const scoreTeam2 = scoreTeam2Raw ?? 0;
       const groupName = (row.group_name as string) || null;
       const matchId = row.id as string;
+      const status = row.status as string;
 
-      // Determine sets won by each team from set_scores
+      // Determine sets won by each team from set_scores (source of truth)
       const sets = setsByMatch.get(matchId) || [];
       let setsWonByTeam1 = 0;
       let setsWonByTeam2 = 0;
@@ -117,11 +124,20 @@ export class StandingsCalculator {
         else if (set.team2Points > set.team1Points) setsWonByTeam2++;
       }
 
-      // If no set_scores exist, fall back to score_team1/score_team2 as sets won
-      if (sets.length === 0) {
+      // Fall back to score_team1/2 if no set_scores recorded
+      const usingScoreFallback = sets.length === 0;
+      if (usingScoreFallback) {
         setsWonByTeam1 = scoreTeam1;
         setsWonByTeam2 = scoreTeam2;
       }
+
+      // Did this match produce a clear winner?
+      const hasDecidedOutcome = setsWonByTeam1 !== setsWonByTeam2;
+      const isCompleted = status === 'completed';
+      if (!isCompleted && !hasDecidedOutcome) continue;
+      // Edge case: completed match with 0-0 score (shouldn't happen but
+      // skip to avoid phantom played counts).
+      if (isCompleted && !hasDecidedOutcome) continue;
 
       // Determine winner: team with more sets won
       const team1Won = setsWonByTeam1 > setsWonByTeam2;

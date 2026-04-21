@@ -387,6 +387,101 @@ describe('StandingsCalculator', () => {
       expect(teamD.played).toBe(0);
       expect(teamD.points).toBe(0);
     });
+
+    it('should count matches that have a decided score even if status is not yet "completed"', async () => {
+      // Regression test for "la cuenta de los puntos está en desfase":
+      // the admin saved scores (score_team1/2 → 2-0) but the match stayed
+      // status='upcoming'/'live'. Previously the service silently ignored
+      // those matches and the table showed 0 points despite the matrix
+      // showing results.
+      const poolQuery = vi.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 'tournament-1', format: 'groups' }] })
+        .mockResolvedValueOnce({
+          rows: [
+            matchRow({
+              id: 'match-1',
+              team1_id: 'team-A',
+              team2_id: 'team-B',
+              score_team1: 2,
+              score_team2: 0,
+              group_name: 'A',
+              status: 'upcoming',
+            }),
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const clientQuery = vi.fn().mockImplementation((sql: string, params?: unknown[]) => {
+        if (typeof sql === 'string' && sql.startsWith('INSERT INTO standings')) {
+          const row = standingsDbRow({
+            team_id: params![1],
+            played: params![4],
+            wins: params![5],
+            losses: params![6],
+            sets_for: params![7],
+            sets_against: params![8],
+            points: params![9],
+          });
+          return Promise.resolve({ rows: [row] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      mockPoolWithClient(poolQuery, clientQuery);
+      const standings = await calculator.calculate('tournament-1');
+
+      const winner = standings.find(s => s.teamId === 'team-A')!;
+      expect(winner.played).toBe(1);
+      expect(winner.wins).toBe(1);
+      expect(winner.points).toBe(3); // 2-0 sweep
+      const loser = standings.find(s => s.teamId === 'team-B')!;
+      expect(loser.played).toBe(1);
+      expect(loser.losses).toBe(1);
+      expect(loser.points).toBe(0);
+    });
+
+    it('should still skip matches with no score AND no completed status', async () => {
+      // The opposite case: a pristine upcoming match with 0-0 score and no
+      // set_scores should NOT count as played.
+      const poolQuery = vi.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 'tournament-1', format: 'groups' }] })
+        .mockResolvedValueOnce({
+          rows: [
+            matchRow({
+              id: 'match-1',
+              team1_id: 'team-A',
+              team2_id: 'team-B',
+              score_team1: 0,
+              score_team2: 0,
+              group_name: 'A',
+              status: 'upcoming',
+            }),
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const clientQuery = vi.fn().mockImplementation((sql: string, params?: unknown[]) => {
+        if (typeof sql === 'string' && sql.startsWith('INSERT INTO standings')) {
+          const row = standingsDbRow({
+            team_id: params![1],
+            played: params![4],
+            wins: params![5],
+            losses: params![6],
+            points: params![9],
+          });
+          return Promise.resolve({ rows: [row] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      mockPoolWithClient(poolQuery, clientQuery);
+      const standings = await calculator.calculate('tournament-1');
+
+      const teamA = standings.find(s => s.teamId === 'team-A')!;
+      expect(teamA.played).toBe(0);
+      expect(teamA.wins).toBe(0);
+      expect(teamA.points).toBe(0);
+    });
   });
 
   // =========================================================================

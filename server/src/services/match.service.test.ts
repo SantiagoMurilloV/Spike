@@ -269,7 +269,12 @@ describe('MatchService.updateScore', () => {
     expect(standingsCalculator.recalculate).toHaveBeenCalledWith('tournament-1');
   });
 
-  it('should NOT trigger standings recalculation when status stays live', async () => {
+  it('should trigger standings recalculation on any score edit even without a status change', async () => {
+    // Previously the service only recalculated on the upcoming→completed
+    // transition, which meant admin edits that only touched score fields
+    // never updated the standings table. That was the root cause of
+    // "la cuenta de los puntos está en desfase" — some matches had
+    // scores but no status flip, so the table read 0 pts.
     const liveRow = sampleMatchRow({ status: 'live' });
     mockPool(
       vi.fn()
@@ -277,12 +282,12 @@ describe('MatchService.updateScore', () => {
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [liveRow] })
         .mockResolvedValueOnce({ rows: [liveRow] })
-        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] }),
     );
 
     await service.updateScore('match-1', { scoreTeam1: 1, scoreTeam2: 0 });
 
-    expect(standingsCalculator.recalculate).not.toHaveBeenCalled();
+    expect(standingsCalculator.recalculate).toHaveBeenCalledWith('tournament-1');
   });
 });
 
@@ -453,20 +458,16 @@ describe('MatchService CRUD operations', () => {
       const existingRow = sampleMatchRow();
       mockPool(
         vi.fn()
-          // getById check
+          // getById check (reused for the merge — we consolidated the two calls)
           .mockResolvedValueOnce({ rows: [existingRow] })
           // getSets for getById
           .mockResolvedValueOnce({ rows: [] })
-          // Second getById for merge
-          .mockResolvedValueOnce({ rows: [existingRow] })
-          // getSets for second getById
-          .mockResolvedValueOnce({ rows: [] })
           // team1 check - not found
-          .mockResolvedValueOnce({ rows: [] })
+          .mockResolvedValueOnce({ rows: [] }),
       );
 
       await expect(
-        service.update('match-1', { team1Id: 'nonexistent-team' })
+        service.update('match-1', { team1Id: 'nonexistent-team' }),
       ).rejects.toThrow('Equipo 1 no fue encontrado');
     });
 
@@ -474,24 +475,20 @@ describe('MatchService CRUD operations', () => {
       const existingRow = sampleMatchRow({ team2_id: 'team-2' });
       mockPool(
         vi.fn()
-          // getById check
+          // getById check (single call serves both existence + merge)
           .mockResolvedValueOnce({ rows: [existingRow] })
           // getSets for getById
-          .mockResolvedValueOnce({ rows: [] })
-          // Second getById for merge
-          .mockResolvedValueOnce({ rows: [existingRow] })
-          // getSets for second getById
-          .mockResolvedValueOnce({ rows: [] })
+          .mockResolvedValueOnce({ rows: [] }),
       );
 
       await expect(
-        service.update('match-1', { team1Id: 'team-2' })
+        service.update('match-1', { team1Id: 'team-2' }),
       ).rejects.toThrow('Los dos equipos deben ser diferentes');
     });
   });
 
   describe('delete', () => {
-    it('should delete an existing match', async () => {
+    it('should delete an existing match and recalculate standings', async () => {
       const queryFn = mockPool(
         vi.fn()
           // getById check
@@ -499,7 +496,7 @@ describe('MatchService CRUD operations', () => {
           // getSets for getById
           .mockResolvedValueOnce({ rows: [] })
           // DELETE
-          .mockResolvedValueOnce({ rows: [] })
+          .mockResolvedValueOnce({ rows: [] }),
       );
 
       await service.delete('match-1');
@@ -507,6 +504,7 @@ describe('MatchService CRUD operations', () => {
       expect(queryFn).toHaveBeenCalledTimes(3);
       expect(queryFn.mock.calls[2][0]).toBe('DELETE FROM matches WHERE id = $1');
       expect(queryFn.mock.calls[2][1]).toEqual(['match-1']);
+      expect(standingsCalculator.recalculate).toHaveBeenCalledWith('tournament-1');
     });
 
     it('should throw NotFoundError when deleting non-existent match', async () => {
