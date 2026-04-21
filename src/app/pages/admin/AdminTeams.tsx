@@ -1,9 +1,9 @@
-import { Plus, Search, Filter, Edit, Trash2, Users, Loader2 } from 'lucide-react';
+import { Plus, Search, Filter, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useData } from '../../context/DataContext';
-import { TeamAvatar } from '../../components/TeamAvatar';
 import { TeamFormModal } from '../../components/admin/TeamFormModal';
+import { TeamRosterCard } from '../../components/admin/TeamRosterCard';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Team } from '../../types';
 import type { CreateTeamDto, UpdateTeamDto } from '../../services/api';
@@ -31,8 +31,8 @@ export function AdminTeams() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setPendingDeleteId(id);
+  const handleDelete = (team: Team) => {
+    setPendingDeleteId(team.id);
   };
 
   const confirmDelete = async () => {
@@ -112,7 +112,7 @@ export function AdminTeams() {
             GESTIÓN DE EQUIPOS
           </h1>
           <p className="text-black/60">
-            Administra los equipos registrados en el sistema
+            Administra los equipos y su plantel. Tocá un equipo para ver sus jugadoras.
           </p>
         </div>
         <button
@@ -164,7 +164,7 @@ export function AdminTeams() {
         </button>
       </div>
 
-      {/* Teams Table (desktop) / Card grid (mobile) */}
+      {/* Collapsible team list — each row expands to reveal its roster */}
       {filteredTeams.length === 0 ? (
         <div className="bg-white border-2 border-black/10 rounded-sm text-center py-16 px-4">
           <div className="w-16 h-16 bg-black/5 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -176,147 +176,17 @@ export function AdminTeams() {
           <p className="text-black/60">Intenta con otros términos de búsqueda</p>
         </div>
       ) : (
-        <>
-          {/* ── Desktop table (md+) ─────────────────────────────── */}
-          <div className="hidden md:block bg-white border-2 border-black/10 rounded-sm overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-black/5 border-b-2 border-black/10">
-                <tr>
-                  <th className="px-6 py-4 text-left text-sm font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>EQUIPO</th>
-                  <th className="px-6 py-4 text-left text-sm font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>INICIALES</th>
-                  <th className="px-6 py-4 text-left text-sm font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>CATEGORÍA</th>
-                  <th className="px-6 py-4 text-left text-sm font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>UBICACIÓN</th>
-                  <th className="px-6 py-4 text-right text-sm font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>ACCIONES</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y-2 divide-black/10">
-                {filteredTeams.map((team) => (
-                  <tr key={team.id} className="hover:bg-black/5 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <TeamAvatar team={team} size="md" />
-                        <span className="font-medium">{team.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-bold text-lg" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>{team.initials}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-black/70">{team.category || '—'}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-black/70">
-                        {team.city || team.department ? (
-                          <>
-                            {team.city && <span>{team.city}</span>}
-                            {team.city && team.department && <span>, </span>}
-                            {team.department && <span className="text-black/50">{team.department}</span>}
-                          </>
-                        ) : '—'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleEdit(team)}
-                          aria-label={`Editar ${team.name}`}
-                          title={`Editar ${team.name}`}
-                          className="p-2 hover:bg-spk-blue/10 text-spk-blue rounded-sm transition-colors"
-                        >
-                          <Edit className="w-4 h-4" aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(team.id)}
-                          disabled={deletingId === team.id}
-                          aria-label={`Eliminar ${team.name}`}
-                          title={`Eliminar ${team.name}`}
-                          className="p-2 hover:bg-spk-red/10 text-spk-red rounded-sm transition-colors disabled:opacity-50"
-                        >
-                          {deletingId === team.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" aria-hidden="true" />
-                          )}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ── Mobile card grid (<md) — visible edit/delete per team ── */}
-          <div className="md:hidden space-y-3">
-            {filteredTeams.map((team) => (
-              <div
-                key={team.id}
-                className="bg-white border-2 border-black/10 rounded-sm p-4 flex items-center gap-3"
-              >
-                <TeamAvatar team={team} size="lg" />
-
-
-                <div className="flex-1 min-w-0">
-                  <div
-                    className="font-bold uppercase truncate"
-                    style={{
-                      fontFamily: 'Barlow Condensed, sans-serif',
-                      letterSpacing: '-0.01em',
-                    }}
-                  >
-                    {team.name}
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5 text-xs text-black/60 flex-wrap">
-                    <span
-                      className="font-bold"
-                      style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                    >
-                      {team.initials}
-                    </span>
-                    {team.category && (
-                      <>
-                        <span className="text-black/30">·</span>
-                        <span>{team.category}</span>
-                      </>
-                    )}
-                    {team.city && (
-                      <>
-                        <span className="text-black/30">·</span>
-                        <span>{team.city}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => handleEdit(team)}
-                    aria-label={`Editar ${team.name}`}
-                    className="p-2.5 bg-spk-blue/10 text-spk-blue rounded-sm active:bg-spk-blue/20 transition-colors"
-                  >
-                    <Edit className="w-4 h-4" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(team.id)}
-                    disabled={deletingId === team.id}
-                    aria-label={`Eliminar ${team.name}`}
-                    className="p-2.5 bg-spk-red/10 text-spk-red rounded-sm active:bg-spk-red/20 transition-colors disabled:opacity-50"
-                  >
-                    {deletingId === team.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" aria-hidden="true" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
+        <div className="space-y-3">
+          {filteredTeams.map((team) => (
+            <TeamRosterCard
+              key={team.id}
+              team={team}
+              onEditTeam={handleEdit}
+              onDeleteTeam={handleDelete}
+              deletingTeam={deletingId === team.id}
+            />
+          ))}
+        </div>
       )}
 
       {/* Modal */}

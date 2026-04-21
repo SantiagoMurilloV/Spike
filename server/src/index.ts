@@ -177,6 +177,29 @@ app.post('/api/upload/logo', upload.single('logo'), (req, res) => {
   res.json({ url });
 });
 
+// Document upload — PDF (used for player identity documents). Same
+// base64-in-Postgres strategy as images since Railway's FS is ephemeral.
+// 10 MB cap so people can't dump full scanned folders into a TEXT column.
+const documentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'application/pdf') return cb(null, true);
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, ext === '.pdf');
+  },
+});
+
+app.post('/api/upload/document', documentUpload.single('document'), (req, res) => {
+  if (!req.file) {
+    res.status(400).json({ message: 'Se requiere un archivo PDF válido' });
+    return;
+  }
+  const base64 = req.file.buffer.toString('base64');
+  const url = `data:application/pdf;base64,${base64}`;
+  res.json({ url });
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/tournaments', tournamentRoutes);

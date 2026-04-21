@@ -12,12 +12,28 @@ export interface Team {
   category?: string;
 }
 
+/**
+ * Roster jugadora. Stored per team. Photo and the identity document are
+ * persisted as base64 data URLs (same strategy as team / tournament logos).
+ */
 export interface Player {
   id: string;
-  name: string;
-  number: number;
-  position: string;
+  teamId: string;
+  firstName: string;
+  lastName: string;
+  birthYear?: number;
+  /** Documento: 'TI' | 'CC' | 'CE' | 'RC' | 'PA'. */
+  documentType?: string;
+  documentNumber?: string;
+  category?: string;
+  position?: string;
+  /** Foto cuadrada (data URL). */
   photo?: string;
+  /** Documento escaneado en PDF (data URL). */
+  documentFile?: string;
+  shirtNumber?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface SetScore {

@@ -6,6 +6,7 @@ import type {
   BracketMatch,
   MatchStatus,
   FixtureResult,
+  Player,
 } from '../types';
 
 // ── DTOs (match what the backend expects) ──────────────────────────
@@ -43,6 +44,21 @@ export interface CreateTeamDto {
 }
 
 export type UpdateTeamDto = Partial<CreateTeamDto>;
+
+export interface CreatePlayerDto {
+  firstName: string;
+  lastName: string;
+  birthYear?: number;
+  documentType?: string;
+  documentNumber?: string;
+  category?: string;
+  position?: string;
+  photo?: string;
+  documentFile?: string;
+  shirtNumber?: number;
+}
+
+export type UpdatePlayerDto = Partial<CreatePlayerDto>;
 
 export interface CreateMatchDto {
   tournamentId: string;
@@ -485,6 +501,34 @@ export const api = {
     return data.url;
   },
 
+  /**
+   * Uploads a PDF document (used for player identity docs) and returns a
+   * base64 data URL. The backend stores uploads inline in Postgres so
+   * Railway redeploys don't wipe them.
+   */
+  async uploadDocument(file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append('document', file);
+    const headers: Record<string, string> = {};
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+    const res = await fetch(`${API_BASE}/upload/document`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    if (res.status === 401 && onUnauthorized) {
+      onUnauthorized('/upload/document');
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, data.message || 'Error al subir documento');
+    }
+    const data = await res.json();
+    return data.url;
+  },
+
   // ── Tournaments ────────────────────────────────────────────────
   async getTournaments(): Promise<Tournament[]> {
     const data = await request<BackendTournament[]>('/tournaments');
@@ -620,6 +664,32 @@ export const api = {
   async getTeamMatches(id: string): Promise<Match[]> {
     const data = await request<BackendMatch[]>(`/teams/${id}/matches`);
     return data.map(toFrontendMatch);
+  },
+
+  // ── Players (roster) ───────────────────────────────────────────
+  // Nested under /teams/:teamId/players. Backend already returns camelCase
+  // (see server/src/services/player.service.ts mapRow), so no transform is
+  // needed — the shape matches Player directly.
+  async listTeamPlayers(teamId: string): Promise<Player[]> {
+    return request<Player[]>(`/teams/${teamId}/players`);
+  },
+
+  async createPlayer(teamId: string, dto: CreatePlayerDto): Promise<Player> {
+    return request<Player>(`/teams/${teamId}/players`, {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    });
+  },
+
+  async updatePlayer(teamId: string, playerId: string, dto: UpdatePlayerDto): Promise<Player> {
+    return request<Player>(`/teams/${teamId}/players/${playerId}`, {
+      method: 'PUT',
+      body: JSON.stringify(dto),
+    });
+  },
+
+  async deletePlayer(teamId: string, playerId: string): Promise<void> {
+    await request<void>(`/teams/${teamId}/players/${playerId}`, { method: 'DELETE' });
   },
 
   // ── Matches ────────────────────────────────────────────────────
