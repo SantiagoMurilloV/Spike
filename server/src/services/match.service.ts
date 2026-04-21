@@ -11,7 +11,7 @@ import { NotFoundError, ValidationError } from '../middleware/errorHandler';
 import { validate } from '../middleware/validation';
 import { standingsCalculator } from './standings.service';
 import { bracketGenerator } from './bracket.service';
-import { pushService, getVapidPublicKey } from './push.service';
+import { pushService, ensureReady as ensurePushReady } from './push.service';
 
 /**
  * Fire-and-forget helper that builds the two-team label used in push
@@ -243,23 +243,20 @@ export class MatchService {
     // Fire a push when the admin flips a match into 'live' from here.
     // Score corrections from the admin form skip the score-push flow —
     // that belongs to the referee console where the judge drives scoring.
-    // Skip entirely when VAPID isn't configured (unit tests, dev without
-    // keys) so we don't issue needless DB lookups.
-    if (
-      getVapidPublicKey() &&
-      data.status === 'live' &&
-      existing.status !== 'live'
-    ) {
-      matchHeadline(id)
-        .then(({ title, url }) =>
-          pushService.sendToAll({
-            title: `${title} · En vivo`,
-            body: '¡El partido acaba de comenzar!',
-            url,
-            tag: `match-live-${id}`,
-            data: { matchId: id, type: 'match-live' },
-          }),
-        )
+    if (data.status === 'live' && existing.status !== 'live') {
+      ensurePushReady()
+        .then((keys) => {
+          if (!keys) return;
+          return matchHeadline(id).then(({ title, url }) =>
+            pushService.sendToAll({
+              title: `${title} · En vivo`,
+              body: '¡El partido acaba de comenzar!',
+              url,
+              tag: `match-live-${id}`,
+              data: { matchId: id, type: 'match-live' },
+            }),
+          );
+        })
         .catch((err) => console.warn('[push] match-live dispatch failed', err));
     }
 
@@ -374,8 +371,10 @@ export class MatchService {
     const newSetCount = score.sets?.length ?? previousSetCount;
     const setJustClosed = newSetCount > previousSetCount;
 
-    if (getVapidPublicKey() && (becameLive || becameCompleted || setJustClosed)) {
+    if (becameLive || becameCompleted || setJustClosed) {
       const notify = async () => {
+        const keys = await ensurePushReady();
+        if (!keys) return;
         const { title, url } = await matchHeadline(id);
         if (becameCompleted) {
           const setsH = (score.sets ?? []).filter((s) => s.team1Points > s.team2Points).length;

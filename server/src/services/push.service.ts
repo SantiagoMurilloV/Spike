@@ -4,14 +4,15 @@ import { getPool } from '../config/database';
 /**
  * PushService — handles Web Push subscriptions + dispatch.
  *
- * Uses VAPID (voluntary application server identification) so Android
- * Chrome, desktop Firefox and iOS 16.4+ (when the PWA is installed to the
- * home screen) can all receive pushes without any third-party service.
+ * VAPID keys are resolved with this priority:
+ *   1. `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` env vars (ops-controlled).
+ *   2. A pair persisted in the `app_config` table (auto-generated on first
+ *      boot). This is the common path on Railway / Vercel so the admin
+ *      doesn't have to generate keys manually; they survive restarts and
+ *      redeploys because they live in Postgres.
  *
- * VAPID keys are resolved from environment variables (preferred, so they
- * survive restarts) or auto-generated once at boot as a development
- * fallback. Generated keys are only stable within a single process lifetime
- * — never use the dev fallback in production.
+ * `ensureReady()` has to resolve before any dispatch is attempted — the
+ * match service awaits it, and the HTTP controller does too.
  */
 
 interface VapidKeys {
@@ -19,39 +20,97 @@ interface VapidKeys {
   privateKey: string;
 }
 
-function resolveVapidKeys(): VapidKeys {
-  const publicKey = process.env.VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-  if (publicKey && privateKey) {
-    return { publicKey, privateKey };
-  }
-  if (process.env.NODE_ENV === 'production') {
-    // Don't auto-generate in production — rotating keys would invalidate
-    // every saved subscription and the user would silently stop receiving
-    // pushes. Surface the misconfig instead.
-    console.warn(
-      '[push] VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY not set. Push notifications disabled.',
+let cachedKeys: VapidKeys | null = null;
+let initializing: Promise<VapidKeys | null> | null = null;
+
+async function loadFromDb(): Promise<VapidKeys | null> {
+  try {
+    const pool = getPool();
+    const result = await pool.query<{ key: string; value: string }>(
+      "SELECT key, value FROM app_config WHERE key IN ('vapid_public_key', 'vapid_private_key')",
     );
-    return { publicKey: '', privateKey: '' };
+    const byKey = new Map(result.rows.map((r) => [r.key, r.value]));
+    const publicKey = byKey.get('vapid_public_key');
+    const privateKey = byKey.get('vapid_private_key');
+    if (publicKey && privateKey) return { publicKey, privateKey };
+    return null;
+  } catch {
+    // The app_config table might not exist yet if migrations haven't run.
+    // The caller will retry the next time ensureReady() is called.
+    return null;
   }
-  console.warn(
-    '[push] No VAPID keys set — generating an ephemeral pair for development. ' +
-      'Set VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY in production.',
-  );
-  const generated = webpush.generateVAPIDKeys();
-  return generated;
 }
 
-const VAPID = resolveVapidKeys();
-const VAPID_SUBJECT =
-  process.env.VAPID_SUBJECT || 'mailto:santiagomurilloval@gmail.com';
+async function persistToDb(keys: VapidKeys): Promise<void> {
+  const pool = getPool();
+  const rows: Array<[string, string]> = [
+    ['vapid_public_key', keys.publicKey],
+    ['vapid_private_key', keys.privateKey],
+  ];
+  for (const [key, value] of rows) {
+    await pool.query(
+      `INSERT INTO app_config (key, value)
+       VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [key, value],
+    );
+  }
+}
 
-if (VAPID.publicKey && VAPID.privateKey) {
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID.publicKey, VAPID.privateKey);
+async function initialize(): Promise<VapidKeys | null> {
+  // 1. Environment wins if both values are present.
+  const envPub = process.env.VAPID_PUBLIC_KEY;
+  const envPriv = process.env.VAPID_PRIVATE_KEY;
+  if (envPub && envPriv) {
+    cachedKeys = { publicKey: envPub, privateKey: envPriv };
+    webpush.setVapidDetails(vapidSubject(), envPub, envPriv);
+    return cachedKeys;
+  }
+
+  // 2. Reuse anything we already persisted (survives restarts).
+  const fromDb = await loadFromDb();
+  if (fromDb) {
+    cachedKeys = fromDb;
+    webpush.setVapidDetails(vapidSubject(), fromDb.publicKey, fromDb.privateKey);
+    return cachedKeys;
+  }
+
+  // 3. Generate a fresh pair and persist. This is the common first-boot
+  //    path and means the admin doesn't have to touch env vars to get
+  //    push working.
+  try {
+    const generated = webpush.generateVAPIDKeys();
+    await persistToDb(generated);
+    cachedKeys = generated;
+    webpush.setVapidDetails(vapidSubject(), generated.publicKey, generated.privateKey);
+    console.log('[push] Generated + persisted new VAPID key pair.');
+    return cachedKeys;
+  } catch (err) {
+    console.warn('[push] Could not initialize VAPID keys:', (err as Error).message);
+    return null;
+  }
+}
+
+function vapidSubject(): string {
+  return process.env.VAPID_SUBJECT || 'mailto:santiagomurilloval@gmail.com';
+}
+
+/**
+ * Run once at server boot. Safe to call repeatedly (returns the cached
+ * result). Also called lazily from controllers/services if boot-time init
+ * hadn't run yet (e.g. during tests).
+ */
+export async function ensureReady(): Promise<VapidKeys | null> {
+  if (cachedKeys) return cachedKeys;
+  if (initializing) return initializing;
+  initializing = initialize().finally(() => {
+    initializing = null;
+  });
+  return initializing;
 }
 
 export function getVapidPublicKey(): string {
-  return VAPID.publicKey;
+  return cachedKeys?.publicKey ?? '';
 }
 
 export interface StoredSubscription {
@@ -109,13 +168,13 @@ export class PushService {
 
   /** Send a push to every active subscription. */
   async sendToAll(payload: PushPayload): Promise<void> {
-    if (!VAPID.publicKey || !VAPID.privateKey) return; // silently no-op when not configured
+    const keys = await ensureReady();
+    if (!keys) return; // silently no-op when not configured
     const pool = getPool();
     const result = await pool.query<{ endpoint: string; p256dh: string; auth: string }>(
       'SELECT endpoint, p256dh, auth FROM push_subscriptions',
     );
     const payloadJson = JSON.stringify(payload);
-    // Run in parallel but don't let one bad subscription fail the batch.
     await Promise.allSettled(
       result.rows.map(async (row) => {
         try {
@@ -133,7 +192,6 @@ export class PushService {
           if (status === 404 || status === 410) {
             await this.remove(row.endpoint).catch(() => {});
           } else {
-            // Log and move on — one flaky push shouldn't abort the batch.
             console.warn('[push] send failed', status, (err as Error).message);
           }
         }

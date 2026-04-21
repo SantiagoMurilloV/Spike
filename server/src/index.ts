@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
 import { checkConnection, runMigrations } from './config/database';
+import { ensureReady as ensurePushReady } from './services/push.service';
 import { errorHandler } from './middleware/errorHandler';
 import { authMiddleware } from './middleware/auth';
 import authRoutes from './routes/auth.routes';
@@ -197,6 +198,10 @@ async function startServer() {
       console.log('Conexión a PostgreSQL establecida.');
       await runMigrations();
       console.log('Migraciones ejecutadas correctamente.');
+      // Resolve / generate / persist VAPID keys right after migrations so
+      // app_config exists. Safe to call before any request comes in;
+      // getVapidPublicKey() / sendToAll() use the cached pair.
+      await ensurePushReady();
     }
   } catch (error) {
     console.error('Error durante la inicialización de la base de datos:', error);

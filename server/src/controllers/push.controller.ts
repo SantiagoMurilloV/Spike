@@ -1,9 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
-import { pushService, getVapidPublicKey, StoredSubscription } from '../services/push.service';
+import {
+  pushService,
+  getVapidPublicKey,
+  ensureReady,
+  StoredSubscription,
+} from '../services/push.service';
 import { ValidationError } from '../middleware/errorHandler';
 
-/** Expose the VAPID public key so the browser can register a subscription. */
-export function vapidPublicKey(_req: Request, res: Response): void {
+/**
+ * Expose the VAPID public key so the browser can register a subscription.
+ * Calls `ensureReady()` so the very first request on a fresh deploy still
+ * returns a usable key even if boot-time initialization hadn't run yet.
+ */
+export async function vapidPublicKey(_req: Request, res: Response): Promise<void> {
+  await ensureReady();
   const key = getVapidPublicKey();
   if (!key) {
     res.status(503).json({ message: 'Push notifications no están configuradas' });

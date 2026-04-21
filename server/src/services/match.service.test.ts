@@ -24,7 +24,9 @@ vi.mock('./bracket.service', () => ({
 
 // Mock the push service so unit tests don't try to issue real HTTP pushes
 // to Google/Firefox endpoints — and don't consume extra pool.query mocks
-// via the matchHeadline lookup inside dispatch.
+// via the matchHeadline lookup inside dispatch. `ensureReady` returns null
+// here so the match.service guard short-circuits before it calls
+// matchHeadline (which would drain the mocked pool.query queue).
 vi.mock('./push.service', () => ({
   pushService: {
     sendToAll: vi.fn().mockResolvedValue(undefined),
@@ -32,6 +34,7 @@ vi.mock('./push.service', () => ({
     remove: vi.fn().mockResolvedValue(undefined),
   },
   getVapidPublicKey: () => '',
+  ensureReady: vi.fn().mockResolvedValue(null),
 }));
 
 import { getPool } from '../config/database';
