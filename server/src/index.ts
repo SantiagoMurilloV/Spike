@@ -57,7 +57,10 @@ const corsOptions: cors.CorsOptions = IS_PROD
   : { origin: true, credentials: true };
 
 app.use(cors(corsOptions));
-app.use(express.json());
+// JSON body limit raised so team / tournament payloads can carry a
+// base64-encoded logo (up to ~10 MB raw → ~14 MB encoded plus room for
+// other fields).
+app.use(express.json({ limit: '20mb' }));
 
 // Auth middleware — protects POST/PUT/DELETE (except login)
 app.use(authMiddleware);
@@ -103,32 +106,71 @@ app.get('/uploads/*', (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-// File upload endpoint
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, path.join(__dirname, '../uploads/logos')),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
-  },
-});
+// File upload endpoint — stores the image inline as a base64 data URL
+// instead of writing to disk. Railway's default filesystem is ephemeral
+// (wiped on every redeploy) so disk storage silently lost every upload.
+// Data URLs live in Postgres (logo / cover_image are TEXT columns) so
+// images survive deploys and Postgres restarts.
+//
+// Accept any MIME starting with `image/` — phones upload HEIC/HEIF, PCs
+// send PNG/JPEG/WEBP/GIF, design tools export SVG, and occasionally the
+// platform sends `application/octet-stream` (we validate that by falling
+// back to the file extension).
 const upload = multer({
-  storage,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
   fileFilter: (_req, file, cb) => {
-    const allowed = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
-    cb(null, allowed.includes(file.mimetype));
+    if (file.mimetype.startsWith('image/')) {
+      return cb(null, true);
+    }
+    // Some mobile browsers / mail clients strip the MIME — fall back to
+    // the extension so the upload isn't rejected for a benign reason.
+    const ext = path.extname(file.originalname).toLowerCase();
+    const imageExts = [
+      '.png',
+      '.jpg',
+      '.jpeg',
+      '.webp',
+      '.gif',
+      '.svg',
+      '.bmp',
+      '.avif',
+      '.heic',
+      '.heif',
+    ];
+    cb(null, imageExts.includes(ext));
   },
 });
+
+/** Best-effort MIME inference from the original filename when the client sent a generic one. */
+function mimeFromFilename(name: string): string | null {
+  const ext = path.extname(name).toLowerCase();
+  switch (ext) {
+    case '.png':  return 'image/png';
+    case '.jpg':
+    case '.jpeg': return 'image/jpeg';
+    case '.webp': return 'image/webp';
+    case '.gif':  return 'image/gif';
+    case '.svg':  return 'image/svg+xml';
+    case '.bmp':  return 'image/bmp';
+    case '.avif': return 'image/avif';
+    case '.heic': return 'image/heic';
+    case '.heif': return 'image/heif';
+    default:      return null;
+  }
+}
+
 app.post('/api/upload/logo', upload.single('logo'), (req, res) => {
   if (!req.file) {
-    res.status(400).json({ message: 'No se proporcionó un archivo válido' });
+    res.status(400).json({ message: 'No se proporcionó un archivo de imagen válido' });
     return;
   }
-  // PUBLIC_URL lets Railway expose absolute URLs so the Vercel-hosted
-  // frontend can load images from the backend origin. Falls back to a
-  // relative path in local dev (proxied by Vite).
-  const publicBase = process.env.PUBLIC_URL?.replace(/\/$/, '') ?? '';
-  const url = `${publicBase}/uploads/logos/${req.file.filename}`;
+  const mime =
+    req.file.mimetype && req.file.mimetype !== 'application/octet-stream'
+      ? req.file.mimetype
+      : mimeFromFilename(req.file.originalname) || 'image/jpeg';
+  const base64 = req.file.buffer.toString('base64');
+  const url = `data:${mime};base64,${base64}`;
   res.json({ url });
 });
 
