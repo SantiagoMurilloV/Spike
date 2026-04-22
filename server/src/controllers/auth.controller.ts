@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/auth.service';
+import { revokeToken } from '../services/tokenBlacklist';
 import { ValidationError } from '../middleware/errorHandler';
 import { loginRateLimiter } from '../middleware/rateLimit';
 
@@ -22,8 +23,20 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
   }
 }
 
-export async function logout(_req: Request, res: Response): Promise<void> {
-  // JWT is stateless — logout is handled client-side by discarding the token
+export async function logout(req: Request, res: Response): Promise<void> {
+  // Revoke the bearer token so it's rejected even if someone kept a
+  // copy. JWT is stateless so this lives in an in-memory blacklist —
+  // enough for our single Railway instance + 24h token lifetime.
+  //
+  // The authMiddleware already validated the token, so if we got here
+  // `req.user` is set and the token is good. We pull the raw token from
+  // the header and add its SHA-256 hash to the blacklist alongside the
+  // token's own `exp` so the janitor can drop it when it would've
+  // expired anyway.
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ') && req.user?.exp) {
+    revokeToken(authHeader.substring(7), req.user.exp);
+  }
   res.json({ message: 'Sesión cerrada exitosamente' });
 }
 

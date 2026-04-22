@@ -62,6 +62,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback((message?: string) => {
+    // Tell the server to revoke this JWT so it stops working even if
+    // someone copied it out of localStorage. Fire-and-forget — we don't
+    // want a slow network to block the UX of "cerrar sesión".
+    // The auth header is read from the token we're about to clear, so
+    // the request has to go out BEFORE setAuthToken(null).
+    api.logout().catch(() => {
+      /* swallow — local logout still happens so the user isn't stuck */
+    });
+
     setToken(null);
     setUser(null);
     setAuthToken(null);

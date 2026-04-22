@@ -279,8 +279,16 @@ async function request<T>(
     headers,
   });
 
-  // Notify AuthContext on unauthorized (except for login endpoint itself)
-  if (response.status === 401 && onUnauthorized && !path.includes('/auth/login')) {
+  // Notify AuthContext on unauthorized (except for the auth endpoints
+  // themselves — a 401 on /auth/login is the user typing the wrong
+  // password, and a 401 on /auth/logout would cause the 401 handler to
+  // re-enter logout() and loop).
+  if (
+    response.status === 401 &&
+    onUnauthorized &&
+    !path.includes('/auth/login') &&
+    !path.includes('/auth/logout')
+  ) {
     onUnauthorized(path);
   }
 

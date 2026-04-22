@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/auth.service';
+import { isRevoked } from '../services/tokenBlacklist';
 import { JwtPayload } from '../types';
 
 // Extend Express Request to include user
@@ -57,6 +58,14 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
 
   const token = authHeader.substring(7);
 
+  // Revocation check first — if the user logged out or the admin was
+  // force-logged-out for inactivity we refuse the token even though it
+  // hasn't hit its natural `exp` yet.
+  if (isRevoked(token)) {
+    res.status(401).json({ error: 'Sesión cerrada. Iniciá sesión de nuevo.' });
+    return;
+  }
+
   try {
     const payload = authService.verifyToken(token);
     req.user = payload;
@@ -87,8 +96,13 @@ export function requireRole(...allowed: string[]) {
         res.status(401).json({ error: 'Token de autenticación requerido' });
         return;
       }
+      const token = authHeader.substring(7);
+      if (isRevoked(token)) {
+        res.status(401).json({ error: 'Sesión cerrada. Iniciá sesión de nuevo.' });
+        return;
+      }
       try {
-        req.user = authService.verifyToken(authHeader.substring(7));
+        req.user = authService.verifyToken(token);
       } catch {
         res.status(401).json({ error: 'Token inválido o expirado' });
         return;

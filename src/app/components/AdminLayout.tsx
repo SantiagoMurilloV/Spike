@@ -10,15 +10,30 @@ import {
   Calendar,
   UserCog,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import { useIdleTimeout, useActivePresence } from '../hooks/useIdleTimeout';
+import { IdleWarningDialog } from './admin/IdleWarningDialog';
+
+// Idle auto-logout — admin only. Judges deliberately stay on the
+// scoring console for long stretches between rallies and must never
+// be kicked out mid-match.
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 min total idle → logout
+const IDLE_WARN_MS = 60 * 1000; // warn 60 s before the logout fires
 
 export function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout, user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [idleWarnOpen, setIdleWarnOpen] = useState(false);
+
+  // "Online" dot in the sidebar. True while the user has generated any
+  // activity in the last minute AND the tab is visible — flips to dim
+  // grey when the admin steps away or minimizes the browser.
+  const isActive = useActivePresence(60_000);
 
   // Admin sidebar — teams are managed from inside each tournament now, so
   // there's no dedicated "Equipos" entry (would be redundant with Torneos
@@ -31,10 +46,37 @@ export function AdminLayout() {
     { icon: Settings, label: 'Configuración', path: '/admin/settings' },
   ];
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     logout();
     navigate('/login');
-  };
+  }, [logout, navigate]);
+
+  // Fires at IDLE_WARN_MS before the final timeout → show countdown modal.
+  const handleIdleWarn = useCallback(() => {
+    setIdleWarnOpen(true);
+  }, []);
+
+  // Fires at IDLE_TIMEOUT_MS → force logout.
+  const handleIdleTimeout = useCallback(() => {
+    setIdleWarnOpen(false);
+    toast.info('Tu sesión se cerró por inactividad');
+    handleLogout();
+  }, [handleLogout]);
+
+  // Only arm the idle hook for admins. Every other role on this layout
+  // (should be none, but being defensive) is exempt.
+  const { reset: resetIdle } = useIdleTimeout({
+    enabled: user?.role === 'admin',
+    timeoutMs: IDLE_TIMEOUT_MS,
+    warnMs: IDLE_WARN_MS,
+    onWarn: handleIdleWarn,
+    onTimeout: handleIdleTimeout,
+  });
+
+  const handleContinueSession = useCallback(() => {
+    setIdleWarnOpen(false);
+    resetIdle();
+  }, [resetIdle]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -135,16 +177,37 @@ export function AdminLayout() {
         {/* User & Logout */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10 bg-black">
           <div className="flex items-center gap-3 mb-4 px-2">
-            <div className="w-10 h-10 bg-white rounded-sm flex items-center justify-center">
-              <span className="text-black font-bold text-lg" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                A
+            <div className="relative">
+              <div className="w-10 h-10 bg-white rounded-sm flex items-center justify-center">
+                <span className="text-black font-bold text-lg" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+                  {(user?.username ?? 'A').charAt(0).toUpperCase()}
+                </span>
+              </div>
+              {/* Presence dot — pulses green when active, dims to grey on
+                  idle / hidden tab. Gives a visible cue the admin's
+                  dashboard is being watched. */}
+              <span
+                className={`absolute -right-1 -bottom-1 w-3 h-3 rounded-full border-2 border-black ${
+                  isActive ? 'bg-spk-win' : 'bg-white/30'
+                }`}
+                aria-hidden="true"
+              >
+                {isActive && (
+                  <motion.span
+                    className="absolute inset-0 rounded-full bg-spk-win"
+                    animate={{ scale: [1, 1.8], opacity: [0.55, 0] }}
+                    transition={{ duration: 1.6, repeat: Infinity, ease: 'easeOut' }}
+                  />
+                )}
               </span>
             </div>
             <div className="flex-1 min-w-0">
               <div className="font-bold text-white truncate" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
                 {user?.username ?? 'Administrador'}
               </div>
-              <div className="text-xs text-white/60 truncate">admin@spk-cup.club</div>
+              <div className="text-xs text-white/60 truncate">
+                {isActive ? 'En línea' : 'Inactivo'}
+              </div>
             </div>
           </div>
           <motion.button
@@ -179,6 +242,18 @@ export function AdminLayout() {
       <main className="md:ml-72 pt-16 md:pt-0 min-h-screen bg-white">
         <Outlet />
       </main>
+
+      {/* Idle warning — only active for admins (the hook itself is
+          disabled for other roles). */}
+      <IdleWarningDialog
+        open={idleWarnOpen}
+        secondsUntilLogout={Math.floor(IDLE_WARN_MS / 1000)}
+        onContinue={handleContinueSession}
+        onLogoutNow={() => {
+          setIdleWarnOpen(false);
+          handleLogout();
+        }}
+      />
     </div>
   );
 }
