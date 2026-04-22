@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -117,6 +117,24 @@ function SpkPanel({
 export function AdminTournamentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  // Tab selection is URL-driven so the AdminLayout sidebar can deep-link
+  // straight into "Equipos" / "Cruces" / "Partidos" for a specific
+  // tournament. Query param form (?tab=…) instead of nested routes
+  // keeps this change minimal and backwards-compatible with any bookmark
+  // pointing at /admin/tournaments/:id.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const validTabs = ['info', 'teams', 'fixtures', 'matches'] as const;
+  type TabId = (typeof validTabs)[number];
+  const rawTab = searchParams.get('tab');
+  const activeTab: TabId = (validTabs as readonly string[]).includes(rawTab ?? '')
+    ? (rawTab as TabId)
+    : 'info';
+  const handleTabChange = (next: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'info') params.delete('tab');
+    else params.set('tab', next);
+    setSearchParams(params, { replace: true });
+  };
   // Used by the "Crear equipo nuevo" flow inside the Equipos tab — we go
   // through the shared DataContext action so the global teams list stays
   // in sync with the one we just created for this tournament.
@@ -784,7 +802,7 @@ export function AdminTournamentDetail() {
           reach every section on a phone. Styled with the SPK system tokens
           (black rail, red active state, Barlow Condensed uppercase) to match
           the rest of the admin surface. */}
-      <Tabs defaultValue="info">
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList
           className="!flex w-full !h-auto overflow-x-auto bg-black p-1 rounded-sm gap-1 justify-start"
         >
