@@ -963,7 +963,6 @@ export function AdminTournamentDetail() {
                       title={category}
                       count={teams.length}
                       subtitle={`${teams.length} ${teams.length === 1 ? 'equipo' : 'equipos'}`}
-                      defaultOpen={idx === 0}
                     >
                       {/* Each enrolled team is itself a collapsible row so
                           admins can see/edit its roster without leaving
@@ -1140,8 +1139,7 @@ export function AdminTournamentDetail() {
                               title={category || 'Sin categoría'}
                               count={catGroupNames.length}
                               subtitle={`${catGroupNames.length} ${catGroupNames.length === 1 ? 'grupo' : 'grupos'}`}
-                              defaultOpen={idx === 0}
-                            >
+                                    >
                               <div className="space-y-6">
                                 {catGroupNames.map((gName) => (
                                   <GroupMatrix
@@ -1171,8 +1169,7 @@ export function AdminTournamentDetail() {
                         title={`Enfrentamientos — ${displayLabel}`}
                         count={groupMatches.length}
                         subtitle={`${groupMatches.length} ${groupMatches.length === 1 ? 'partido' : 'partidos'}`}
-                        defaultOpen={idx === 0}
-                      >
+                        >
                         <div className="space-y-2">
                           {groupMatches.map((m) => (
                             <div
@@ -1408,8 +1405,7 @@ export function AdminTournamentDetail() {
                               title={`Bracket · ${category}`}
                               count={catBracketMatches.length}
                               subtitle={`${catBracketMatches.length} ${catBracketMatches.length === 1 ? 'partido' : 'partidos'}`}
-                              defaultOpen={idx === 0}
-                            >
+                                    >
                               {renderBracket(catBracketMatches)}
                             </CategorySection>
                           ))}
