@@ -5,6 +5,7 @@ import {
   ValidationError,
 } from '../middleware/errorHandler';
 import { BCRYPT_ROUNDS, validatePasswordStrength } from './password';
+import { encryptPassword } from './passwordRecovery';
 
 /**
  * App user. Today we have two roles:
@@ -98,11 +99,12 @@ export class UserService {
     }
 
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    const recovery = encryptPassword(password);
     const result = await pool.query(
-      `INSERT INTO users (username, password_hash, role, display_name, created_by)
-       VALUES ($1, $2, 'judge', $3, $4)
+      `INSERT INTO users (username, password_hash, role, display_name, created_by, password_recovery)
+       VALUES ($1, $2, 'judge', $3, $4, $5)
        RETURNING id, username, role, display_name, created_at, updated_at`,
-      [username, hash, displayName, createdBy],
+      [username, hash, displayName, createdBy, recovery],
     );
     return mapUserRow(result.rows[0]);
   }
@@ -133,9 +135,10 @@ export class UserService {
       throw new ValidationError('Solo se puede resetear la contraseña de usuarios juez');
     }
     const hash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    const recovery = encryptPassword(newPassword);
     await pool.query(
-      'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
-      [hash, id],
+      'UPDATE users SET password_hash = $1, password_recovery = $2, updated_at = NOW() WHERE id = $3',
+      [hash, recovery, id],
     );
   }
 }

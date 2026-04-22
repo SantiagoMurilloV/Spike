@@ -19,20 +19,41 @@ Vercel corre funciones serverless, lo cual no encaja bien con el Express persist
 3. Añade el plugin de base de datos: **+ New → Database → Add PostgreSQL**. Railway inyecta automáticamente la variable `DATABASE_URL` en tu servicio.
 4. En **Variables**, añade:
 
-   | Nombre                 | Valor                                                                                          |
-   | ---------------------- | ---------------------------------------------------------------------------------------------- |
-   | `NODE_ENV`             | `production`                                                                                   |
-   | `JWT_SECRET`           | ≥16 caracteres aleatorios (`openssl rand -hex 32`)                                             |
-   | `CORS_ORIGINS`         | la URL de Vercel (después del paso 2)                                                          |
-   | `PUBLIC_URL`           | URL pública de Railway, ej. `https://spk-cup-api.up.railway.app`                               |
-   | `SUPER_ADMIN_USERNAME` | opcional, default `superadmin`                                                                 |
-   | `SUPER_ADMIN_PASSWORD` | **obligatorio en prod**, ≥8 chars con letra y número. Se lee una sola vez para crear la cuenta |
+   | Nombre                    | Valor                                                                                                  |
+   | ------------------------- | ------------------------------------------------------------------------------------------------------ |
+   | `NODE_ENV`                | `production`                                                                                           |
+   | `JWT_SECRET`              | ≥16 caracteres aleatorios (`openssl rand -hex 32`)                                                     |
+   | `CORS_ORIGINS`            | la URL de Vercel (después del paso 2)                                                                  |
+   | `PUBLIC_URL`              | URL pública de Railway, ej. `https://spk-cup-api.up.railway.app`                                       |
+   | `SUPER_ADMIN_USERNAME`    | opcional, default `superadmin`                                                                         |
+   | `SUPER_ADMIN_PASSWORD`    | **obligatorio en prod**, ≥8 chars con letra y número. Se lee una sola vez para crear la cuenta         |
+   | `PLATFORM_RECOVERY_KEY`   | **OPCIONAL + ARRIESGADO** — 64 hex chars (`openssl rand -hex 32`). Activa "ver contraseña actual" en el panel super_admin |
 
    > `DATABASE_URL`, `PORT` y `RAILWAY_STATIC_URL` los inyecta Railway solo.
    >
    > El super administrador se crea automáticamente al primer boot. Una vez creado podés borrar
    > `SUPER_ADMIN_PASSWORD` de Railway — la cuenta sigue existiendo. Para cambiar la contraseña,
    > usá el flujo desde la misma app.
+
+### ⚠️ Sobre `PLATFORM_RECOVERY_KEY`
+
+Esta variable activa el modo donde el super_admin puede ver y editar la contraseña actual
+de cualquier usuario. El password se guarda encriptado con AES-256-GCM usando esta clave —
+la clave **no vive en la DB**, solo en esta env var.
+
+**Trade-offs**:
+
+- Si alguien se lleva tu DB de Railway **Y** esta env var → tiene todas las contraseñas en plano.
+- Si se compromete una cuenta super_admin → el atacante ve todas las contraseñas de la
+  plataforma vía el endpoint `GET /api/platform/users/:id/password`.
+- Si **perdés** la clave o la cambiás sin migrar → los ciphertexts viejos se vuelven
+  ilegibles (los logins siguen funcionando porque el bcrypt hash es independiente).
+
+**Para activar**: `openssl rand -hex 32` → pegar el resultado en la env var → redeploy.
+**Para desactivar**: borrá la env var → redeploy. El feature queda inerte; la columna
+`password_recovery` en Postgres queda con ciphertexts viejos pero nadie los puede leer.
+
+Si no configurás esta variable, el panel opera en el modo seguro por default (reset + show-once).
 
 5. Railway construye, corre las migraciones (lo hace el mismo backend al bootear) y te da una URL pública tipo `https://spk-cup-api.up.railway.app`. **Guarda esa URL.**
 

@@ -3,6 +3,7 @@ import { getPool } from '../config/database';
 import { NotFoundError, ValidationError } from '../middleware/errorHandler';
 import { BCRYPT_ROUNDS, validatePasswordStrength } from './password';
 import { getPresence } from './presence';
+import { encryptPassword, decryptPassword, isRecoveryEnabled } from './passwordRecovery';
 
 /**
  * Super-admin platform operations. Everything here is gated behind
@@ -33,6 +34,12 @@ export interface PlatformStats {
     activeUsers: number;
     activeVisitors: number;
   };
+  /**
+   * True when `PLATFORM_RECOVERY_KEY` is configured on the backend
+   * and the "ver contraseña actual" flow is functional. Surfaced to
+   * the super-admin UI so it can show an explicit warning banner.
+   */
+  passwordRecoveryEnabled: boolean;
 }
 
 export interface PlatformUser {
@@ -120,6 +127,7 @@ export class PlatformService {
         total: r.super_admin + r.admin + r.judge,
       },
       presence: getPresence(),
+      passwordRecoveryEnabled: isRecoveryEnabled(),
     };
   }
 
@@ -182,12 +190,15 @@ export class PlatformService {
       role === 'admin' ? (data.tournamentQuota ?? 1) : 0;
     const createdBy = role === 'judge' ? (data.createdBy ?? null) : null;
     const adminNote = data.adminNote?.trim() || null;
+    // Null if PLATFORM_RECOVERY_KEY isn't configured — the feature is
+    // opt-in, so new users created while it's off just get a NULL here.
+    const recovery = encryptPassword(password);
 
     const result = await pool.query(
-      `INSERT INTO users (username, password_hash, role, display_name, tournament_quota, created_by, admin_note)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO users (username, password_hash, role, display_name, tournament_quota, created_by, admin_note, password_recovery)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [username, hash, role, displayName, tournamentQuota, createdBy, adminNote],
+      [username, hash, role, displayName, tournamentQuota, createdBy, adminNote, recovery],
     );
     return mapUser({ ...result.rows[0], owned_count: 0 });
   }
@@ -250,6 +261,11 @@ export class PlatformService {
       fields.push(`password_hash = $${idx}`);
       values.push(hash);
       idx++;
+      // Also refresh the recovery ciphertext so subsequent "see current
+      // password" reads match reality. Null when the feature is off.
+      fields.push(`password_recovery = $${idx}`);
+      values.push(encryptPassword(data.password));
+      idx++;
     }
     if (data.adminNote !== undefined) {
       fields.push(`admin_note = $${idx}`);
@@ -268,6 +284,30 @@ export class PlatformService {
       values,
     );
     return this.getUserById(id);
+  }
+
+  /**
+   * Decrypt and return the stored recovery ciphertext for a user. The
+   * caller is responsible for gating this behind `requireRole('super_admin')`.
+   *
+   * Returns:
+   *   · `{ enabled: false }`           — feature is off (no env key)
+   *   · `{ enabled: true, password: null }` — feature on but this user
+   *                                          predates it / has no cipher yet
+   *   · `{ enabled: true, password: "..." }` — the real password
+   */
+  async revealPassword(
+    id: string,
+  ): Promise<{ enabled: boolean; password: string | null }> {
+    if (!isRecoveryEnabled()) return { enabled: false, password: null };
+    const pool = getPool();
+    const result = await pool.query(
+      'SELECT password_recovery FROM users WHERE id = $1',
+      [id],
+    );
+    if (result.rows.length === 0) throw new NotFoundError('Usuario');
+    const enc = result.rows[0].password_recovery as string | null;
+    return { enabled: true, password: decryptPassword(enc) };
   }
 
   private async getUserById(id: string): Promise<PlatformUser> {

@@ -4,6 +4,7 @@ import { getPool } from '../config/database';
 import { JwtPayload, LoginRequest, LoginResponse } from '../types';
 import { UnauthorizedError } from '../middleware/errorHandler';
 import { BCRYPT_ROUNDS, validatePasswordStrength } from './password';
+import { encryptPassword } from './passwordRecovery';
 
 // JWT_SECRET is required in production. A weak fallback is only allowed in dev/test.
 function resolveJwtSecret(): string {
@@ -103,9 +104,13 @@ export class AuthService {
     }
 
     const hash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    // Keep the encrypted recovery ciphertext in sync so super_admin's
+    // "reveal current password" stays accurate. Null when the feature
+    // is off (no PLATFORM_RECOVERY_KEY).
+    const recovery = encryptPassword(newPassword);
     await pool.query(
-      'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
-      [hash, userId],
+      'UPDATE users SET password_hash = $1, password_recovery = $2, updated_at = NOW() WHERE id = $3',
+      [hash, recovery, userId],
     );
   }
 

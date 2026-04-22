@@ -127,6 +127,8 @@ export interface PlatformStats {
     activeUsers: number;
     activeVisitors: number;
   };
+  /** True when PLATFORM_RECOVERY_KEY is configured on the backend. */
+  passwordRecoveryEnabled: boolean;
 }
 
 export interface PlatformUser {
@@ -910,5 +912,15 @@ export const api = {
 
   async deletePlatformUser(id: string): Promise<void> {
     await request<void>(`/platform/users/${id}`, { method: 'DELETE' });
+  },
+
+  /**
+   * Reveal the stored plaintext password of a user. Returns `enabled:
+   * false` when PLATFORM_RECOVERY_KEY isn't set on the backend, or
+   * `password: null` when the user predates the feature / hasn't had
+   * their password reset since enabling it.
+   */
+  async revealUserPassword(id: string): Promise<{ enabled: boolean; password: string | null }> {
+    return request<{ enabled: boolean; password: string | null }>(`/platform/users/${id}/password`);
   },
 };

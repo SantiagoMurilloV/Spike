@@ -5,6 +5,7 @@ import {
   createUser,
   updateUser,
   deleteUser,
+  revealPassword,
 } from '../controllers/platform.controller';
 import { requireRole } from '../middleware/auth';
 
@@ -20,5 +21,6 @@ router.get('/users', requireRole('super_admin'), listUsers);
 router.post('/users', requireRole('super_admin'), createUser);
 router.put('/users/:id', requireRole('super_admin'), updateUser);
 router.delete('/users/:id', requireRole('super_admin'), deleteUser);
+router.get('/users/:id/password', requireRole('super_admin'), revealPassword);
 
 export default router;

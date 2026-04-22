@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Trophy, Users, UserCog, Shield, Activity, Eye, Loader2 } from 'lucide-react';
+import { Trophy, Users, UserCog, Shield, Activity, Eye, Loader2, KeyRound } from 'lucide-react';
 import { motion } from 'motion/react';
 import { api, type PlatformStats } from '../../services/api';
 
@@ -58,6 +58,25 @@ export function SuperAdminDashboard() {
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-sm text-red-700 text-sm">
           {error}
+        </div>
+      )}
+
+      {/* Password-recovery mode banner. Only shown when PLATFORM_RECOVERY_KEY
+          is configured on the backend. It's a deliberate "you asked for this"
+          reminder so the super_admin doesn't forget they're operating in a
+          mode where passwords are recoverable. */}
+      {stats?.passwordRecoveryEnabled && (
+        <div className="flex items-start gap-3 px-4 py-3 bg-spk-gold/10 border-l-4 border-spk-gold rounded-sm">
+          <KeyRound className="w-5 h-5 text-spk-gold flex-shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="text-sm">
+            <p className="font-bold text-black/80">Modo "ver contraseña actual" activo</p>
+            <p className="text-black/60 mt-0.5">
+              Las contraseñas de los usuarios son recuperables desde esta consola.
+              Si la clave de recuperación (<code className="px-1 rounded bg-black/5 text-[12px]">PLATFORM_RECOVERY_KEY</code>)
+              se filtra junto con la base de datos, todas las contraseñas quedan expuestas.
+              Para apagar el modo, borrá esa env var de Railway.
+            </p>
+          </div>
         </div>
       )}
 

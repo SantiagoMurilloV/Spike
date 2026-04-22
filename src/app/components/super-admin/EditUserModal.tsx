@@ -39,6 +39,10 @@ export function EditUserModal({ isOpen, onClose, onSaved, user }: EditUserModalP
   const [displayName, setDisplayName] = useState('');
   const [adminNote, setAdminNote] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  /** Password value we pre-loaded from the backend (if recovery is on).
+   *  Used to detect whether the super_admin actually changed it — we only
+   *  POST a new password when the field differs from what was fetched. */
+  const [loadedPassword, setLoadedPassword] = useState('');
   /** When `false` the password input shows a locked placeholder and
    *  disables editing — matches the "not retrievable" reality but
    *  still gives a clear "click to replace" affordance. */
@@ -47,15 +51,37 @@ export function EditUserModal({ isOpen, onClose, onSaved, user }: EditUserModalP
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (isOpen && user) {
-      setUsername(user.username);
-      setDisplayName(user.displayName ?? '');
-      setAdminNote(user.adminNote ?? '');
-      setNewPassword('');
-      setPasswordUnlocked(false);
-      setShowPasswordValue(false);
-      setSubmitting(false);
-    }
+    if (!(isOpen && user)) return;
+    setUsername(user.username);
+    setDisplayName(user.displayName ?? '');
+    setAdminNote(user.adminNote ?? '');
+    setNewPassword('');
+    setLoadedPassword('');
+    setPasswordUnlocked(false);
+    setShowPasswordValue(false);
+    setSubmitting(false);
+
+    // Try to pre-fetch the current password. If the recovery feature is
+    // disabled (no env key) OR this user's row has no ciphertext yet
+    // (legacy, pre-feature) we silently fall back to the locked •••••• view.
+    let cancelled = false;
+    api
+      .revealUserPassword(user.id)
+      .then((r) => {
+        if (cancelled) return;
+        if (r.enabled && r.password) {
+          setNewPassword(r.password);
+          setLoadedPassword(r.password);
+          setPasswordUnlocked(true);
+          setShowPasswordValue(false); // start masked; super_admin clicks 👁 to peek
+        }
+      })
+      .catch(() => {
+        // ignore — the modal keeps working in "reset only" mode
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, user]);
 
   const handleGenerate = () => {
@@ -82,8 +108,15 @@ export function EditUserModal({ isOpen, onClose, onSaved, user }: EditUserModalP
       if (trimmedNote !== (user.adminNote ?? '')) {
         dto.adminNote = trimmedNote;
       }
-      const willChangePassword = passwordUnlocked && newPassword.trim().length > 0;
-      if (willChangePassword) dto.password = newPassword;
+      // Only send a new password if the field was actually edited. If we
+      // pre-loaded the current password from the recovery endpoint and
+      // the super_admin didn't change it, we skip the update to avoid
+      // rehashing the same value.
+      const pwChanged =
+        passwordUnlocked &&
+        newPassword.trim().length > 0 &&
+        newPassword !== loadedPassword;
+      if (pwChanged) dto.password = newPassword;
 
       if (Object.keys(dto).length === 0) {
         toast.info('No hay cambios para guardar');
@@ -94,7 +127,7 @@ export function EditUserModal({ isOpen, onClose, onSaved, user }: EditUserModalP
       await api.updatePlatformUser(user.id, dto);
       toast.success('Usuario actualizado');
       await onSaved({
-        newPassword: willChangePassword ? newPassword : null,
+        newPassword: pwChanged ? newPassword : null,
       });
       onClose();
     } catch (err) {

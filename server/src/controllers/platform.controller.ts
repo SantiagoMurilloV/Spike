@@ -57,3 +57,19 @@ export async function deleteUser(req: Request, res: Response, next: NextFunction
     next(err);
   }
 }
+
+/**
+ * Reveal the stored-plaintext password of a user. Only works when the
+ * recovery feature is on (PLATFORM_RECOVERY_KEY env var set) AND the
+ * target user has a ciphertext on file. Super_admin-gated at the route.
+ */
+export async function revealPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const id = req.params.id as string;
+    validateUUID(id, 'ID de usuario');
+    const result = await platformService.revealPassword(id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
