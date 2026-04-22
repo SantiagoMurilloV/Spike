@@ -338,15 +338,21 @@ export class BracketGenerator {
   async resolveBracketFromStandings(tournamentId: string): Promise<number> {
     const pool = getPool();
 
-    // Fetch the current standings snapshot.
+    // Fetch the current standings snapshot. We also read `is_qualified`
+    // here because the standings service now only flips that flag once
+    // the group phase is actually finished. That's exactly the signal we
+    // need to avoid seeding bracket slots from a phantom 0-0 ranking —
+    // before my fix the bracket would fill with whatever team happened
+    // to sit at position 1 alphabetically, which is useless to the public.
     const standingsResult = await pool.query(
-      'SELECT team_id, group_name, position FROM standings WHERE tournament_id = $1',
+      'SELECT team_id, group_name, position, is_qualified FROM standings WHERE tournament_id = $1',
       [tournamentId],
     );
     const standings = standingsResult.rows as Array<{
       team_id: string;
       group_name: string | null;
       position: number;
+      is_qualified: boolean;
     }>;
 
     const resolvePlaceholder = (placeholder: string | null): string | null => {
@@ -359,7 +365,11 @@ export class BracketGenerator {
       const found = standings.find(
         (s) => s.group_name === groupName && s.position === pos,
       );
-      return found ? found.team_id : null;
+      // Only resolve if the team is actually qualified — i.e. the group
+      // is complete. Otherwise leave the slot as "Por definir" so the
+      // public bracket doesn't lie about who's advancing.
+      if (!found || !found.is_qualified) return null;
+      return found.team_id;
     };
 
     // Only load matches that have at least one placeholder — team-advanced

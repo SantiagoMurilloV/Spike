@@ -231,6 +231,52 @@ export class StandingsCalculator {
     // elimination crossings.
     const qualifyCount = this.getQualifyCount(format);
 
+    // Per-group completion map. A team is only ever marked as "qualified"
+    // once its group has actually finished — otherwise at 0-0 across the
+    // board we'd be crowning the first N teams alphabetically and the
+    // bracket would seed itself from a phantom ranking.
+    //
+    // A group is complete when:
+    //   · it has at least one scheduled match, AND
+    //   · every match in that group has a decided outcome (status
+    //     === 'completed' OR a best-of-3 majority in score_team1/2 or
+    //     set_scores — matching the same rule we used for stats above).
+    const groupStats = new Map<string, { total: number; decided: number }>();
+    for (const row of allMatchesResult.rows) {
+      const groupKey = (row.group_name as string) ?? '';
+      const bucket = groupStats.get(groupKey) ?? { total: 0, decided: 0 };
+      bucket.total++;
+      const status = row.status as string;
+      const matchId = row.id as string;
+      const sets = setsByMatch.get(matchId) ?? [];
+      let setsWonByTeam1 = 0;
+      let setsWonByTeam2 = 0;
+      for (const set of sets) {
+        if (set.team1Points > set.team2Points) setsWonByTeam1++;
+        else if (set.team2Points > set.team1Points) setsWonByTeam2++;
+      }
+      if (sets.length === 0) {
+        setsWonByTeam1 = (row.score_team1 as number | null) ?? 0;
+        setsWonByTeam2 = (row.score_team2 as number | null) ?? 0;
+      }
+      const majorityReached = Math.max(setsWonByTeam1, setsWonByTeam2) >= 2;
+      const hasDecidedOutcome = majorityReached && setsWonByTeam1 !== setsWonByTeam2;
+      // A match counts as "decided" for group-completion purposes only when
+      // the ref actually finalized it — either the admin flipped status to
+      // 'completed' (walkover / forfeit kept on fallback scores) or a
+      // best-of-3 majority landed in set_scores. A 'live' match at 2-0 is
+      // technically mathematically decided but we still want the judge to
+      // close it before the bracket seeds are released.
+      if (status === 'completed' || hasDecidedOutcome) {
+        bucket.decided++;
+      }
+      groupStats.set(groupKey, bucket);
+    }
+    const groupIsComplete = (groupName: string | null): boolean => {
+      const bucket = groupStats.get(groupName ?? '');
+      return !!bucket && bucket.total > 0 && bucket.decided === bucket.total;
+    };
+
     // Delete existing standings for this tournament and insert new ones
     const client = await pool.connect();
     try {
@@ -241,7 +287,12 @@ export class StandingsCalculator {
       for (let i = 0; i < sorted.length; i++) {
         const stats = sorted[i];
         const position = stats.groupPosition;
-        const isQualified = position <= qualifyCount;
+        // Qualification is only meaningful once the group phase wraps up.
+        // Before that every team is just sitting at position 1..N with 0
+        // points — marking them qualified would put phantom trophies in
+        // the public table and seed the bracket from nothing.
+        const isQualified =
+          position <= qualifyCount && groupIsComplete(stats.groupName);
 
         const result = await client.query(
           `INSERT INTO standings (tournament_id, team_id, group_name, position, played, wins, losses, sets_for, sets_against, points, is_qualified)

@@ -806,6 +806,42 @@ describe('StandingsCalculator', () => {
       const qualified = standings.filter(s => s.isQualified);
       expect(qualified).toHaveLength(4);
     });
+
+    // Regression for the "all scores 0-0 but the bracket has names" bug:
+    // when the group phase hasn't actually finished, nobody is qualified
+    // yet, so the bracket won't seed from a phantom ranking.
+    it('should mark 0 teams as qualified while any group match is still pending', async () => {
+      const poolQuery = vi.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 'tournament-1', format: 'groups+knockout' }] })
+        .mockResolvedValueOnce({
+          rows: [
+            matchRow({ id: 'm1', team1_id: 'A', team2_id: 'B', score_team1: 2, score_team2: 0, status: 'completed', group_name: 'A' }),
+            // m2 is still upcoming — group A is not complete.
+            matchRow({ id: 'm2', team1_id: 'A', team2_id: 'C', score_team1: 0, score_team2: 0, status: 'upcoming', group_name: 'A' }),
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const clientQuery = vi.fn().mockImplementation((sql: string, params?: unknown[]) => {
+        if (typeof sql === 'string' && sql.startsWith('INSERT INTO standings')) {
+          return Promise.resolve({
+            rows: [standingsDbRow({
+              team_id: params![1],
+              group_name: params![2],
+              position: params![3],
+              is_qualified: params![10],
+            })],
+          });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      mockPoolWithClient(poolQuery, clientQuery);
+      const standings = await calculator.calculate('tournament-1');
+
+      const qualified = standings.filter((s) => s.isQualified);
+      expect(qualified).toHaveLength(0);
+    });
   });
 
   // =========================================================================
