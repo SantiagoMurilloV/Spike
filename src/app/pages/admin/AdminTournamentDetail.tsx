@@ -27,7 +27,7 @@ import { TeamFormModal } from '../../components/admin/TeamFormModal';
 import { TeamRosterCard } from '../../components/admin/TeamRosterCard';
 import { useData } from '../../context/DataContext';
 import type { UpdateTeamDto } from '../../services/api';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
+import { Tabs, TabsContent } from '../../components/ui/tabs';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import {
@@ -798,30 +798,12 @@ export function AdminTournamentDetail() {
         </div>
       </div>
 
-      {/* Tabs — scrollable horizontally on narrow screens so organizers can
-          reach every section on a phone. Styled with the SPK system tokens
-          (black rail, red active state, Barlow Condensed uppercase) to match
-          the rest of the admin surface. */}
+      {/* Tabs — the horizontal tab strip was removed because the admin
+          sidebar already deep-links to every section (?tab=info|teams|
+          fixtures|matches). `<Tabs>` stays as the content-switcher so
+          the URL param still drives which panel is visible, it just
+          renders without a visible trigger row. */}
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList
-          className="!flex w-full !h-auto overflow-x-auto bg-black p-1 rounded-sm gap-1 justify-start"
-        >
-          {[
-            { value: 'info', label: 'Información General' },
-            { value: 'teams', label: 'Equipos Inscritos' },
-            { value: 'fixtures', label: 'Cruces/Fixtures' },
-            { value: 'matches', label: 'Partidos' },
-          ].map((tab) => (
-            <TabsTrigger
-              key={tab.value}
-              value={tab.value}
-              className="flex-shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 text-[11px] sm:text-xs text-white/70 hover:text-white data-[state=active]:bg-spk-red data-[state=active]:text-white rounded-sm uppercase font-bold transition-colors"
-              style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.06em' }}
-            >
-              {tab.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
 
         {/* ── Info Tab ──────────────────────────────────────────── */}
         <TabsContent value="info">
