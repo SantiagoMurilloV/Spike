@@ -359,17 +359,34 @@ export class MatchService {
     }
 
     // Push dispatch (fire-and-forget):
-    //   - status transitions to 'live'   → "En vivo" notification
-    //   - a new set just got closed      → current score notification
+    //   - status transitions to 'live'      → "En vivo" notification
+    //   - a set just got decided            → "Set N cerrado" notification
     //   - status transitions to 'completed' → "Final" notification
-    // The match.sets array that arrives in the ScoreUpdate is the source
-    // of truth — we compare its length against the previous sets count to
-    // detect a set closure.
+    //
+    // IMPORTANT: we count only DECIDED sets (one side ≥ 25 points with 2
+    // of ventaja, or ≥ 15 with 2 in a 5th), NOT the raw array length.
+    // The RefereeScore autosave now persists the in-progress set as the
+    // last row in set_scores so the public + re-entry work correctly —
+    // using `score.sets.length` here would fire a spurious "Set 1 cerrado"
+    // on the very first point of every set, and skip real closures (the
+    // array length stays the same between "Set 1 at 24-20" and "Set 1
+    // closed at 25-20").
     const becameLive = score.status === 'live' && existing.status !== 'live';
     const becameCompleted = score.status === 'completed' && existing.status !== 'completed';
-    const previousSetCount = existing.sets?.length ?? 0;
-    const newSetCount = score.sets?.length ?? previousSetCount;
-    const setJustClosed = newSetCount > previousSetCount;
+    const decidedSetsCount = (sets: Array<{ setNumber: number; team1Points: number; team2Points: number }> | undefined) => {
+      if (!sets) return 0;
+      let n = 0;
+      for (const s of sets) {
+        const target = s.setNumber >= 5 ? 15 : 25;
+        const top = Math.max(s.team1Points, s.team2Points);
+        const diff = Math.abs(s.team1Points - s.team2Points);
+        if (top >= target && diff >= 2) n++;
+      }
+      return n;
+    };
+    const previousDecidedSets = decidedSetsCount(existing.sets);
+    const newDecidedSets = decidedSetsCount(score.sets);
+    const setJustClosed = newDecidedSets > previousDecidedSets;
 
     if (becameLive || becameCompleted || setJustClosed) {
       const notify = async () => {

@@ -32,7 +32,12 @@ export default defineConfig({
         display: 'standalone',
         background_color: '#000000',
         theme_color: '#E31E24',
-        orientation: 'portrait-primary',
+        // "any" lets the installed PWA respect the phone's own rotation
+        // setting — admins in kiosk mode want landscape for the referee
+        // console, spectators often flip their phone to see the bracket
+        // wider. Previously this was locked to portrait-primary which
+        // ignored the OS rotation toggle entirely.
+        orientation: 'any',
         icons: [
           {
             src: '/icon-192.png',

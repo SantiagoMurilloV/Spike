@@ -184,6 +184,18 @@ export class PushService {
               keys: { p256dh: row.p256dh, auth: row.auth },
             },
             payloadJson,
+            {
+              // `urgency: 'high'` tells FCM/APNs to bypass doze-mode batching
+              // on Android and deliver ASAP on iOS. Without it a phone that's
+              // been idle for a bit can defer match notifications by up to 15
+              // minutes — which is the "no llegan instantaneamente" symptom.
+              urgency: 'high',
+              // TTL in seconds: how long the push gateway holds onto an
+              // undelivered message. 10 minutes is enough for a device
+              // coming back online mid-match but short enough that a
+              // closed-set notification doesn't show up an hour later.
+              TTL: 600,
+            },
           );
         } catch (err: unknown) {
           const status = (err as { statusCode?: number }).statusCode;
