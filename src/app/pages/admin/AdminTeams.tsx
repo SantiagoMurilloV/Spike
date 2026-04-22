@@ -1,4 +1,4 @@
-import { Plus, Search, Filter, Loader2 } from 'lucide-react';
+import { Search, Filter, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useData } from '../../context/DataContext';
@@ -6,10 +6,16 @@ import { TeamFormModal } from '../../components/admin/TeamFormModal';
 import { TeamRosterCard } from '../../components/admin/TeamRosterCard';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Team } from '../../types';
-import type { CreateTeamDto, UpdateTeamDto } from '../../services/api';
+import type { UpdateTeamDto } from '../../services/api';
 
+/**
+ * Global team list. Intentionally read-only for creation — new teams are
+ * now registered inside their tournament (see AdminTournamentDetail's
+ * Equipos tab). This page stays so admins can manage rosters, edit team
+ * metadata and delete teams that are no longer enrolled anywhere.
+ */
 export function AdminTeams() {
-  const { teams, loading, error, addTeam, updateTeam, deleteTeam, refreshTeams } = useData();
+  const { teams, loading, error, updateTeam, deleteTeam, refreshTeams } = useData();
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | undefined>();
@@ -20,11 +26,6 @@ export function AdminTeams() {
     team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     team.initials.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const handleCreate = () => {
-    setEditingTeam(undefined);
-    setIsModalOpen(true);
-  };
 
   const handleEdit = (team: Team) => {
     setEditingTeam(team);
@@ -52,33 +53,21 @@ export function AdminTeams() {
   };
 
   const handleSubmit = async (team: Team) => {
-    if (editingTeam) {
-      const dto: UpdateTeamDto = {
-        name: team.name,
-        initials: team.initials,
-        logo: team.logo,
-        primaryColor: team.colors.primary,
-        secondaryColor: team.colors.secondary,
-        city: team.city,
-        department: team.department,
-        category: team.category,
-      };
-      await updateTeam(editingTeam.id, dto);
-      toast.success('Equipo actualizado correctamente');
-    } else {
-      const dto: CreateTeamDto = {
-        name: team.name,
-        initials: team.initials,
-        logo: team.logo,
-        primaryColor: team.colors.primary,
-        secondaryColor: team.colors.secondary,
-        city: team.city,
-        department: team.department,
-        category: team.category,
-      };
-      await addTeam(dto);
-      toast.success('Equipo creado correctamente');
-    }
+    // Edit-only: new teams are now created inside the tournament, so this
+    // modal only ever runs with editingTeam set.
+    if (!editingTeam) return;
+    const dto: UpdateTeamDto = {
+      name: team.name,
+      initials: team.initials,
+      logo: team.logo,
+      primaryColor: team.colors.primary,
+      secondaryColor: team.colors.secondary,
+      city: team.city,
+      department: team.department,
+      category: team.category,
+    };
+    await updateTeam(editingTeam.id, dto);
+    toast.success('Equipo actualizado correctamente');
   };
 
   if (loading.teams && teams.length === 0) {
@@ -106,22 +95,14 @@ export function AdminTeams() {
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-            GESTIÓN DE EQUIPOS
-          </h1>
-          <p className="text-black/60">
-            Administra los equipos y su plantel. Tocá un equipo para ver sus jugadoras.
-          </p>
-        </div>
-        <button
-          onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-spk-red text-white hover:bg-spk-red-dark rounded-sm transition-colors font-medium"
-        >
-          <Plus className="w-4 h-4" />
-          <span style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.05em' }} className="uppercase font-bold">Crear Equipo</span>
-        </button>
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+          GESTIÓN DE EQUIPOS
+        </h1>
+        <p className="text-black/60">
+          Administra los equipos existentes y su plantel. Los equipos nuevos se crean
+          dentro del torneo correspondiente.
+        </p>
       </div>
 
       {/* Stats */}

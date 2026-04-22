@@ -18,11 +18,13 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { api } from '../../services/api';
-import type { ScoreUpdate } from '../../services/api';
+import type { ScoreUpdate, CreateTeamDto } from '../../services/api';
 import { Tournament, Team, Match, BracketMatch, FixtureResult, StandingsRow } from '../../types';
 import { TeamAvatar } from '../../components/TeamAvatar';
 import { GroupMatrix } from '../../components/GroupMatrix';
 import { CategorySection } from '../../components/admin/CategorySection';
+import { TeamFormModal } from '../../components/admin/TeamFormModal';
+import { useData } from '../../context/DataContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -113,6 +115,10 @@ function SpkPanel({
 export function AdminTournamentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  // Used by the "Crear equipo nuevo" flow inside the Equipos tab — we go
+  // through the shared DataContext action so the global teams list stays
+  // in sync with the one we just created for this tournament.
+  const { addTeam } = useData();
 
   // Data state
   const [tournament, setTournament] = useState<Tournament | null>(null);
@@ -141,6 +147,10 @@ export function AdminTournamentDetail() {
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
+  // "Crear equipo nuevo" flow inside the Equipos tab. Opens TeamFormModal
+  // in create mode; handleCreateTeam auto-enrols the result in this
+  // tournament so the admin never has to flip to /admin/teams.
+  const [showNewTeamModal, setShowNewTeamModal] = useState(false);
 
   const handleRecalculateStandings = useCallback(async () => {
     if (!id) return;
@@ -329,6 +339,34 @@ export function AdminTournamentDetail() {
     } finally {
       setEnrolling(false);
     }
+  };
+
+  /**
+   * Create-a-new-team flow. Fires from the TeamFormModal submit callback:
+   *   1. Create the team via DataContext (so the global list updates)
+   *   2. Auto-enrol it in the current tournament
+   *   3. Refresh the enrolled list + mirror into local allTeams so the
+   *      enrolment dropdown drops it right away.
+   * Errors are thrown so the modal stays open and shows the message.
+   */
+  const handleCreateAndEnrollTeam = async (team: Team) => {
+    if (!id) return;
+    const dto: CreateTeamDto = {
+      name: team.name,
+      initials: team.initials,
+      logo: team.logo,
+      primaryColor: team.colors.primary,
+      secondaryColor: team.colors.secondary,
+      city: team.city,
+      department: team.department,
+      category: team.category,
+    };
+    const created = await addTeam(dto);
+    await api.enrollTeam(id, created.id);
+    const updated = await api.getEnrolledTeams(id);
+    setEnrolledTeams(updated);
+    setAllTeams((prev) => (prev.some((t) => t.id === created.id) ? prev : [...prev, created]));
+    toast.success(`${created.name} creado e inscrito`);
   };
 
   const handleUnenroll = async (teamId: string) => {
@@ -822,13 +860,17 @@ export function AdminTournamentDetail() {
         {/* ── Equipos Tab ──────────────────────────────────────── */}
         <TabsContent value="teams">
           <SpkPanel title={`Equipos Inscritos (${enrolledTeams.length})`}>
-              {/* Enroll team control — stacks vertically on mobile so the
-                  select + button don't squeeze each other. */}
+              {/* Enrolment controls — two paths for registering a team:
+                  (A) pick one that already exists via the select, or
+                  (B) fire "Crear equipo nuevo" which opens the TeamFormModal
+                  and auto-enrols the result. Teams are no longer created
+                  from /admin/teams; they only live there for editing and
+                  roster management. */}
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
                 <div className="flex-1">
                   <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar equipo para inscribir..." />
+                      <SelectValue placeholder="Inscribir equipo existente..." />
                     </SelectTrigger>
                     <SelectContent>
                       {availableTeams.length === 0 ? (
@@ -856,7 +898,16 @@ export function AdminTournamentDetail() {
                   ) : (
                     <Plus className="w-4 h-4" />
                   )}
-                  Inscribir Equipo
+                  Inscribir
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setShowNewTeamModal(true)}
+                  variant="outline"
+                  className="w-full sm:w-auto flex-shrink-0 border-black/20 hover:bg-black/5"
+                >
+                  <Plus className="w-4 h-4" />
+                  Crear Equipo Nuevo
                 </Button>
               </div>
 
@@ -915,6 +966,15 @@ export function AdminTournamentDetail() {
                 </div>
               )}
           </SpkPanel>
+
+          {/* "Crear equipo nuevo" modal lives inside the Equipos tab so
+              the user stays in context. On success the team is both
+              registered globally and auto-enrolled in this tournament. */}
+          <TeamFormModal
+            isOpen={showNewTeamModal}
+            onClose={() => setShowNewTeamModal(false)}
+            onSubmit={handleCreateAndEnrollTeam}
+          />
         </TabsContent>
 
         {/* ── Cruces Tab ───────────────────────────────────────── */}
