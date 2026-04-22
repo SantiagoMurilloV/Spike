@@ -6,12 +6,14 @@ import {
   Check,
   X as XIcon,
   Edit3,
+  Pencil,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { api, type PlatformUser } from '../../services/api';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { CreateUserModal } from '../../components/super-admin/CreateUserModal';
+import { EditUserModal } from '../../components/super-admin/EditUserModal';
 import { useAuth } from '../../context/AuthContext';
 
 /**
@@ -27,6 +29,8 @@ export function SuperAdminUsers() {
   const [error, setError] = useState<string | null>(null);
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  /** Set when the super_admin clicks the pencil on a row. null = closed. */
+  const [editingUser, setEditingUser] = useState<PlatformUser | null>(null);
 
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -148,16 +152,9 @@ export function SuperAdminUsers() {
         </motion.button>
       </div>
 
-      {/* Users table */}
+      {/* Users table — no repeating "Usuarios" header, the page title
+          already reads USUARIOS. Count lives implicitly in the rows. */}
       <section className="bg-white border-2 border-black/10 rounded-sm overflow-hidden">
-        <div className="bg-black text-white px-4 sm:px-5 py-3">
-          <h2
-            className="font-bold uppercase text-sm sm:text-base"
-            style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
-          >
-            Usuarios ({users.length})
-          </h2>
-        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-black/5 border-b-2 border-black/10">
@@ -261,20 +258,31 @@ export function SuperAdminUsers() {
                       {parent ? parent.username : <span className="text-black/30">—</span>}
                     </Td>
                     <Td className="text-right">
-                      <button
-                        type="button"
-                        onClick={() => setPendingDeleteId(u.id)}
-                        disabled={deleting === u.id || isSelf}
-                        aria-label={`Eliminar ${u.username}`}
-                        title={isSelf ? 'No podés eliminarte a vos mismo' : 'Eliminar usuario'}
-                        className="p-2 bg-spk-red/10 text-spk-red rounded-sm hover:bg-spk-red/20 disabled:opacity-30 disabled:cursor-not-allowed"
-                      >
-                        {deleting === u.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </button>
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditingUser(u)}
+                          aria-label={`Editar ${u.username}`}
+                          title="Editar usuario y contraseña"
+                          className="p-2 bg-spk-blue/10 text-spk-blue rounded-sm hover:bg-spk-blue/20"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingDeleteId(u.id)}
+                          disabled={deleting === u.id || isSelf}
+                          aria-label={`Eliminar ${u.username}`}
+                          title={isSelf ? 'No podés eliminarte a vos mismo' : 'Eliminar usuario'}
+                          className="p-2 bg-spk-red/10 text-spk-red rounded-sm hover:bg-spk-red/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          {deleting === u.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </Td>
                   </tr>
                 );
@@ -289,6 +297,13 @@ export function SuperAdminUsers() {
         onClose={() => setCreateModalOpen(false)}
         onCreated={load}
         admins={admins}
+      />
+
+      <EditUserModal
+        isOpen={editingUser !== null}
+        user={editingUser}
+        onClose={() => setEditingUser(null)}
+        onSaved={load}
       />
 
       <ConfirmDialog

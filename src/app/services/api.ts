@@ -153,6 +153,8 @@ export interface UpdatePlatformUserDto {
   role?: 'super_admin' | 'admin' | 'judge';
   tournamentQuota?: number;
   displayName?: string;
+  username?: string;
+  password?: string;
 }
 
 // ── Backend response shapes (raw from API) ─────────────────────────

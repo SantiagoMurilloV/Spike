@@ -60,6 +60,10 @@ export interface UpdatePlatformUserDto {
   role?: 'super_admin' | 'admin' | 'judge';
   tournamentQuota?: number;
   displayName?: string;
+  /** Optional rename. Must still be 3+ chars and url-safe. */
+  username?: string;
+  /** Optional password reset. Must pass the same strength policy as create. */
+  password?: string;
 }
 
 function mapUser(row: Record<string, unknown>): PlatformUser {
@@ -205,6 +209,35 @@ export class PlatformService {
     if (data.displayName !== undefined) {
       fields.push(`display_name = $${idx}`);
       values.push(data.displayName?.trim() || null);
+      idx++;
+    }
+    if (data.username !== undefined) {
+      const username = data.username.trim();
+      if (username.length < 3) {
+        throw new ValidationError('El nombre de usuario debe tener al menos 3 caracteres');
+      }
+      if (!/^[a-zA-Z0-9._-]+$/.test(username)) {
+        throw new ValidationError(
+          'El nombre de usuario solo puede contener letras, números, puntos, guiones o guiones bajos',
+        );
+      }
+      // Uniqueness: make sure no OTHER user has this username already.
+      const dup = await pool.query(
+        'SELECT id FROM users WHERE LOWER(username) = LOWER($1) AND id != $2',
+        [username, id],
+      );
+      if (dup.rows.length > 0) {
+        throw new ValidationError('Ya existe un usuario con ese nombre');
+      }
+      fields.push(`username = $${idx}`);
+      values.push(username);
+      idx++;
+    }
+    if (data.password !== undefined && data.password !== '') {
+      validatePasswordStrength(data.password);
+      const hash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
+      fields.push(`password_hash = $${idx}`);
+      values.push(hash);
       idx++;
     }
 
