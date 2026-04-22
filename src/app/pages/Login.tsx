@@ -8,11 +8,12 @@ import { useData } from '../context/DataContext';
 import { ApiError } from '../services/api';
 
 /**
- * Map a user role to the landing page for that role so a judge doesn't end
- * up staring at the admin chrome. Falls back to /admin for any unknown role
- * (today only 'admin' and 'judge' are wired, but new roles default safely).
+ * Map a user role to the landing page for that role. Each role gets its
+ * own chrome: super_admin → platform console, admin → tournament admin,
+ * judge → live scoring. Unknown roles fall back to /admin.
  */
 function homeForRole(role: string | undefined): string {
+  if (role === 'super_admin') return '/super-admin';
   if (role === 'judge') return '/judge';
   return '/admin';
 }

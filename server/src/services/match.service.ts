@@ -89,9 +89,44 @@ function mapSetRow(row: Record<string, unknown>): SetScore {
   };
 }
 
+/**
+ * Context used when listing matches. Public + super_admin see everything;
+ * admins see matches of their own tournaments; judges see only LIVE
+ * matches from tournaments owned by the admin that created them.
+ */
+export type MatchListScope =
+  | { scope: 'all' }
+  | { scope: 'owner'; ownerId: string }
+  | { scope: 'judge'; judgeCreatedBy: string };
+
 export class MatchService {
-  async getAll(): Promise<Match[]> {
+  async getAll(scope: MatchListScope = { scope: 'all' }): Promise<Match[]> {
     const pool = getPool();
+    if (scope.scope === 'judge') {
+      // Judges see only live matches from tournaments owned by the admin
+      // who created them. The join with tournaments is how we enforce the
+      // cross-tenant isolation in a single query instead of two round-trips.
+      const result = await pool.query(
+        `SELECT m.* FROM matches m
+         JOIN tournaments t ON m.tournament_id = t.id
+         WHERE t.owner_id = $1 AND m.status = 'live'
+         ORDER BY m.date, m.time`,
+        [scope.judgeCreatedBy],
+      );
+      const matches = result.rows.map(mapRow);
+      return this.attachSets(matches);
+    }
+    if (scope.scope === 'owner') {
+      const result = await pool.query(
+        `SELECT m.* FROM matches m
+         JOIN tournaments t ON m.tournament_id = t.id
+         WHERE t.owner_id = $1
+         ORDER BY m.date, m.time`,
+        [scope.ownerId],
+      );
+      const matches = result.rows.map(mapRow);
+      return this.attachSets(matches);
+    }
     const result = await pool.query('SELECT * FROM matches ORDER BY date, time');
     const matches = result.rows.map(mapRow);
     return this.attachSets(matches);

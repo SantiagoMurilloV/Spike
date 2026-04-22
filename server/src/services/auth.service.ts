@@ -46,7 +46,7 @@ export class AuthService {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const pool = getPool();
     const result = await pool.query(
-      'SELECT id, username, password_hash, role FROM users WHERE username = $1',
+      'SELECT id, username, password_hash, role, created_by FROM users WHERE username = $1',
       [credentials.username],
     );
 
@@ -62,7 +62,13 @@ export class AuthService {
       throw new UnauthorizedError('Credenciales incorrectas');
     }
 
-    const payload = { userId: user.id, role: user.role };
+    // `createdBy` goes into the token so judge-scoped queries (live
+    // match feed) don't have to hit the users table on every request.
+    const payload = {
+      userId: user.id,
+      role: user.role,
+      createdBy: user.created_by ?? null,
+    };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRATION });
 
     return {

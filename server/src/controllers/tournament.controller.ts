@@ -6,10 +6,17 @@ import { bracketGenerator } from '../services/bracket.service';
 import { standingsCalculator } from '../services/standings.service';
 import { validateUUID } from '../middleware/validation';
 import { ValidationError } from '../middleware/errorHandler';
+import { optionalUser } from '../middleware/auth';
 
-export async function getAll(_req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const tournaments = await tournamentService.getAll();
+    // Scope by caller role:
+    //   · admin      → only their own tournaments (owner_id match)
+    //   · super_admin / public / judge → everything
+    const caller = optionalUser(req);
+    const tournaments = caller?.role === 'admin'
+      ? await tournamentService.getAll({ scope: 'owner', ownerId: caller.userId })
+      : await tournamentService.getAll({ scope: 'all' });
     res.json(tournaments);
   } catch (error) {
     next(error);
@@ -29,7 +36,15 @@ export async function getById(req: Request, res: Response, next: NextFunction): 
 
 export async function create(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const tournament = await tournamentService.create(req.body);
+    // Ownership comes from req.user (set by authMiddleware), never from
+    // the body — a malicious admin could otherwise assign tournaments to
+    // another tenant. super_admin creating a tournament gets null owner
+    // (platform-owned; visible to every super_admin, no quota).
+    let ownerId: string | null = null;
+    if (req.user?.role === 'admin') {
+      ownerId = req.user.userId;
+    }
+    const tournament = await tournamentService.create(req.body, ownerId);
     res.status(201).json(tournament);
   } catch (error) {
     next(error);

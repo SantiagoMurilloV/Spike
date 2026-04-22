@@ -10,7 +10,7 @@ interface ProtectedRouteProps {
    * (admins → /admin, judges → /judge) so they don't see someone else's
    * chrome.
    */
-  allowedRoles?: Array<'admin' | 'judge'>;
+  allowedRoles?: Array<'super_admin' | 'admin' | 'judge'>;
 }
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
@@ -34,12 +34,22 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && user && !allowedRoles.includes(user.role as 'admin' | 'judge')) {
+  if (
+    allowedRoles &&
+    user &&
+    !allowedRoles.includes(user.role as 'super_admin' | 'admin' | 'judge')
+  ) {
     // Wrong role → send them to their own home rather than showing a
-    // "not found" page. Admins land at /admin, judges at /judge, everyone
-    // else at /login (shouldn't happen but it's a safe fallback).
+    // "not found" page. super_admins land at /super-admin, admins at
+    // /admin, judges at /judge, anyone else at /login.
     const fallback =
-      user.role === 'admin' ? '/admin' : user.role === 'judge' ? '/judge' : '/login';
+      user.role === 'super_admin'
+        ? '/super-admin'
+        : user.role === 'admin'
+          ? '/admin'
+          : user.role === 'judge'
+            ? '/judge'
+            : '/login';
     return <Navigate to={fallback} replace />;
   }
 

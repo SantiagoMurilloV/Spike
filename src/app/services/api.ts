@@ -111,6 +111,46 @@ export interface Judge {
   updatedAt?: string;
 }
 
+// ── Platform (super_admin) ────────────────────────────────────────
+
+export interface PlatformStats {
+  tournaments: number;
+  teams: number;
+  players: number;
+  users: {
+    super_admin: number;
+    admin: number;
+    judge: number;
+    total: number;
+  };
+}
+
+export interface PlatformUser {
+  id: string;
+  username: string;
+  role: string;
+  displayName?: string;
+  tournamentQuota: number;
+  createdBy?: string | null;
+  ownedTournamentsCount: number;
+  createdAt?: string;
+}
+
+export interface CreatePlatformUserDto {
+  username: string;
+  password: string;
+  role: 'super_admin' | 'admin' | 'judge';
+  displayName?: string;
+  tournamentQuota?: number;
+  createdBy?: string | null;
+}
+
+export interface UpdatePlatformUserDto {
+  role?: 'super_admin' | 'admin' | 'judge';
+  tournamentQuota?: number;
+  displayName?: string;
+}
+
 // ── Backend response shapes (raw from API) ─────────────────────────
 
 interface BackendTeam {
@@ -141,6 +181,7 @@ interface BackendTournament {
   courts: string[];
   courtLocations?: Record<string, string>;
   categories?: string[];
+  ownerId?: string;
 }
 
 interface BackendEnrolledTeam {
@@ -347,6 +388,7 @@ function toFrontendTournament(t: BackendTournament): Tournament {
     courts: t.courts ?? [],
     courtLocations: t.courtLocations ?? {},
     categories: t.categories ?? [],
+    ownerId: t.ownerId,
   };
 }
 
@@ -814,5 +856,32 @@ export const api = {
       },
     );
     return raw.bracketMatches.map(toFrontendBracketMatch);
+  },
+
+  // ── Platform (super_admin only) ────────────────────────────────
+  async getPlatformStats(): Promise<PlatformStats> {
+    return request<PlatformStats>('/platform/stats');
+  },
+
+  async listPlatformUsers(): Promise<PlatformUser[]> {
+    return request<PlatformUser[]>('/platform/users');
+  },
+
+  async createPlatformUser(dto: CreatePlatformUserDto): Promise<PlatformUser> {
+    return request<PlatformUser>('/platform/users', {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    });
+  },
+
+  async updatePlatformUser(id: string, dto: UpdatePlatformUserDto): Promise<PlatformUser> {
+    return request<PlatformUser>(`/platform/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(dto),
+    });
+  },
+
+  async deletePlatformUser(id: string): Promise<void> {
+    await request<void>(`/platform/users/${id}`, { method: 'DELETE' });
   },
 };

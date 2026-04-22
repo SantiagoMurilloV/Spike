@@ -97,6 +97,9 @@ export interface Tournament {
    * `category` matches one of these values. Empty / undefined → no filter.
    */
   categories?: string[];
+  /** UUID of the admin (tenant) that owns this tournament. Null for legacy
+   *  or platform-owned tournaments. */
+  ownerId?: string;
 }
 
 export interface BracketMatch {

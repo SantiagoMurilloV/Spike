@@ -21,6 +21,12 @@ export interface Tournament {
    * omitted means "no filter" — every team is enrollable.
    */
   categories?: string[];
+  /**
+   * UUID of the admin (tenant) that owns this tournament. NULL means
+   * the row predates multitenancy or was created by a super_admin
+   * without assigning an owner. Drives admin-dashboard scoping.
+   */
+  ownerId?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -179,11 +185,16 @@ export interface ScoreUpdate {
 
 // === Auth ===
 
-export type AppRole = 'admin' | 'judge';
+export type AppRole = 'super_admin' | 'admin' | 'judge';
 
 export interface JwtPayload {
   userId: string;
   role: AppRole | string;
+  /**
+   * For judges: the admin (userId) that created this account — used to
+   * scope their match feed. Null for admins / super_admins.
+   */
+  createdBy?: string | null;
   iat: number;
   exp: number;
 }

@@ -3,12 +3,14 @@ import { userService } from '../services/user.service';
 import { validateUUID } from '../middleware/validation';
 
 export async function listJudges(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
-    const judges = await userService.listJudges();
+    // Admins see only the judges they created; super_admin sees all.
+    const createdBy = req.user?.role === 'admin' ? req.user.userId : undefined;
+    const judges = await userService.listJudges(createdBy);
     res.json(judges);
   } catch (error) {
     next(error);
@@ -21,7 +23,11 @@ export async function createJudge(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const judge = await userService.createJudge(req.body);
+    // Admin-created judges are tied to that admin so they only see
+    // matches of that admin's tournaments. super_admin creates unscoped
+    // (platform) judges by default.
+    const createdBy = req.user?.role === 'admin' ? req.user.userId : null;
+    const judge = await userService.createJudge(req.body, createdBy);
     res.status(201).json(judge);
   } catch (error) {
     next(error);

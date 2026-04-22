@@ -38,9 +38,23 @@ function mapUserRow(row: Record<string, unknown>): AppUser {
 }
 
 export class UserService {
-  /** Return every user with the 'judge' role, newest first. */
-  async listJudges(): Promise<AppUser[]> {
+  /**
+   * Return judges. If `createdBy` is set we only return judges that were
+   * created by that admin — that's how the admin dashboard lists "my
+   * judges" instead of every judge on the platform.
+   */
+  async listJudges(createdBy?: string): Promise<AppUser[]> {
     const pool = getPool();
+    if (createdBy) {
+      const result = await pool.query(
+        `SELECT id, username, role, display_name, created_at, updated_at
+         FROM users
+         WHERE role = 'judge' AND created_by = $1
+         ORDER BY created_at DESC`,
+        [createdBy],
+      );
+      return result.rows.map(mapUserRow);
+    }
     const result = await pool.query(
       `SELECT id, username, role, display_name, created_at, updated_at
        FROM users
@@ -50,8 +64,13 @@ export class UserService {
     return result.rows.map(mapUserRow);
   }
 
-  /** Create a new judge user with bcrypt-hashed password. */
-  async createJudge(data: CreateJudgeDto): Promise<AppUser> {
+  /**
+   * Create a new judge. `createdBy` is set by the controller from
+   * `req.user.userId` when an admin creates the judge — that's what
+   * scopes the judge's match feed to only the admin's tournaments.
+   * super_admin can pass null (platform-wide judge).
+   */
+  async createJudge(data: CreateJudgeDto, createdBy: string | null = null): Promise<AppUser> {
     const username = (data.username || '').trim();
     const password = data.password || '';
     const displayName = data.displayName?.trim() || null;
@@ -80,10 +99,10 @@ export class UserService {
 
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const result = await pool.query(
-      `INSERT INTO users (username, password_hash, role, display_name)
-       VALUES ($1, $2, 'judge', $3)
+      `INSERT INTO users (username, password_hash, role, display_name, created_by)
+       VALUES ($1, $2, 'judge', $3, $4)
        RETURNING id, username, role, display_name, created_at, updated_at`,
-      [username, hash, displayName],
+      [username, hash, displayName, createdBy],
     );
     return mapUserRow(result.rows[0]);
   }

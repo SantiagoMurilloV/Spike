@@ -8,6 +8,7 @@ import fs from 'fs';
 import multer from 'multer';
 import { checkConnection, runMigrations } from './config/database';
 import { ensureReady as ensurePushReady } from './services/push.service';
+import { ensureSuperAdmin } from './services/platformBootstrap';
 import { errorHandler } from './middleware/errorHandler';
 import { authMiddleware } from './middleware/auth';
 import authRoutes from './routes/auth.routes';
@@ -18,6 +19,7 @@ import settingsRoutes from './routes/settings.routes';
 import userRoutes from './routes/user.routes';
 import pushRoutes from './routes/push.routes';
 import adminRoutes from './routes/admin.routes';
+import platformRoutes from './routes/platform.routes';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
@@ -209,6 +211,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/platform', platformRoutes);
 
 // Error handler — must be last. Registering it up here (outside startServer)
 // ensures it catches errors even if boot-time migration fails.
@@ -227,6 +230,9 @@ async function startServer() {
       // app_config exists. Safe to call before any request comes in;
       // getVapidPublicKey() / sendToAll() use the cached pair.
       await ensurePushReady();
+      // Bootstrap the platform owner account so /super-admin/* works on
+      // first boot without manual SQL. Idempotent.
+      await ensureSuperAdmin();
     }
   } catch (error) {
     console.error('Error durante la inicialización de la base de datos:', error);

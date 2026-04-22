@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { Layout } from './components/Layout';
 import { AdminLayout } from './components/AdminLayout';
 import { JudgeLayout } from './components/JudgeLayout';
+import { SuperAdminLayout } from './components/SuperAdminLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 // Keep Home eager: it's the landing page and already critical-path.
@@ -45,6 +46,12 @@ const AdminTournamentDetail = lazy(() =>
 
 const JudgeDashboard = lazy(() =>
   import('./pages/judge/JudgeDashboard').then((m) => ({ default: m.JudgeDashboard })),
+);
+
+const SuperAdminDashboard = lazy(() =>
+  import('./pages/super-admin/SuperAdminDashboard').then((m) => ({
+    default: m.SuperAdminDashboard,
+  })),
 );
 
 // RefereeScore is the live-scoring console. ONLY judges can open it — admins
@@ -128,5 +135,17 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [{ index: true, element: withSuspense(<JudgeDashboard />) }],
+  },
+  {
+    // Platform-level console. Only the super_admin(s) can reach this.
+    // AdminLayout + AdminDashboard stay untouched; this is a parallel
+    // control plane for tenant management + global stats.
+    path: '/super-admin',
+    element: (
+      <ProtectedRoute allowedRoles={['super_admin']}>
+        <SuperAdminLayout />
+      </ProtectedRoute>
+    ),
+    children: [{ index: true, element: withSuspense(<SuperAdminDashboard />) }],
   },
 ]);

@@ -8,8 +8,18 @@ import {
   StandingsRow,
   BracketMatch,
 } from '../types';
-import { NotFoundError } from '../middleware/errorHandler';
+import { NotFoundError, ValidationError } from '../middleware/errorHandler';
 import { validate, validateDateRange } from '../middleware/validation';
+
+/**
+ * Context for listing tournaments. Matches caller roles:
+ *   · public (no token)  → { scope: 'all' }
+ *   · admin              → { scope: 'owner', ownerId: userId }
+ *   · super_admin        → { scope: 'all' }
+ */
+export type ListScope =
+  | { scope: 'all' }
+  | { scope: 'owner'; ownerId: string };
 
 function mapRow(row: Record<string, unknown>): Tournament {
   // court_locations may come as object (jsonb parsed by pg) or null/undefined
@@ -30,6 +40,7 @@ function mapRow(row: Record<string, unknown>): Tournament {
     courts: row.courts as string[],
     courtLocations: rawLocations && typeof rawLocations === 'object' ? rawLocations : {},
     categories: (row.categories as string[] | null | undefined) ?? [],
+    ownerId: (row.owner_id as string | null) ?? undefined,
     createdAt: row.created_at as string | undefined,
     updatedAt: row.updated_at as string | undefined,
   };
@@ -104,10 +115,22 @@ function mapBracketRow(row: Record<string, unknown>): BracketMatch {
 }
 
 export class TournamentService {
-  async getAll(): Promise<Tournament[]> {
+  /**
+   * List tournaments filtered by the caller's scope.
+   *   · `{ scope: 'all' }`            → every tournament (public pages + super_admin)
+   *   · `{ scope: 'owner', ownerId }` → only rows belonging to that admin
+   */
+  async getAll(scope: ListScope = { scope: 'all' }): Promise<Tournament[]> {
     const pool = getPool();
+    if (scope.scope === 'owner') {
+      const result = await pool.query(
+        'SELECT * FROM tournaments WHERE owner_id = $1 ORDER BY start_date DESC',
+        [scope.ownerId],
+      );
+      return result.rows.map(mapRow);
+    }
     const result = await pool.query(
-      'SELECT * FROM tournaments ORDER BY start_date DESC'
+      'SELECT * FROM tournaments ORDER BY start_date DESC',
     );
     return result.rows.map(mapRow);
   }
@@ -121,12 +144,51 @@ export class TournamentService {
     return mapRow(result.rows[0]);
   }
 
-  async create(data: CreateTournamentDto): Promise<Tournament> {
+  /**
+   * Enforce the admin's tournament creation cap. No-op for super_admin or
+   * when ownerId is null (legacy / platform-owned). Throws a ValidationError
+   * with a human-readable message so the frontend can surface it directly.
+   */
+  async assertQuota(ownerId: string | null): Promise<void> {
+    if (!ownerId) return;
+    const pool = getPool();
+    const userResult = await pool.query(
+      'SELECT role, tournament_quota FROM users WHERE id = $1',
+      [ownerId],
+    );
+    if (userResult.rows.length === 0) return;
+    const user = userResult.rows[0] as { role: string; tournament_quota: number };
+    if (user.role !== 'admin') return; // super_admin has no quota
+    const countResult = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM tournaments WHERE owner_id = $1',
+      [ownerId],
+    );
+    const n = (countResult.rows[0] as { n: number }).n;
+    if (n >= user.tournament_quota) {
+      throw new ValidationError(
+        `Alcanzaste el límite de tu plan (${user.tournament_quota} torneo${
+          user.tournament_quota === 1 ? '' : 's'
+        }). Contactá al super administrador para ampliarlo.`,
+      );
+    }
+  }
+
+  /**
+   * Create a tournament. `ownerId` is set by the controller from
+   * `req.user` — never trust a client-provided value — so admins can only
+   * ever create tournaments under their own name. Super_admin may pass
+   * null (platform-owned).
+   */
+  async create(
+    data: CreateTournamentDto,
+    ownerId: string | null = null,
+  ): Promise<Tournament> {
     this.validateData(data);
+    await this.assertQuota(ownerId);
     const pool = getPool();
     const result = await pool.query(
-      `INSERT INTO tournaments (name, sport, club, start_date, end_date, description, cover_image, logo, status, teams_count, format, courts, court_locations, categories)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      `INSERT INTO tournaments (name, sport, club, start_date, end_date, description, cover_image, logo, status, teams_count, format, courts, court_locations, categories, owner_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING *`,
       [
         data.name,
@@ -143,7 +205,8 @@ export class TournamentService {
         data.courts || [],
         JSON.stringify(data.courtLocations || {}),
         data.categories ?? [],
-      ]
+        ownerId,
+      ],
     );
     return mapRow(result.rows[0]);
   }

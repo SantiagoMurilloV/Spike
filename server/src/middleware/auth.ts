@@ -3,6 +3,26 @@ import { authService } from '../services/auth.service';
 import { isRevoked } from '../services/tokenBlacklist';
 import { JwtPayload } from '../types';
 
+/**
+ * Best-effort decode of the Authorization header for public endpoints
+ * that need to scope their response by role (e.g. GET /tournaments
+ * returns every tournament to anonymous spectators but only the caller's
+ * own tournaments to an authenticated admin). Returns null when there's
+ * no token, it's revoked, or it fails to verify — never throws so
+ * callers can `??`/`?.` freely.
+ */
+export function optionalUser(req: Request): JwtPayload | null {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const token = authHeader.substring(7);
+  if (isRevoked(token)) return null;
+  try {
+    return authService.verifyToken(token);
+  } catch {
+    return null;
+  }
+}
+
 // Extend Express Request to include user
 declare global {
   namespace Express {
