@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { getPool } from '../config/database';
 import { JwtPayload, LoginRequest, LoginResponse } from '../types';
 import { UnauthorizedError } from '../middleware/errorHandler';
+import { BCRYPT_ROUNDS, validatePasswordStrength } from './password';
 
 // JWT_SECRET is required in production. A weak fallback is only allowed in dev/test.
 function resolveJwtSecret(): string {
@@ -25,24 +26,39 @@ function resolveJwtSecret(): string {
 
 const JWT_SECRET = resolveJwtSecret();
 const JWT_EXPIRATION = '24h';
-const BCRYPT_ROUNDS = 10;
+
+/**
+ * Dummy bcrypt hash used to equalize timing on login when the username
+ * doesn't exist. Without this, a missing user returns ~1 ms while a
+ * wrong password takes ~150 ms (bcrypt.compare), which leaks username
+ * existence via response-time side channel. Running a fake compare
+ * against a constant hash makes both paths take the same time.
+ *
+ * The plaintext "never-matches" is irrelevant — this is only used as
+ * the haystack for bcrypt.compare with whatever the attacker sent.
+ */
+const DUMMY_BCRYPT_HASH = bcrypt.hashSync(
+  'spkcup-timing-equalizer-never-matches',
+  10,
+);
 
 export class AuthService {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const pool = getPool();
     const result = await pool.query(
       'SELECT id, username, password_hash, role FROM users WHERE username = $1',
-      [credentials.username]
+      [credentials.username],
     );
 
-    if (result.rows.length === 0) {
-      throw new UnauthorizedError('Credenciales incorrectas');
-    }
-
+    // Constant-time path: always run bcrypt.compare() once, regardless of
+    // whether the user exists. Otherwise a "user not found" shortcut
+    // returns in ~1 ms vs ~150 ms for a wrong password, which leaks
+    // username enumeration through timing.
     const user = result.rows[0];
-    const validPassword = await bcrypt.compare(credentials.password, user.password_hash);
+    const hashToCheck = user?.password_hash ?? DUMMY_BCRYPT_HASH;
+    const validPassword = await bcrypt.compare(credentials.password, hashToCheck);
 
-    if (!validPassword) {
+    if (!user || !validPassword) {
       throw new UnauthorizedError('Credenciales incorrectas');
     }
 
@@ -55,12 +71,35 @@ export class AuthService {
     };
   }
 
-  async changePassword(userId: string, newPassword: string): Promise<void> {
+  /**
+   * Change the password of the currently authenticated user. Requires the
+   * caller to confirm their current password so a stolen JWT alone cannot
+   * lock out the real owner.
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    validatePasswordStrength(newPassword, 'nueva contraseña');
+
     const pool = getPool();
+    const result = await pool.query(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [userId],
+    );
+    if (result.rows.length === 0) {
+      throw new UnauthorizedError('Usuario no encontrado');
+    }
+    const valid = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
+    if (!valid) {
+      throw new UnauthorizedError('Contraseña actual incorrecta');
+    }
+
     const hash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
     await pool.query(
       'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
-      [hash, userId]
+      [hash, userId],
     );
   }
 

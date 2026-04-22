@@ -442,10 +442,10 @@ export const api = {
     await request<void>('/auth/logout', { method: 'POST' });
   },
 
-  async changePassword(newPassword: string): Promise<void> {
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
     await request<void>('/auth/password', {
       method: 'PUT',
-      body: JSON.stringify({ newPassword }),
+      body: JSON.stringify({ currentPassword, newPassword }),
     });
   },
 

@@ -4,6 +4,7 @@ import {
   NotFoundError,
   ValidationError,
 } from '../middleware/errorHandler';
+import { BCRYPT_ROUNDS, validatePasswordStrength } from './password';
 
 /**
  * App user. Today we have two roles:
@@ -24,8 +25,6 @@ export interface CreateJudgeDto {
   password: string;
   displayName?: string;
 }
-
-const BCRYPT_ROUNDS = 10;
 
 function mapUserRow(row: Record<string, unknown>): AppUser {
   return {
@@ -65,9 +64,7 @@ export class UserService {
         'El nombre de usuario solo puede contener letras, números, puntos, guiones o guiones bajos',
       );
     }
-    if (password.length < 6) {
-      throw new ValidationError('La contraseña debe tener al menos 6 caracteres');
-    }
+    validatePasswordStrength(password);
 
     const pool = getPool();
 
@@ -107,9 +104,7 @@ export class UserService {
 
   /** Reset a judge's password. Admin-only recovery flow. */
   async resetJudgePassword(id: string, newPassword: string): Promise<void> {
-    if ((newPassword || '').length < 6) {
-      throw new ValidationError('La contraseña debe tener al menos 6 caracteres');
-    }
+    validatePasswordStrength(newPassword);
     const pool = getPool();
     const result = await pool.query('SELECT id, role FROM users WHERE id = $1', [id]);
     if (result.rows.length === 0) {

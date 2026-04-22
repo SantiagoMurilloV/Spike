@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/auth.service';
 import { ValidationError } from '../middleware/errorHandler';
+import { loginRateLimiter } from '../middleware/rateLimit';
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -11,6 +12,10 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     }
 
     const result = await authService.login({ username, password });
+    // Success — reset this user's rate-limit bucket so five legitimate
+    // logins in a session (e.g. admin testing judge accounts) don't lock
+    // them out. Failed attempts still accumulate.
+    loginRateLimiter.clear(req);
     res.json(result);
   } catch (error) {
     next(error);
@@ -24,14 +29,18 @@ export async function logout(_req: Request, res: Response): Promise<void> {
 
 export async function changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { newPassword } = req.body;
+    const { currentPassword, newPassword } = req.body;
 
-    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
-      throw new ValidationError('La nueva contraseña debe tener al menos 6 caracteres');
+    if (!currentPassword || typeof currentPassword !== 'string') {
+      throw new ValidationError('La contraseña actual es requerida');
+    }
+    if (!newPassword || typeof newPassword !== 'string') {
+      throw new ValidationError('La nueva contraseña es requerida');
     }
 
     const userId = req.user!.userId;
-    await authService.changePassword(userId, newPassword);
+    // auth.service validates strength + checks current password
+    await authService.changePassword(userId, currentPassword, newPassword);
     res.json({ message: 'Contraseña actualizada exitosamente' });
   } catch (error) {
     next(error);
