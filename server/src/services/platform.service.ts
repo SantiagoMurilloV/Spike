@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import { getPool } from '../config/database';
 import { NotFoundError, ValidationError } from '../middleware/errorHandler';
 import { BCRYPT_ROUNDS, validatePasswordStrength } from './password';
+import { getPresence } from './presence';
 
 /**
  * Super-admin platform operations. Everything here is gated behind
@@ -19,6 +20,18 @@ export interface PlatformStats {
     admin: number;
     judge: number;
     total: number;
+  };
+  /**
+   * Live-presence counters, computed from the in-memory presence tracker
+   * (services/presence.ts). Both cover roughly the last 5 minutes.
+   *
+   *   · activeUsers    — logged-in users that made a request recently
+   *   · activeVisitors — total unique (ip+user-agent) fingerprints
+   *                      including anonymous visitors
+   */
+  presence: {
+    activeUsers: number;
+    activeVisitors: number;
   };
 }
 
@@ -92,6 +105,7 @@ export class PlatformService {
         judge: r.judge,
         total: r.super_admin + r.admin + r.judge,
       },
+      presence: getPresence(),
     };
   }
 

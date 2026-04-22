@@ -53,6 +53,11 @@ const SuperAdminDashboard = lazy(() =>
     default: m.SuperAdminDashboard,
   })),
 );
+const SuperAdminUsers = lazy(() =>
+  import('./pages/super-admin/SuperAdminUsers').then((m) => ({
+    default: m.SuperAdminUsers,
+  })),
+);
 
 // RefereeScore is the live-scoring console. ONLY judges can open it — admins
 // use the match-edit form for corrections. Keeping the /admin/referee path
@@ -146,6 +151,9 @@ export const router = createBrowserRouter([
         <SuperAdminLayout />
       </ProtectedRoute>
     ),
-    children: [{ index: true, element: withSuspense(<SuperAdminDashboard />) }],
+    children: [
+      { index: true, element: withSuspense(<SuperAdminDashboard />) },
+      { path: 'users', element: withSuspense(<SuperAdminUsers />) },
+    ],
   },
 ]);

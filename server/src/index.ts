@@ -9,6 +9,7 @@ import multer from 'multer';
 import { checkConnection, runMigrations } from './config/database';
 import { ensureReady as ensurePushReady } from './services/push.service';
 import { ensureSuperAdmin } from './services/platformBootstrap';
+import { touchUser, touchVisitor } from './services/presence';
 import { errorHandler } from './middleware/errorHandler';
 import { authMiddleware } from './middleware/auth';
 import authRoutes from './routes/auth.routes';
@@ -67,8 +68,23 @@ app.use(cors(corsOptions));
 // other fields).
 app.use(express.json({ limit: '20mb' }));
 
+// Presence tracking — counts anonymous visitors (fingerprint by
+// IP+UA) on every request, and authed users once the auth middleware
+// resolves req.user. Feeds the super-admin dashboard's "activos" counters.
+app.use((req, _res, next) => {
+  // Skip health checks so Railway uptime pings don't inflate the count.
+  if (req.path !== '/api/health') touchVisitor(req);
+  next();
+});
+
 // Auth middleware — protects POST/PUT/DELETE (except login)
 app.use(authMiddleware);
+
+// Mark authed users active AFTER authMiddleware has populated req.user.
+app.use((req, _res, next) => {
+  if (req.user?.userId) touchUser(req.user.userId);
+  next();
+});
 
 // Health check
 app.get('/api/health', (_req, res) => {

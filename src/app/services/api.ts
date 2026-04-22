@@ -123,6 +123,10 @@ export interface PlatformStats {
     judge: number;
     total: number;
   };
+  presence: {
+    activeUsers: number;
+    activeVisitors: number;
+  };
 }
 
 export interface PlatformUser {
