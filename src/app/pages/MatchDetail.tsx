@@ -14,23 +14,38 @@ export function MatchDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadMatch = async () => {
+  const loadMatch = async (options: { silent?: boolean } = {}) => {
     if (!id) return;
-    setLoading(true);
-    setError(null);
+    if (!options.silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const data = await api.getMatch(id);
       setMatch(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar el partido');
+      if (!options.silent) {
+        setError(err instanceof Error ? err.message : 'Error al cargar el partido');
+      }
     } finally {
-      setLoading(false);
+      if (!options.silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadMatch();
   }, [id]);
+
+  // Auto-refresh while the match is live so spectators don't have to pull
+  // to refresh. 4s is snappy enough that a rally-by-rally audience sees
+  // the score move shortly after the judge scores it, and cheap enough
+  // that we're not hammering the backend.
+  useEffect(() => {
+    if (!match || match.status !== 'live') return;
+    const interval = setInterval(() => loadMatch({ silent: true }), 4000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [match?.status, id]);
 
   if (loading) {
     return (
@@ -93,6 +108,25 @@ export function MatchDetail() {
 
   const isLive = match.status === 'live';
   const isCompleted = match.status === 'completed';
+
+  // Public scoreboard numbers.
+  //
+  // Historically the big headline number was `match.score.team1/2` —
+  // which actually stores SETS WON, not points. So a match at 18-15 in
+  // Set 1 looked like "0-0" to the public. Now that RefereeScore
+  // persists the in-progress set, we can show live POINTS as the
+  // hero and relegate the sets-won tally to a smaller line.
+  //
+  //   • live   → big = current set points (last entry in match.sets)
+  //   • done   → big = sets won (classic final-score look)
+  //   • upcoming → VS placeholder
+  const setsWonH = match.sets?.filter((s) => s.team1 > s.team2).length ?? 0;
+  const setsWonA = match.sets?.filter((s) => s.team2 > s.team1).length ?? 0;
+  const liveSet = match.sets?.[match.sets.length - 1];
+  const liveCurrentSetNumber = match.sets?.length ?? 1;
+  const bigScoreH = isLive ? liveSet?.team1 ?? 0 : setsWonH;
+  const bigScoreA = isLive ? liveSet?.team2 ?? 0 : setsWonA;
+  const hasAnyScore = isLive || isCompleted;
 
   return (
     <div className="min-h-screen bg-white">
@@ -175,39 +209,66 @@ export function MatchDetail() {
                 </h2>
               </div>
 
-              {/* Score */}
+              {/* Score — big number is live set points while the match is
+                  in progress, and sets-won once it's finalized. */}
               <div className="text-center flex-shrink-0">
-                {match.score ? (
-                  <div className="flex items-center gap-2 sm:gap-4 md:gap-6">
-                    <motion.div
-                      className="text-4xl sm:text-6xl md:text-8xl font-bold text-white"
-                      style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ duration: 0.5, delay: 0.2 }}
-                    >
-                      {match.score.team1}
-                    </motion.div>
-                    <div className="text-2xl sm:text-4xl md:text-5xl text-white/50 font-bold">-</div>
-                    <motion.div
-                      className="text-4xl sm:text-6xl md:text-8xl font-bold text-white"
-                      style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ duration: 0.5, delay: 0.3 }}
-                    >
-                      {match.score.team2}
-                    </motion.div>
-                  </div>
+                {hasAnyScore ? (
+                  <>
+                    <div className="flex items-center gap-2 sm:gap-4 md:gap-6">
+                      <motion.div
+                        key={`h-${bigScoreH}`}
+                        className="text-5xl sm:text-7xl md:text-8xl font-bold text-white tabular-nums"
+                        style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.04em' }}
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ duration: 0.4, delay: 0.2 }}
+                      >
+                        {bigScoreH}
+                      </motion.div>
+                      <div className="text-2xl sm:text-4xl md:text-5xl text-white/50 font-bold">-</div>
+                      <motion.div
+                        key={`a-${bigScoreA}`}
+                        className="text-5xl sm:text-7xl md:text-8xl font-bold text-white tabular-nums"
+                        style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.04em' }}
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ duration: 0.4, delay: 0.3 }}
+                      >
+                        {bigScoreA}
+                      </motion.div>
+                    </div>
+                    {/* Secondary readout: during a live match this is the
+                        sets-won tally (so the public still knows the big
+                        score is set points, not the match). For completed
+                        matches we swap and show the final set-by-set list. */}
+                    {isLive && (
+                      <div
+                        className="mt-2 text-[11px] sm:text-xs uppercase text-white/75 tracking-[0.2em] font-bold"
+                        style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                      >
+                        Puntos · Set {liveCurrentSetNumber}
+                        <span className="mx-2 text-white/40">·</span>
+                        Sets ganados {setsWonH}–{setsWonA}
+                      </div>
+                    )}
+                    {isCompleted && (
+                      <div
+                        className="mt-2 text-[11px] sm:text-xs uppercase text-white/75 tracking-[0.2em] font-bold"
+                        style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                      >
+                        Sets ganados
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="text-3xl sm:text-4xl md:text-5xl text-white/80 font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
                     VS
                   </div>
                 )}
-                
+
                 {/* Live Badge */}
                 {isLive && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.5 }}
