@@ -1,12 +1,12 @@
-import { Plus, Search, Filter, Edit, Trash2, Eye, Users, Calendar, Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { Plus, Search, Filter, Edit, Trash2, Eye, Users, Calendar, Loader2, Lock } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useData } from '../../context/DataContext';
 import { TournamentFormModal } from '../../components/admin/TournamentFormModal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Tournament } from '../../types';
-import type { CreateTournamentDto, UpdateTournamentDto } from '../../services/api';
+import { api, type CreateTournamentDto, type UpdateTournamentDto } from '../../services/api';
 import { tournamentStatusColor, tournamentStatusLabel } from '../../lib/status';
 
 export function AdminTournaments() {
@@ -17,6 +17,30 @@ export function AdminTournaments() {
   const [editingTournament, setEditingTournament] = useState<Tournament | undefined>();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  // Quota from /auth/me — drives the "X/Y torneos de tu plan" badge and
+  // the disabled state on the Create Tournament button.
+  const [quota, setQuota] = useState<{ used: number; cap: number } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getMe()
+      .then((me) => {
+        if (cancelled) return;
+        setQuota({
+          used: me.ownedTournamentsCount,
+          cap: me.tournamentQuota,
+        });
+      })
+      .catch(() => {
+        // Silently ignore — quota is informational; creation is still
+        // server-enforced so the user gets a toast if they overflow.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tournaments.length]);
+
+  const atCap = quota !== null && quota.used >= quota.cap;
 
   const filteredTournaments = tournaments.filter(t =>
     t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -129,13 +153,33 @@ export function AdminTournaments() {
           </h1>
           <p className="text-black/60">
             Crea y administra los torneos del sistema
+            {quota && (
+              <>
+                {' · '}
+                <span className={atCap ? 'text-spk-red font-bold' : 'text-black/70 font-bold'}>
+                  {quota.used} / {quota.cap} torneos de tu plan
+                </span>
+              </>
+            )}
           </p>
         </div>
         <button
-          onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-spk-red text-white hover:bg-spk-red-dark rounded-sm transition-colors font-medium"
+          onClick={() => {
+            if (atCap) {
+              toast.error(
+                `Alcanzaste el límite de ${quota!.cap} torneo${
+                  quota!.cap === 1 ? '' : 's'
+                } de tu plan. Contactá al super administrador para ampliarlo.`,
+              );
+              return;
+            }
+            handleCreate();
+          }}
+          disabled={atCap}
+          className="flex items-center gap-2 px-4 py-2 bg-spk-red text-white hover:bg-spk-red-dark rounded-sm transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          title={atCap ? 'Plan al tope — no podés crear más torneos' : undefined}
         >
-          <Plus className="w-4 h-4" />
+          {atCap ? <Lock className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           <span style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.05em' }} className="uppercase font-bold">Crear Torneo</span>
         </button>
       </div>

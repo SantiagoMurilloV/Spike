@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
-  Users,
   Trophy,
+  Users,
+  UserCog,
   Shield,
-  UserPlus,
+  Plus,
   Trash2,
   Loader2,
-  RefreshCw,
-  Pencil,
-  X,
+  Check,
+  X as XIcon,
+  Edit3,
 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import {
   api,
@@ -19,96 +21,153 @@ import {
   type CreatePlatformUserDto,
 } from '../../services/api';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { useAuth } from '../../context/AuthContext';
 
 /**
- * Super-admin platform console. Shows the 3 global counters (tournaments,
- * teams, users by role) and a users table with inline role + quota editing
- * and a create / delete flow.
- *
- * Everything here goes through `/api/platform/*` endpoints which are
- * gated by `requireRole('super_admin')` on the backend. A regular admin
- * who somehow lands here gets 401s and sees an error state.
+ * Super-admin dashboard: platform rollups + full user CRUD. One page,
+ * everything above the fold on desktop. Create form at the top, user
+ * table below, inline quota editing per admin row.
  */
 export function SuperAdminDashboard() {
+  const { user: currentUser } = useAuth();
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [users, setUsers] = useState<PlatformUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<PlatformUser | null>(null);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
-  const reload = useCallback(async () => {
+  // Create form
+  const [form, setForm] = useState<CreatePlatformUserDto>({
+    username: '',
+    password: '',
+    role: 'admin',
+    displayName: '',
+    tournamentQuota: 1,
+    createdBy: null,
+  });
+  const [creating, setCreating] = useState(false);
+
+  // Delete dialog
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  // Quota editing
+  const [quotaDraft, setQuotaDraft] = useState<Record<string, string>>({});
+  const [quotaSaving, setQuotaSaving] = useState<string | null>(null);
+
+  const loadEverything = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [s, u] = await Promise.all([api.getPlatformStats(), api.listPlatformUsers()]);
+      const [s, u] = await Promise.all([
+        api.getPlatformStats(),
+        api.listPlatformUsers(),
+      ]);
       setStats(s);
       setUsers(u);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar la plataforma');
+      setError(err instanceof Error ? err.message : 'Error al cargar datos');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    reload();
-  }, [reload]);
+    loadEverything();
+  }, [loadEverything]);
 
-  const admins = useMemo(() => users.filter((u) => u.role === 'admin'), [users]);
-
-  const handleCreate = async (dto: CreatePlatformUserDto) => {
-    const created = await api.createPlatformUser(dto);
-    setUsers((prev) => [created, ...prev]);
-    reload(); // refresh stats too
-    toast.success('Usuario creado');
-  };
-
-  const handleUpdate = async (
-    id: string,
-    patch: { role?: PlatformUser['role']; tournamentQuota?: number; displayName?: string },
-  ) => {
-    const updated = await api.updatePlatformUser(id, patch);
-    setUsers((prev) => prev.map((u) => (u.id === id ? updated : u)));
-    toast.success('Usuario actualizado');
-  };
-
-  const confirmDelete = async () => {
-    if (!pendingDeleteId) return;
-    setDeleting(true);
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreating(true);
     try {
-      await api.deletePlatformUser(pendingDeleteId);
-      setUsers((prev) => prev.filter((u) => u.id !== pendingDeleteId));
-      reload();
-      setPendingDeleteId(null);
+      // Normalise: judges need a parent admin; admins need a quota;
+      // super_admins need nothing extra.
+      const dto: CreatePlatformUserDto = {
+        username: form.username.trim(),
+        password: form.password,
+        role: form.role,
+        displayName: form.displayName?.trim() || undefined,
+        tournamentQuota:
+          form.role === 'admin' ? Number(form.tournamentQuota ?? 1) : undefined,
+        createdBy: form.role === 'judge' ? form.createdBy ?? null : null,
+      };
+      await api.createPlatformUser(dto);
+      toast.success(`Usuario ${dto.username} creado`);
+      setForm({
+        username: '',
+        password: '',
+        role: 'admin',
+        displayName: '',
+        tournamentQuota: 1,
+        createdBy: null,
+      });
+      await loadEverything();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : (err as Error).message;
+      toast.error(msg);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!pendingDeleteId) return;
+    const id = pendingDeleteId;
+    setDeleting(id);
+    try {
+      await api.deletePlatformUser(id);
       toast.success('Usuario eliminado');
+      setPendingDeleteId(null);
+      await loadEverything();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al eliminar');
       throw err;
     } finally {
-      setDeleting(false);
+      setDeleting(null);
     }
   };
 
-  if (loading && !stats) {
+  const handleQuotaSave = async (id: string) => {
+    const raw = quotaDraft[id];
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 0) {
+      toast.error('El cupo debe ser un entero >= 0');
+      return;
+    }
+    setQuotaSaving(id);
+    try {
+      await api.updatePlatformUser(id, { tournamentQuota: n });
+      toast.success('Cupo actualizado');
+      setQuotaDraft((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      await loadEverything();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al guardar');
+    } finally {
+      setQuotaSaving(null);
+    }
+  };
+
+  const admins = users.filter((u) => u.role === 'admin');
+
+  if (loading && users.length === 0) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-spk-red" />
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-spk-red" aria-hidden="true" />
       </div>
     );
   }
 
-  if (error && !stats) {
+  if (error && users.length === 0) {
     return (
-      <div className="p-6 text-center py-16">
+      <div className="max-w-lg mx-auto text-center py-16 px-6">
         <p className="text-red-600 mb-4">{error}</p>
         <button
-          onClick={reload}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-spk-red text-white rounded-sm"
+          onClick={loadEverything}
+          className="px-4 py-2 bg-spk-red text-white hover:bg-spk-red-dark rounded-sm"
         >
-          <RefreshCw className="w-4 h-4" />
           Reintentar
         </button>
       </div>
@@ -116,578 +175,346 @@ export function SuperAdminDashboard() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-[1600px] mx-auto">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1
-            className="text-2xl sm:text-3xl font-bold"
-            style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-          >
-            PANEL DE PLATAFORMA
-          </h1>
-          <p className="text-black/60">
-            Vista global del sistema. Creá, editá y borrá usuarios de toda la plataforma.
-          </p>
-        </div>
-        <button
-          onClick={() => setCreateOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-spk-red text-white hover:bg-spk-red-dark rounded-sm font-medium"
+    <div className="p-4 sm:p-6 space-y-8">
+      <div>
+        <h1
+          className="text-2xl sm:text-3xl font-bold"
+          style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
         >
-          <UserPlus className="w-4 h-4" />
-          <span
-            style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.05em' }}
-            className="uppercase font-bold"
-          >
-            Crear Usuario
-          </span>
-        </button>
+          PANEL DEL SUPER ADMINISTRADOR
+        </h1>
+        <p className="text-black/60">
+          Vista completa de la plataforma. Desde acá creás, editás y eliminás
+          usuarios, y definís cuántos torneos puede abrir cada administrador.
+        </p>
       </div>
 
-      {/* Stats cards */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard
-            icon={<Trophy className="w-5 h-5 text-spk-red" />}
-            label="Torneos"
-            value={stats.tournaments}
-          />
-          <StatCard
-            icon={<Users className="w-5 h-5 text-spk-blue" />}
-            label="Equipos únicos"
-            value={stats.teams}
-          />
-          <StatCard
-            icon={<Users className="w-5 h-5 text-spk-blue" />}
-            label="Jugadoras"
-            value={stats.players}
-          />
-          <StatCard
-            icon={<Shield className="w-5 h-5 text-spk-red" />}
-            label="Usuarios totales"
-            value={stats.users.total}
-            breakdown={[
-              { label: 'Super', value: stats.users.super_admin },
-              { label: 'Admin', value: stats.users.admin },
-              { label: 'Juez', value: stats.users.judge },
-            ]}
-          />
-        </div>
-      )}
+      {/* Stats grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard
+          label="Torneos"
+          value={stats?.tournaments ?? 0}
+          Icon={Trophy}
+          accent="bg-spk-gold/10 text-spk-gold"
+        />
+        <StatCard
+          label="Equipos (únicos)"
+          value={stats?.teams ?? 0}
+          Icon={Users}
+          accent="bg-spk-blue/10 text-spk-blue"
+        />
+        <StatCard
+          label="Jugadoras"
+          value={stats?.players ?? 0}
+          Icon={UserCog}
+          accent="bg-spk-win/10 text-spk-win"
+        />
+        <StatCard
+          label="Usuarios"
+          value={stats?.users.total ?? 0}
+          Icon={Shield}
+          accent="bg-spk-red/10 text-spk-red"
+          subtitle={
+            stats
+              ? `${stats.users.super_admin} super · ${stats.users.admin} admin · ${stats.users.judge} juez`
+              : undefined
+          }
+        />
+      </div>
 
-      {/* Users table */}
-      <div className="bg-white border border-black/10 rounded-sm overflow-hidden">
-        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-black/10 bg-black/[0.03]">
+      {/* Create form */}
+      <section className="bg-white border-2 border-black/10 rounded-sm overflow-hidden">
+        <div className="bg-black text-white px-4 sm:px-5 py-3">
           <h2
-            className="text-base sm:text-lg font-bold uppercase"
-            style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.06em' }}
+            className="font-bold uppercase text-sm sm:text-base"
+            style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
           >
-            Usuarios ({users.length})
+            Crear usuario
           </h2>
         </div>
-
-        {/* Desktop: table */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-black/[0.04] text-black/60">
-              <tr>
-                <Th>Usuario</Th>
-                <Th>Rol</Th>
-                <Th>Cupo de torneos</Th>
-                <Th>Torneos creados</Th>
-                <Th>Creado por</Th>
-                <Th className="text-right">Acciones</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-black/5">
-              {users.map((u) => (
-                <tr key={u.id} className="hover:bg-black/[0.02]">
-                  <Td>
-                    <div className="font-bold">{u.username}</div>
-                    {u.displayName && (
-                      <div className="text-xs text-black/50">{u.displayName}</div>
-                    )}
-                  </Td>
-                  <Td>
-                    <RoleBadge role={u.role} />
-                  </Td>
-                  <Td>{u.role === 'admin' ? u.tournamentQuota : '—'}</Td>
-                  <Td>{u.ownedTournamentsCount}</Td>
-                  <Td>
-                    {u.createdBy
-                      ? users.find((other) => other.id === u.createdBy)?.username ?? '—'
-                      : '—'}
-                  </Td>
-                  <Td className="text-right">
-                    <div className="inline-flex gap-1">
-                      <button
-                        onClick={() => setEditing(u)}
-                        aria-label={`Editar ${u.username}`}
-                        className="p-2 bg-spk-blue/10 text-spk-blue rounded-sm hover:bg-spk-blue/20"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setPendingDeleteId(u.id)}
-                        aria-label={`Eliminar ${u.username}`}
-                        className="p-2 bg-spk-red/10 text-spk-red rounded-sm hover:bg-spk-red/20"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile: stacked cards */}
-        <div className="md:hidden divide-y divide-black/5">
-          {users.map((u) => (
-            <div key={u.id} className="p-3 flex items-start gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-bold">{u.username}</span>
-                  <RoleBadge role={u.role} />
-                </div>
-                <div className="text-xs text-black/60 mt-1 space-y-0.5">
-                  {u.role === 'admin' && (
-                    <div>
-                      Torneos {u.ownedTournamentsCount}/{u.tournamentQuota}
-                    </div>
-                  )}
-                  {u.createdBy && (
-                    <div>
-                      Creado por:{' '}
-                      {users.find((other) => other.id === u.createdBy)?.username ?? '—'}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex gap-1 flex-shrink-0">
-                <button
-                  onClick={() => setEditing(u)}
-                  aria-label={`Editar ${u.username}`}
-                  className="p-2 bg-spk-blue/10 text-spk-blue rounded-sm"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => setPendingDeleteId(u.id)}
-                  aria-label={`Eliminar ${u.username}`}
-                  className="p-2 bg-spk-red/10 text-spk-red rounded-sm"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {createOpen && (
-        <CreateUserModal
-          admins={admins}
-          onClose={() => setCreateOpen(false)}
-          onCreate={async (dto) => {
-            await handleCreate(dto);
-            setCreateOpen(false);
-          }}
-        />
-      )}
-
-      {editing && (
-        <EditUserModal
-          user={editing}
-          admins={admins}
-          onClose={() => setEditing(null)}
-          onSave={async (patch) => {
-            await handleUpdate(editing.id, patch);
-            setEditing(null);
-          }}
-        />
-      )}
-
-      <ConfirmDialog
-        open={pendingDeleteId !== null}
-        onOpenChange={(open) => {
-          if (!open) setPendingDeleteId(null);
-        }}
-        title="Eliminar usuario"
-        description="Esta acción no se puede deshacer. Los torneos que haya creado quedarán huérfanos (accesibles solo para el super admin)."
-        confirmLabel="Eliminar"
-        loading={deleting}
-        onConfirm={confirmDelete}
-      />
-    </div>
-  );
-}
-
-// ── Internals ──────────────────────────────────────────────────────
-
-function StatCard({
-  icon,
-  label,
-  value,
-  breakdown,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  breakdown?: { label: string; value: number }[];
-}) {
-  return (
-    <div className="bg-white border border-black/10 rounded-sm p-4">
-      <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/60">
-        {icon}
-        {label}
-      </div>
-      <div
-        className="mt-2 text-3xl sm:text-4xl font-bold tabular-nums"
-        style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-      >
-        {value}
-      </div>
-      {breakdown && (
-        <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-black/60">
-          {breakdown.map((b) => (
-            <span
-              key={b.label}
-              className="inline-flex items-center gap-1 bg-black/[0.04] px-2 py-0.5 rounded-full"
-            >
-              <span>{b.label}</span>
-              <span className="font-bold">{b.value}</span>
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RoleBadge({ role }: { role: string }) {
-  const colors: Record<string, string> = {
-    super_admin: 'bg-spk-red/10 text-spk-red border-spk-red/30',
-    admin: 'bg-spk-blue/10 text-spk-blue border-spk-blue/30',
-    judge: 'bg-black/5 text-black/70 border-black/20',
-  };
-  const label =
-    role === 'super_admin' ? 'Super Admin' : role === 'admin' ? 'Admin' : 'Juez';
-  const cls = colors[role] ?? 'bg-black/5 text-black/60 border-black/20';
-  return (
-    <span
-      className={`inline-flex items-center px-2 py-0.5 border rounded-full text-[10px] uppercase font-bold tracking-wider ${cls}`}
-      style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
-    >
-      {label}
-    </span>
-  );
-}
-
-function Th({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <th
-      className={`text-left px-4 py-2 text-[10px] font-bold uppercase tracking-wider ${className}`}
-      style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.1em' }}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-4 py-3 align-top ${className}`}>{children}</td>;
-}
-
-// ── Create user modal ─────────────────────────────────────────────
-
-function CreateUserModal({
-  admins,
-  onClose,
-  onCreate,
-}: {
-  admins: PlatformUser[];
-  onClose: () => void;
-  onCreate: (dto: CreatePlatformUserDto) => Promise<void>;
-}) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState<CreatePlatformUserDto['role']>('admin');
-  const [displayName, setDisplayName] = useState('');
-  const [quota, setQuota] = useState(1);
-  const [createdBy, setCreatedBy] = useState<string>('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      const dto: CreatePlatformUserDto = {
-        username: username.trim(),
-        password,
-        role,
-        displayName: displayName.trim() || undefined,
-        tournamentQuota: role === 'admin' ? quota : undefined,
-        createdBy: role === 'judge' ? createdBy || null : undefined,
-      };
-      await onCreate(dto);
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : 'Error al crear usuario',
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white rounded-sm shadow-2xl max-w-md w-full max-h-[92vh] overflow-y-auto my-4">
-        <div className="sticky top-0 bg-white border-b border-black/10 px-4 sm:px-6 py-4 flex items-center justify-between">
-          <h2
-            className="text-lg sm:text-xl font-bold"
-            style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-          >
-            CREAR USUARIO
-          </h2>
-          <button onClick={onClose} aria-label="Cerrar" className="p-2 hover:bg-black/5 rounded-sm">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4" noValidate>
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-sm text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-
-          <Field label="Usuario">
+        <form
+          onSubmit={handleCreate}
+          className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          noValidate
+        >
+          <Field label="Usuario *">
             <input
               type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoComplete="off"
               required
-              className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
+              value={form.username}
+              onChange={(e) => setForm({ ...form, username: e.target.value })}
+              placeholder="Ej: juan.perez"
+              autoComplete="off"
+              className="w-full px-3 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
             />
           </Field>
-          <Field label="Contraseña (mín. 8, letras + números)">
+          <Field label="Contraseña *">
             <input
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="new-password"
               required
-              className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              placeholder="Mín 8 chars, con letra y número"
+              autoComplete="new-password"
+              className="w-full px-3 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
             />
           </Field>
-          <Field label="Rol">
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as CreatePlatformUserDto['role'])}
-              className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red bg-white"
-            >
-              <option value="admin">Admin · organiza torneos</option>
-              <option value="judge">Juez · arbitra partidos</option>
-              <option value="super_admin">Super admin · plataforma</option>
-            </select>
-          </Field>
-          <Field label="Nombre visible (opcional)">
+          <Field label="Nombre visible">
             <input
               type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
+              value={form.displayName ?? ''}
+              onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+              placeholder="Opcional"
+              className="w-full px-3 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
             />
           </Field>
-          {role === 'admin' && (
+          <Field label="Rol *">
+            <select
+              value={form.role}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  role: e.target.value as CreatePlatformUserDto['role'],
+                })
+              }
+              className="w-full px-3 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red bg-white"
+            >
+              <option value="admin">Administrador de torneos</option>
+              <option value="judge">Juez</option>
+              <option value="super_admin">Super administrador</option>
+            </select>
+          </Field>
+          {form.role === 'admin' && (
             <Field label="Cupo de torneos">
               <input
                 type="number"
                 min={0}
-                value={quota}
-                onChange={(e) => setQuota(Math.max(0, parseInt(e.target.value || '0', 10)))}
-                className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
+                value={form.tournamentQuota ?? 1}
+                onChange={(e) =>
+                  setForm({ ...form, tournamentQuota: Number(e.target.value) })
+                }
+                className="w-full px-3 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
               />
-              <p className="text-xs text-black/50 mt-1">
-                Cantidad máxima de torneos que este admin puede crear.
-              </p>
             </Field>
           )}
-          {role === 'judge' && (
-            <Field label="Admin propietario (opcional)">
+          {form.role === 'judge' && (
+            <Field label="Admin dueño del juez">
               <select
-                value={createdBy}
-                onChange={(e) => setCreatedBy(e.target.value)}
-                className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red bg-white"
+                value={form.createdBy ?? ''}
+                onChange={(e) =>
+                  setForm({ ...form, createdBy: e.target.value || null })
+                }
+                className="w-full px-3 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red bg-white"
               >
-                <option value="">Sin admin (juez de plataforma)</option>
+                <option value="">Sin admin (plataforma)</option>
                 {admins.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.username}
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-black/50 mt-1">
-                El juez solo verá los partidos en vivo de los torneos de este admin.
-              </p>
             </Field>
           )}
-
-          <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-black/10">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="sm:flex-none px-4 py-2.5 bg-black/5 hover:bg-black/10 rounded-sm font-bold uppercase"
-              style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.06em' }}
-            >
-              Cancelar
-            </button>
-            <button
+          <div className="md:col-span-2 lg:col-span-3 flex justify-end">
+            <motion.button
               type="submit"
-              disabled={submitting}
-              className="flex-1 px-4 py-2.5 bg-spk-red text-white hover:bg-spk-red-dark rounded-sm font-bold uppercase inline-flex items-center justify-center gap-2"
-              style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.06em' }}
+              disabled={creating}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="inline-flex items-center gap-2 px-5 py-3 bg-spk-red hover:bg-spk-red-dark text-white rounded-sm font-bold uppercase disabled:opacity-50"
+              style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
             >
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              Crear
-            </button>
+              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Crear usuario
+            </motion.button>
           </div>
         </form>
-      </div>
+      </section>
+
+      {/* Users table */}
+      <section className="bg-white border-2 border-black/10 rounded-sm overflow-hidden">
+        <div className="bg-black text-white px-4 sm:px-5 py-3">
+          <h2
+            className="font-bold uppercase text-sm sm:text-base"
+            style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
+          >
+            Usuarios ({users.length})
+          </h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-black/5 border-b-2 border-black/10">
+              <tr>
+                <Th>Usuario</Th>
+                <Th>Rol</Th>
+                <Th>Cupo / torneos</Th>
+                <Th>Creado por</Th>
+                <Th className="text-right">Acciones</Th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-black/5">
+              {users.map((u) => {
+                const isSelf = u.id === currentUser?.id;
+                const parent = users.find((x) => x.id === u.createdBy);
+                const editingQuota = quotaDraft[u.id] !== undefined;
+                return (
+                  <tr key={u.id} className="hover:bg-black/[0.02]">
+                    <Td>
+                      <div className="flex flex-col">
+                        <span
+                          className="font-bold"
+                          style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                        >
+                          {u.username}
+                        </span>
+                        {u.displayName && (
+                          <span className="text-xs text-black/50">{u.displayName}</span>
+                        )}
+                      </div>
+                    </Td>
+                    <Td>
+                      <RoleBadge role={u.role} />
+                    </Td>
+                    <Td>
+                      {u.role === 'admin' ? (
+                        editingQuota ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={0}
+                              value={quotaDraft[u.id]}
+                              onChange={(e) =>
+                                setQuotaDraft((prev) => ({ ...prev, [u.id]: e.target.value }))
+                              }
+                              className="w-20 px-2 py-1 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleQuotaSave(u.id)}
+                              disabled={quotaSaving === u.id}
+                              aria-label="Guardar cupo"
+                              className="p-1.5 bg-spk-win/10 text-spk-win rounded-sm hover:bg-spk-win/20"
+                            >
+                              {quotaSaving === u.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Check className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setQuotaDraft((prev) => {
+                                  const next = { ...prev };
+                                  delete next[u.id];
+                                  return next;
+                                })
+                              }
+                              aria-label="Cancelar edición"
+                              className="p-1.5 bg-black/5 text-black/60 rounded-sm hover:bg-black/10"
+                            >
+                              <XIcon className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="tabular-nums font-medium">
+                              {u.ownedTournamentsCount} / {u.tournamentQuota}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setQuotaDraft((prev) => ({
+                                  ...prev,
+                                  [u.id]: String(u.tournamentQuota),
+                                }))
+                              }
+                              aria-label="Editar cupo"
+                              className="p-1 text-black/40 hover:text-spk-red"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )
+                      ) : (
+                        <span className="text-black/40">—</span>
+                      )}
+                    </Td>
+                    <Td className="text-black/60">
+                      {parent ? parent.username : <span className="text-black/30">—</span>}
+                    </Td>
+                    <Td className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => setPendingDeleteId(u.id)}
+                        disabled={deleting === u.id || isSelf}
+                        aria-label={`Eliminar ${u.username}`}
+                        title={isSelf ? 'No podés eliminarte a vos mismo' : 'Eliminar usuario'}
+                        className="p-2 bg-spk-red/10 text-spk-red rounded-sm hover:bg-spk-red/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        {deleting === u.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </Td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(openDialog) => {
+          if (!openDialog) setPendingDeleteId(null);
+        }}
+        title="Eliminar usuario"
+        description="Esta acción no se puede deshacer. Se perderá el acceso del usuario al sistema."
+        confirmLabel="Eliminar"
+        loading={deleting !== null}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }
 
-function EditUserModal({
-  user,
-  admins,
-  onClose,
-  onSave,
+// ── Small helpers ──────────────────────────────────────────────────
+
+function StatCard({
+  label,
+  value,
+  subtitle,
+  Icon,
+  accent,
 }: {
-  user: PlatformUser;
-  admins: PlatformUser[];
-  onClose: () => void;
-  onSave: (patch: {
-    role?: PlatformUser['role'];
-    tournamentQuota?: number;
-    displayName?: string;
-  }) => Promise<void>;
+  label: string;
+  value: number;
+  subtitle?: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  accent: string;
 }) {
-  const [role, setRole] = useState(user.role);
-  const [displayName, setDisplayName] = useState(user.displayName ?? '');
-  const [quota, setQuota] = useState(user.tournamentQuota);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      await onSave({
-        role: role as PlatformUser['role'],
-        displayName: displayName.trim() || undefined,
-        tournamentQuota: role === 'admin' ? quota : undefined,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al actualizar');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white rounded-sm shadow-2xl max-w-md w-full max-h-[92vh] overflow-y-auto my-4">
-        <div className="sticky top-0 bg-white border-b border-black/10 px-4 sm:px-6 py-4 flex items-center justify-between">
-          <h2
-            className="text-lg sm:text-xl font-bold"
+    <div className="bg-white border-2 border-black/10 rounded-sm p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs uppercase tracking-wider text-black/50 truncate">
+            {label}
+          </div>
+          <div
+            className="text-3xl sm:text-4xl font-bold mt-1 tabular-nums"
             style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
           >
-            EDITAR {user.username.toUpperCase()}
-          </h2>
-          <button onClick={onClose} aria-label="Cerrar" className="p-2 hover:bg-black/5 rounded-sm">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4" noValidate>
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-sm text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-          <Field label="Rol">
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red bg-white"
-            >
-              <option value="admin">Admin</option>
-              <option value="judge">Juez</option>
-              <option value="super_admin">Super admin</option>
-            </select>
-          </Field>
-          <Field label="Nombre visible">
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
-            />
-          </Field>
-          {role === 'admin' && (
-            <Field label="Cupo de torneos">
-              <input
-                type="number"
-                min={0}
-                value={quota}
-                onChange={(e) => setQuota(Math.max(0, parseInt(e.target.value || '0', 10)))}
-                className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
-              />
-              <p className="text-xs text-black/50 mt-1">
-                Torneos actualmente creados por este admin: {user.ownedTournamentsCount}.
-              </p>
-            </Field>
-          )}
-
-          {/* Placeholder for future: changing a judge's owning admin */}
-          {role === 'judge' && user.createdBy && (
-            <div className="text-xs text-black/50">
-              Creado por:{' '}
-              {admins.find((a) => a.id === user.createdBy)?.username ?? '—'}
-            </div>
-          )}
-
-          <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-black/10">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="sm:flex-none px-4 py-2.5 bg-black/5 hover:bg-black/10 rounded-sm font-bold uppercase"
-              style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.06em' }}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex-1 px-4 py-2.5 bg-spk-red text-white hover:bg-spk-red-dark rounded-sm font-bold uppercase inline-flex items-center justify-center gap-2"
-              style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.06em' }}
-            >
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              Guardar
-            </button>
+            {value}
           </div>
-        </form>
+          {subtitle && <div className="text-[11px] text-black/50 mt-1">{subtitle}</div>}
+        </div>
+        <div className={`w-10 h-10 rounded-sm flex items-center justify-center flex-shrink-0 ${accent}`}>
+          <Icon className="w-5 h-5" aria-hidden="true" />
+        </div>
       </div>
     </div>
   );
@@ -695,14 +522,48 @@ function EditUserModal({
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label
-        className="block text-xs font-bold uppercase mb-1.5 text-black/70"
+    <label className="block">
+      <span
+        className="block text-xs font-bold uppercase tracking-wider mb-1"
         style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
       >
         {label}
-      </label>
+      </span>
       {children}
-    </div>
+    </label>
+  );
+}
+
+function Th({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <th
+      className={`text-left px-4 py-3 text-xs font-bold uppercase tracking-wider ${className}`}
+      style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
+    >
+      {children}
+    </th>
+  );
+}
+
+function Td({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <td className={`px-4 py-3 align-middle ${className}`}>{children}</td>;
+}
+
+function RoleBadge({ role }: { role: string }) {
+  const style =
+    role === 'super_admin'
+      ? 'bg-spk-red text-white'
+      : role === 'admin'
+        ? 'bg-spk-blue/10 text-spk-blue border border-spk-blue/30'
+        : 'bg-black/5 text-black/70 border border-black/10';
+  const label =
+    role === 'super_admin' ? 'Super Admin' : role === 'admin' ? 'Admin' : 'Juez';
+  return (
+    <span
+      className={`inline-flex items-center px-2.5 py-1 rounded-sm text-[11px] font-bold uppercase ${style}`}
+      style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.06em' }}
+    >
+      {label}
+    </span>
   );
 }

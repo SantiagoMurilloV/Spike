@@ -19,14 +19,20 @@ Vercel corre funciones serverless, lo cual no encaja bien con el Express persist
 3. Añade el plugin de base de datos: **+ New → Database → Add PostgreSQL**. Railway inyecta automáticamente la variable `DATABASE_URL` en tu servicio.
 4. En **Variables**, añade:
 
-   | Nombre           | Valor                                                                   |
-   | ---------------- | ----------------------------------------------------------------------- |
-   | `NODE_ENV`       | `production`                                                            |
-   | `JWT_SECRET`     | al menos 16 caracteres aleatorios (`openssl rand -hex 32` por ejemplo)  |
-   | `CORS_ORIGINS`   | la URL de Vercel (la pondrás después del paso 2, ver abajo)             |
-   | `PUBLIC_URL`     | la URL pública de Railway, ej. `https://spk-cup-api.up.railway.app`     |
+   | Nombre                 | Valor                                                                                          |
+   | ---------------------- | ---------------------------------------------------------------------------------------------- |
+   | `NODE_ENV`             | `production`                                                                                   |
+   | `JWT_SECRET`           | ≥16 caracteres aleatorios (`openssl rand -hex 32`)                                             |
+   | `CORS_ORIGINS`         | la URL de Vercel (después del paso 2)                                                          |
+   | `PUBLIC_URL`           | URL pública de Railway, ej. `https://spk-cup-api.up.railway.app`                               |
+   | `SUPER_ADMIN_USERNAME` | opcional, default `superadmin`                                                                 |
+   | `SUPER_ADMIN_PASSWORD` | **obligatorio en prod**, ≥8 chars con letra y número. Se lee una sola vez para crear la cuenta |
 
    > `DATABASE_URL`, `PORT` y `RAILWAY_STATIC_URL` los inyecta Railway solo.
+   >
+   > El super administrador se crea automáticamente al primer boot. Una vez creado podés borrar
+   > `SUPER_ADMIN_PASSWORD` de Railway — la cuenta sigue existiendo. Para cambiar la contraseña,
+   > usá el flujo desde la misma app.
 
 5. Railway construye, corre las migraciones (lo hace el mismo backend al bootear) y te da una URL pública tipo `https://spk-cup-api.up.railway.app`. **Guarda esa URL.**
 

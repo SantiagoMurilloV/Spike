@@ -23,6 +23,49 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
   }
 }
 
+/**
+ * Return the authenticated user's profile, including scoping metadata
+ * (tournament_quota, count of owned tournaments). Used by the admin
+ * dashboard to display "X/Y torneos usados" and by the super-admin
+ * console to sanity-check its own session.
+ */
+export async function me(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'No autenticado' });
+      return;
+    }
+    const { getPool } = await import('../config/database');
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT u.id, u.username, u.role, u.display_name, u.tournament_quota,
+              u.created_by,
+              COUNT(t.id)::int AS owned_tournaments_count
+       FROM users u
+       LEFT JOIN tournaments t ON t.owner_id = u.id
+       WHERE u.id = $1
+       GROUP BY u.id`,
+      [req.user.userId],
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+      return;
+    }
+    const row = result.rows[0];
+    res.json({
+      id: row.id,
+      username: row.username,
+      role: row.role,
+      displayName: row.display_name ?? undefined,
+      tournamentQuota: row.tournament_quota,
+      createdBy: row.created_by ?? null,
+      ownedTournamentsCount: row.owned_tournaments_count,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function logout(req: Request, res: Response): Promise<void> {
   // Revoke the bearer token so it's rejected even if someone kept a
   // copy. JWT is stateless so this lives in an in-memory blacklist —

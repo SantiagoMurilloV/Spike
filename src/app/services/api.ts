@@ -499,6 +499,23 @@ export const api = {
     });
   },
 
+  /**
+   * Fetch the authenticated user's own profile including quota and
+   * owned-tournaments count. Drives the "X/Y torneos de tu plan" badge
+   * in the admin UI.
+   */
+  async getMe(): Promise<{
+    id: string;
+    username: string;
+    role: string;
+    displayName?: string;
+    tournamentQuota: number;
+    createdBy?: string | null;
+    ownedTournamentsCount: number;
+  }> {
+    return request('/auth/me');
+  },
+
   // ── Admin destructive ops ──────────────────────────────────────
   /**
    * Wipe every torneo / equipo / partido / bracket / clasificación while

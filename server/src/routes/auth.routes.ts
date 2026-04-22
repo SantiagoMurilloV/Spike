@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { login, logout, changePassword } from '../controllers/auth.controller';
+import { login, logout, changePassword, me } from '../controllers/auth.controller';
 import { loginRateLimiter } from '../middleware/rateLimit';
+import { requireRole } from '../middleware/auth';
 
 const router = Router();
 
@@ -11,5 +12,9 @@ const router = Router();
 router.post('/login', loginRateLimiter, login);
 router.post('/logout', logout);
 router.put('/password', changePassword);
+// /me is authenticated (any role) and exposes the caller's own profile
+// including tournament quota — frontend uses it to render the "X/Y
+// torneos de tu plan" indicator.
+router.get('/me', requireRole('super_admin', 'admin', 'judge'), me);
 
 export default router;
