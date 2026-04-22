@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode,
 } from 'react';
 import { Tournament, Match, Team } from '../types';
@@ -40,6 +41,14 @@ interface DataContextType {
   // States
   loading: LoadingState;
   error: ErrorState;
+  /**
+   * True when at least one initial fetch has been in-flight for longer
+   * than `SLOW_NETWORK_THRESHOLD_MS`. Used to swap the "loading gray
+   * skeleton" UI for a more explicit "despertando servidor" banner so
+   * users on Railway cold starts know what's happening instead of
+   * assuming the app is broken.
+   */
+  slowNetwork: boolean;
 
   // Tournament CRUD
   addTournament: (data: CreateTournamentDto) => Promise<Tournament>;
@@ -64,6 +73,14 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+/**
+ * How long an initial fetch can hang before we admit "the server is
+ * probably waking up". Tuned for Railway's Trial/Hobby cold-start
+ * window (10-20 s). 3 s means users on a warm server never see the
+ * banner; users on a cold one see it before the skeleton feels stuck.
+ */
+const SLOW_NETWORK_THRESHOLD_MS = 3000;
+
 export function DataProvider({ children }: { children: ReactNode }) {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -81,11 +98,42 @@ export function DataProvider({ children }: { children: ReactNode }) {
     teams: null,
   });
 
+  // Tracks whether any initial fetch has been pending longer than the
+  // threshold. Separate from `loading` because not every spinner should
+  // promote to a "server waking up" banner — only the first slow one.
+  const [slowNetwork, setSlowNetwork] = useState(false);
+  const slowNetworkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inflightCount = useRef(0);
+
+  /**
+   * Increments the in-flight counter and starts the "slow network" timer
+   * if this is the first pending request. When the counter drops back to
+   * 0 we clear the timer and hide the banner.
+   */
+  const trackInflight = useCallback((delta: 1 | -1) => {
+    inflightCount.current = Math.max(0, inflightCount.current + delta);
+    if (delta === 1 && inflightCount.current === 1) {
+      // First pending request — arm the slow-network timer.
+      if (slowNetworkTimer.current) clearTimeout(slowNetworkTimer.current);
+      slowNetworkTimer.current = setTimeout(() => {
+        setSlowNetwork(true);
+      }, SLOW_NETWORK_THRESHOLD_MS);
+    }
+    if (inflightCount.current === 0) {
+      if (slowNetworkTimer.current) {
+        clearTimeout(slowNetworkTimer.current);
+        slowNetworkTimer.current = null;
+      }
+      setSlowNetwork(false);
+    }
+  }, []);
+
   // ── Refresh functions ──────────────────────────────────────────
 
   const refreshTeams = useCallback(async () => {
     setLoading((prev) => ({ ...prev, teams: true }));
     setError((prev) => ({ ...prev, teams: null }));
+    trackInflight(1);
     try {
       const data = await api.getTeams();
       // api.getTeams() already calls updateTeamsCache internally
@@ -96,12 +144,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setError((prev) => ({ ...prev, teams: message }));
     } finally {
       setLoading((prev) => ({ ...prev, teams: false }));
+      trackInflight(-1);
     }
-  }, []);
+  }, [trackInflight]);
 
   const refreshTournaments = useCallback(async () => {
     setLoading((prev) => ({ ...prev, tournaments: true }));
     setError((prev) => ({ ...prev, tournaments: null }));
+    trackInflight(1);
     try {
       const data = await api.getTournaments();
       setTournaments(data);
@@ -111,12 +161,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setError((prev) => ({ ...prev, tournaments: message }));
     } finally {
       setLoading((prev) => ({ ...prev, tournaments: false }));
+      trackInflight(-1);
     }
-  }, []);
+  }, [trackInflight]);
 
   const refreshMatches = useCallback(async () => {
     setLoading((prev) => ({ ...prev, matches: true }));
     setError((prev) => ({ ...prev, matches: null }));
+    trackInflight(1);
     try {
       const data = await api.getMatches();
       setMatches(data);
@@ -126,8 +178,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setError((prev) => ({ ...prev, matches: message }));
     } finally {
       setLoading((prev) => ({ ...prev, matches: false }));
+      trackInflight(-1);
     }
-  }, []);
+  }, [trackInflight]);
 
   // Load initial data — teams first so the cache is ready for matches.
   // Use allSettled so a single failure doesn't block the other resources.
@@ -290,6 +343,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         teams,
         loading,
         error,
+        slowNetwork,
         addTournament,
         updateTournament: updateTournamentFn,
         deleteTournament: deleteTournamentFn,
