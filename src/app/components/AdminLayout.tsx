@@ -2,7 +2,6 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router';
 import {
   LayoutDashboard,
   Trophy,
-  Users,
   Settings,
   LogOut,
   Menu,
@@ -21,11 +20,13 @@ export function AdminLayout() {
   const { logout, user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Admin sidebar — teams are managed from inside each tournament now, so
+  // there's no dedicated "Equipos" entry (would be redundant with Torneos
+  // → Equipos tab).
   const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
     { icon: Trophy, label: 'Torneos', path: '/admin/tournaments' },
     { icon: Calendar, label: 'Partidos', path: '/admin/matches' },
-    { icon: Users, label: 'Equipos', path: '/admin/teams' },
     { icon: UserCog, label: 'Jueces', path: '/admin/judges' },
     { icon: Settings, label: 'Configuración', path: '/admin/settings' },
   ];

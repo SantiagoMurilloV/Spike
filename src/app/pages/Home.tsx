@@ -1,9 +1,8 @@
 import { motion, useScroll, useTransform } from 'motion/react';
-import { Trophy, Users, ArrowRight, Search, RefreshCw, LogIn, UserPlus } from 'lucide-react';
+import { Trophy, ArrowRight, Search, RefreshCw, LogIn, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { TournamentCard } from '../components/TournamentCard';
 import { MatchCard } from '../components/MatchCard';
-import { TeamAvatar } from '../components/TeamAvatar';
 import { TournamentCardSkeleton } from '../components/SkeletonLoaders';
 import { LiveBadge } from '../components/LiveBadge';
 import { useData } from '../context/DataContext';
@@ -23,15 +22,11 @@ const HERO_IMAGE =
 export function Home() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { tournaments, teams, matches, loading, error, refreshTournaments } = useData();
+  const { tournaments, matches, loading, error, refreshTournaments } = useData();
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'ongoing' | 'upcoming' | 'completed'>('all');
-  const [teamSearch, setTeamSearch] = useState('');
-  // Main directory view: toggles the big white section between the tournaments
-  // list and the teams directory. Persisted via ?view=teams for deep links.
-  const [mainTab, setMainTab] = useState<'tournaments' | 'teams'>('tournaments');
 
   const heroOpacity = useTransform(scrollY, [0, 300], [1, 0]);
   const heroScale = useTransform(scrollY, [0, 300], [1, 1.2]);
@@ -48,22 +43,17 @@ export function Home() {
 
   // Deep-link handler:
   //   ?filter=live      → scroll to #live-matches (or #directory fallback)
-  //   ?filter=ongoing   → tournaments tab + "En curso" filter + scroll
-  //   ?filter=upcoming  → tournaments tab + "Próximos" filter + scroll
-  //   ?filter=completed → tournaments tab + "Finalizados" filter + scroll
-  //   ?view=teams       → switch to the Equipos tab + scroll to #directory
-  // Params are consumed on mount so refreshing doesn't re-trigger the scroll.
+  //   ?filter=ongoing   → "En curso" filter + scroll to #directory
+  //   ?filter=upcoming  → "Próximos" filter + scroll to #directory
+  //   ?filter=completed → "Finalizados" filter + scroll to #directory
+  // The old ?view=teams link is gone now that teams no longer live here;
+  // we silently drop it so old saved links don't throw.
   useEffect(() => {
     const filter = searchParams.get('filter');
-    const view = searchParams.get('view');
-    if (!filter && !view) return;
+    if (!filter) return;
 
     if (filter === 'ongoing' || filter === 'upcoming' || filter === 'completed') {
       setFilterStatus(filter);
-      setMainTab('tournaments');
-    }
-    if (view === 'teams') {
-      setMainTab('teams');
     }
 
     const scrollTo = (id: string, fallbackId?: string) => {
@@ -76,8 +66,7 @@ export function Home() {
     };
 
     if (filter === 'live') scrollTo('live-matches', 'directory');
-    else if (filter) scrollTo('directory');
-    else if (view === 'teams') scrollTo('directory');
+    else scrollTo('directory');
 
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
@@ -101,17 +90,6 @@ export function Home() {
     () => matches.filter((m) => m.status === 'live'),
     [matches],
   );
-
-  const filteredTeams = useMemo(() => {
-    const q = teamSearch.trim().toLowerCase();
-    if (!q) return teams;
-    return teams.filter((t) =>
-      t.name.toLowerCase().includes(q) ||
-      t.initials.toLowerCase().includes(q) ||
-      (t.category || '').toLowerCase().includes(q) ||
-      (t.city || '').toLowerCase().includes(q),
-    );
-  }, [teams, teamSearch]);
 
   /**
    * Scrolls the viewport to the live-matches section if any match is live;
@@ -363,12 +341,6 @@ export function Home() {
                 </div>
                 <div>
                   <div className="text-4xl sm:text-5xl font-bold mb-1 tabular-nums" style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.02em' }}>
-                    {teams.length}
-                  </div>
-                  <div className="text-sm text-white/60 uppercase tracking-wider">Equipos</div>
-                </div>
-                <div>
-                  <div className="text-4xl sm:text-5xl font-bold mb-1 tabular-nums" style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.02em' }}>
                     {statusCounts.ongoing}
                   </div>
                   <div className="text-sm text-white/60 uppercase tracking-wider">En vivo</div>
@@ -458,105 +430,39 @@ export function Home() {
         </section>
       )}
 
-      {/* Main Directory Section — Torneos / Equipos tabs share this slot so
-          users switch between the two lists without losing hero context. */}
+      {/* Main Directory Section — tournaments list only. Teams are no
+          longer exposed on the public home; they live inside each
+          tournament. */}
       <section id="directory" className="bg-white text-black py-14 md:py-20 scroll-mt-20">
         <div className="max-w-[1600px] mx-auto px-6 md:px-12">
-          {/* Section Header — H2 + lead on the left, tab switcher on the
-              right (desktop). Stacks vertically on mobile. */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="mb-8 md:mb-10 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6"
+            className="mb-8 md:mb-10"
           >
-            <div>
-              <div
-                className="text-[11px] text-spk-red uppercase tracking-[0.28em] mb-3"
-                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-              >
-                {mainTab === 'tournaments' ? 'Temporada 2026' : 'Clubes & equipos'}
-              </div>
-              <h2
-                className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter leading-[0.95]"
-                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-              >
-                {mainTab === 'tournaments' ? 'TODOS LOS TORNEOS' : 'TODOS LOS EQUIPOS'}
-              </h2>
-              <div className="mt-4 flex items-center gap-4">
-                <div className="w-20 h-1 bg-spk-red" />
-                <p className="text-sm md:text-base text-black/55 max-w-xl leading-relaxed">
-                  {mainTab === 'tournaments'
-                    ? 'Explora torneos en curso, próximos y ya finalizados. Toca cualquier torneo para ver brackets, tablas y resultados en vivo.'
-                    : 'Consulta los clubes registrados, categorías y toda la plantilla participante.'}
-                </p>
-              </div>
-            </div>
-
-            {/* Tab switcher moves inline with the header on lg+ so the
-                content grid sits tight against the controls. */}
             <div
-              className="inline-flex items-center gap-1 p-1.5 bg-black/[0.04] border border-black/10 rounded-sm self-start lg:self-end shrink-0"
-              role="tablist"
-              aria-label="Vista principal"
+              className="text-[11px] text-spk-red uppercase tracking-[0.28em] mb-3"
+              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
-            {([
-              { value: 'tournaments', label: 'Torneos', count: tournaments.length, Icon: Trophy },
-              { value: 'teams', label: 'Equipos', count: teams.length, Icon: Users },
-            ] as const).map((tab) => {
-              const TabIcon = tab.Icon;
-              const isActive = mainTab === tab.value;
-              return (
-                <button
-                  key={tab.value}
-                  role="tab"
-                  type="button"
-                  aria-selected={isActive}
-                  onClick={() => setMainTab(tab.value)}
-                  className="relative flex items-center gap-2.5 px-4 sm:px-6 py-2.5 rounded-sm transition-colors"
-                  style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.06em' }}
-                >
-                  {isActive && (
-                    <motion.span
-                      layoutId="home-main-tab"
-                      className="absolute inset-0 bg-spk-black rounded-sm shadow-[0_4px_12px_rgba(0,0,0,0.14)]"
-                      transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-                      aria-hidden="true"
-                    />
-                  )}
-                  <span
-                    className={`relative z-10 transition-colors ${
-                      isActive ? 'text-white' : 'text-black/55 group-hover:text-black'
-                    }`}
-                  >
-                    <TabIcon className="w-4 h-4" aria-hidden="true" />
-                  </span>
-                  <span
-                    className={`relative z-10 font-bold uppercase text-sm transition-colors ${
-                      isActive ? 'text-white' : 'text-black/70'
-                    }`}
-                  >
-                    {tab.label}
-                  </span>
-                  <span
-                    className={`relative z-10 min-w-[22px] h-[22px] inline-flex items-center justify-center px-1.5 rounded-full text-[10px] font-bold tabular-nums transition-colors ${
-                      isActive
-                        ? 'bg-spk-red text-white'
-                        : 'bg-black/10 text-black/60'
-                    }`}
-                    style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                  >
-                    {tab.count}
-                  </span>
-                </button>
-              );
-            })}
+              Temporada 2026
+            </div>
+            <h2
+              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter leading-[0.95]"
+              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+            >
+              TODOS LOS TORNEOS
+            </h2>
+            <div className="mt-4 flex items-center gap-4">
+              <div className="w-20 h-1 bg-spk-red" />
+              <p className="text-sm md:text-base text-black/55 max-w-xl leading-relaxed">
+                Explora torneos en curso, próximos y ya finalizados. Toca cualquier torneo para ver brackets, tablas y resultados en vivo.
+              </p>
             </div>
           </motion.div>
 
-          {mainTab === 'tournaments' ? (
-            <>
+          <>
               {/* Search + status filters — inline on lg+, stacked on mobile
                   so the toolbar sits in one tidy row on desktop instead of
                   eating two rows. */}
@@ -700,113 +606,6 @@ export function Home() {
                 </motion.div>
               )}
             </>
-          ) : (
-            // ── Equipos tab ─────────────────────────────────────────
-            <>
-              <div className="mb-8">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.1 }}
-                  className="relative max-w-2xl group"
-                >
-                  <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-black/40 group-focus-within:text-spk-red transition-colors" />
-                  <input
-                    type="text"
-                    placeholder="Buscar equipos, ciudades, categorías…"
-                    value={teamSearch}
-                    onChange={(e) => setTeamSearch(e.target.value)}
-                    className="w-full pl-11 pr-12 py-3.5 bg-white border border-black/15 rounded-sm text-sm sm:text-base focus:outline-none focus:border-spk-red focus:ring-2 focus:ring-spk-red/15 transition-all placeholder:text-black/35"
-                  />
-                  {teamSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setTeamSearch('')}
-                      aria-label="Limpiar búsqueda"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-sm text-black/40 hover:text-spk-red hover:bg-spk-red/10 transition-colors"
-                    >
-                      <span aria-hidden="true" className="text-lg leading-none">×</span>
-                    </button>
-                  )}
-                </motion.div>
-              </div>
-
-              {loading.teams && teams.length === 0 ? (
-                <p className="text-black/50 text-center py-12">Cargando equipos…</p>
-              ) : filteredTeams.length === 0 ? (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-center py-20"
-                >
-                  <Users className="w-16 h-16 text-black/20 mx-auto mb-6" />
-                  <h3
-                    className="text-2xl font-bold mb-3"
-                    style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                  >
-                    {teams.length === 0 ? 'AÚN NO HAY EQUIPOS' : 'NO SE ENCONTRARON EQUIPOS'}
-                  </h3>
-                  <p className="text-black/60">
-                    {teams.length === 0
-                      ? 'Los equipos aparecerán acá cuando se registren'
-                      : 'Probá con otro nombre, categoría o ciudad'}
-                  </p>
-                </motion.div>
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {filteredTeams.map((team, idx) => (
-                    <motion.button
-                      key={team.id}
-                      type="button"
-                      onClick={() => navigate(`/team/${team.id}`)}
-                      initial={{ opacity: 0, y: 10 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ delay: Math.min(idx * 0.03, 0.4), duration: 0.3 }}
-                      whileHover={{ y: -2 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="flex items-center gap-3 p-4 bg-white border-2 border-black/10 hover:border-black rounded-sm text-left transition-colors"
-                    >
-                      <TeamAvatar team={team} size="md" />
-                      <div className="flex-1 min-w-0">
-                        <div
-                          className="font-bold uppercase truncate"
-                          style={{
-                            fontFamily: 'Barlow Condensed, sans-serif',
-                            letterSpacing: '-0.01em',
-                          }}
-                        >
-                          {team.name}
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-black/50 mt-0.5 flex-wrap">
-                          <span style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                            {team.initials}
-                          </span>
-                          {team.category && (
-                            <>
-                              <span className="text-black/20">·</span>
-                              <span className="truncate">{team.category}</span>
-                            </>
-                          )}
-                          {team.city && (
-                            <>
-                              <span className="text-black/20">·</span>
-                              <span className="truncate">{team.city}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <ArrowRight
-                        className="w-4 h-4 text-black/30 flex-shrink-0"
-                        aria-hidden="true"
-                      />
-                    </motion.button>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
         </div>
       </section>
 

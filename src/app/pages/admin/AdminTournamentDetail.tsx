@@ -24,7 +24,9 @@ import { TeamAvatar } from '../../components/TeamAvatar';
 import { GroupMatrix } from '../../components/GroupMatrix';
 import { CategorySection } from '../../components/admin/CategorySection';
 import { TeamFormModal } from '../../components/admin/TeamFormModal';
+import { TeamRosterCard } from '../../components/admin/TeamRosterCard';
 import { useData } from '../../context/DataContext';
+import type { UpdateTeamDto } from '../../services/api';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -118,7 +120,7 @@ export function AdminTournamentDetail() {
   // Used by the "Crear equipo nuevo" flow inside the Equipos tab — we go
   // through the shared DataContext action so the global teams list stays
   // in sync with the one we just created for this tournament.
-  const { addTeam } = useData();
+  const { addTeam, updateTeam } = useData();
 
   // Data state
   const [tournament, setTournament] = useState<Tournament | null>(null);
@@ -148,9 +150,12 @@ export function AdminTournamentDetail() {
   const [clearing, setClearing] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
   // "Crear equipo nuevo" flow inside the Equipos tab. Opens TeamFormModal
-  // in create mode; handleCreateTeam auto-enrols the result in this
-  // tournament so the admin never has to flip to /admin/teams.
+  // in create mode; the submit handler auto-enrols the result in this
+  // tournament. Team management lives entirely inside the tournament now
+  // — there is no separate /admin/teams page.
   const [showNewTeamModal, setShowNewTeamModal] = useState(false);
+  /** Team currently being edited (opens the same TeamFormModal). */
+  const [editingTeam, setEditingTeam] = useState<Team | undefined>();
 
   const handleRecalculateStandings = useCallback(async () => {
     if (!id) return;
@@ -349,6 +354,34 @@ export function AdminTournamentDetail() {
    *      enrolment dropdown drops it right away.
    * Errors are thrown so the modal stays open and shows the message.
    */
+  /**
+   * Routes the TeamFormModal submit to create-and-enrol or plain update
+   * depending on whether `editingTeam` is set. Centralised here so the
+   * same modal renders once and handles both flows.
+   */
+  const handleTeamFormSubmit = async (team: Team) => {
+    if (editingTeam) {
+      const dto: UpdateTeamDto = {
+        name: team.name,
+        initials: team.initials,
+        logo: team.logo,
+        primaryColor: team.colors.primary,
+        secondaryColor: team.colors.secondary,
+        city: team.city,
+        department: team.department,
+        category: team.category,
+      };
+      const updated = await updateTeam(editingTeam.id, dto);
+      // Keep the tournament-scoped copies in sync so the card re-renders
+      // immediately without waiting for a refresh.
+      setEnrolledTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      setAllTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      toast.success('Equipo actualizado');
+      return;
+    }
+    await handleCreateAndEnrollTeam(team);
+  };
+
   const handleCreateAndEnrollTeam = async (team: Team) => {
     if (!id) return;
     const dto: CreateTeamDto = {
@@ -863,9 +896,8 @@ export function AdminTournamentDetail() {
               {/* Enrolment controls — two paths for registering a team:
                   (A) pick one that already exists via the select, or
                   (B) fire "Crear equipo nuevo" which opens the TeamFormModal
-                  and auto-enrols the result. Teams are no longer created
-                  from /admin/teams; they only live there for editing and
-                  roster management. */}
+                  and auto-enrols the result. All team management lives in
+                  this tab now; there's no separate /admin/teams page. */}
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
                 <div className="flex-1">
                   <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
@@ -933,32 +965,20 @@ export function AdminTournamentDetail() {
                       subtitle={`${teams.length} ${teams.length === 1 ? 'equipo' : 'equipos'}`}
                       defaultOpen={idx === 0}
                     >
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {/* Each enrolled team is itself a collapsible row so
+                          admins can see/edit its roster without leaving
+                          this screen. The delete button unenrols the team
+                          from this tournament (doesn't remove it globally). */}
+                      <div className="space-y-3">
                         {teams.map((team) => (
-                          <div
+                          <TeamRosterCard
                             key={team.id}
-                            className="flex items-center gap-3 p-3 bg-white border border-black/10 rounded-sm"
-                          >
-                            <TeamAvatar team={team} size="md" />
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium truncate">{team.name}</p>
-                              {team.city && (
-                                <p className="text-xs text-black/50">{team.city}</p>
-                              )}
-                            </div>
-                            <button
-                              onClick={() => handleUnenroll(team.id)}
-                              disabled={unenrollingId === team.id}
-                              className="p-1.5 text-red-500 hover:bg-red-50 rounded-sm transition-colors disabled:opacity-50"
-                              title="Desinscribir equipo"
-                            >
-                              {unenrollingId === team.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <X className="w-4 h-4" />
-                              )}
-                            </button>
-                          </div>
+                            team={team}
+                            onEditTeam={(t) => setEditingTeam(t)}
+                            onDeleteTeam={(t) => handleUnenroll(t.id)}
+                            deletingTeam={unenrollingId === team.id}
+                            deleteButtonLabel={(t) => `Desinscribir ${t.name} del torneo`}
+                          />
                         ))}
                       </div>
                     </CategorySection>
@@ -967,13 +987,19 @@ export function AdminTournamentDetail() {
               )}
           </SpkPanel>
 
-          {/* "Crear equipo nuevo" modal lives inside the Equipos tab so
-              the user stays in context. On success the team is both
-              registered globally and auto-enrolled in this tournament. */}
+          {/* Team form modal — dual purpose:
+              · create + auto-enrol when `editingTeam` is undefined (the
+                "Crear Equipo Nuevo" button)
+              · edit-in-place when the admin clicks the pencil on a
+                TeamRosterCard (sets `editingTeam`) */}
           <TeamFormModal
-            isOpen={showNewTeamModal}
-            onClose={() => setShowNewTeamModal(false)}
-            onSubmit={handleCreateAndEnrollTeam}
+            isOpen={showNewTeamModal || editingTeam !== undefined}
+            onClose={() => {
+              setShowNewTeamModal(false);
+              setEditingTeam(undefined);
+            }}
+            onSubmit={handleTeamFormSubmit}
+            team={editingTeam}
           />
         </TabsContent>
 
@@ -1133,50 +1159,56 @@ export function AdminTournamentDetail() {
                     })()
                   )}
 
-                  {/* Match list (enfrentamientos) */}
-                  {matchesByPhaseGroup.map(([label, groupMatches]) => (
-                    <div key={label}>
-                      <h3
-                        className="text-lg font-bold mb-3"
-                        style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                  {/* Match list (enfrentamientos) — each phase / group
+                      block is a CategorySection so the Cruces tab stays
+                      scannable. First block opens by default, the rest
+                      fold. */}
+                  {matchesByPhaseGroup.map(([label, groupMatches], idx) => {
+                    const displayLabel = label.includes('|') ? label.replace(/\|/g, ' · ') : label;
+                    return (
+                      <CategorySection
+                        key={label}
+                        title={`Enfrentamientos — ${displayLabel}`}
+                        count={groupMatches.length}
+                        subtitle={`${groupMatches.length} ${groupMatches.length === 1 ? 'partido' : 'partidos'}`}
+                        defaultOpen={idx === 0}
                       >
-                        Enfrentamientos — {label.includes('|') ? label.replace(/\|/g, ' · ') : label}
-                      </h3>
-                      <div className="space-y-2">
-                        {groupMatches.map((m) => (
-                          <div
-                            key={m.id}
-                            className="flex items-center justify-between p-3 bg-white border border-black/10 rounded-sm"
-                          >
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <TeamAvatar team={m.team1} size="sm" />
-                              <span className="text-sm font-medium truncate">
-                                {m.team1.name}
-                              </span>
-                            </div>
-                            <div className="px-4 text-center flex-shrink-0">
-                              {m.score ? (
-                                <span
-                                  className="text-lg font-bold"
-                                  style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                                >
-                                  {m.score.team1} - {m.score.team2}
+                        <div className="space-y-2">
+                          {groupMatches.map((m) => (
+                            <div
+                              key={m.id}
+                              className="flex items-center justify-between p-3 bg-white border border-black/10 rounded-sm"
+                            >
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <TeamAvatar team={m.team1} size="sm" />
+                                <span className="text-sm font-medium truncate">
+                                  {m.team1.name}
                                 </span>
-                              ) : (
-                                <span className="text-sm text-black/40 font-bold">VS</span>
-                              )}
+                              </div>
+                              <div className="px-4 text-center flex-shrink-0">
+                                {m.score ? (
+                                  <span
+                                    className="text-lg font-bold"
+                                    style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                                  >
+                                    {m.score.team1} - {m.score.team2}
+                                  </span>
+                                ) : (
+                                  <span className="text-sm text-black/40 font-bold">VS</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
+                                <span className="text-sm font-medium truncate text-right">
+                                  {m.team2.name}
+                                </span>
+                                <TeamAvatar team={m.team2} size="sm" />
+                              </div>
                             </div>
-                            <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
-                              <span className="text-sm font-medium truncate text-right">
-                                {m.team2.name}
-                              </span>
-                              <TeamAvatar team={m.team2} size="sm" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                          ))}
+                        </div>
+                      </CategorySection>
+                    );
+                  })}
 
                   {/* Bracket matches — organized by category. Collapsed
                       into an accordion per-category when there's more than

@@ -23,6 +23,12 @@ interface TeamRosterCardProps {
   onDeleteTeam: (team: Team) => void;
   /** Whether the parent is currently deleting this team (disables the row). */
   deletingTeam?: boolean;
+  /**
+   * Accessible name and tooltip for the "delete" button. Used when the
+   * card lives inside a tournament so the button reads "Desinscribir" /
+   * "Quitar del torneo" instead of the default "Eliminar equipo".
+   */
+  deleteButtonLabel?: (team: Team) => string;
 }
 
 /**
@@ -40,7 +46,11 @@ export function TeamRosterCard({
   onEditTeam,
   onDeleteTeam,
   deletingTeam,
+  deleteButtonLabel,
 }: TeamRosterCardProps) {
+  const resolvedDeleteLabel = deleteButtonLabel
+    ? deleteButtonLabel(team)
+    : `Eliminar ${team.name}`;
   const [open, setOpen] = useState(false);
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(false);
@@ -184,7 +194,8 @@ export function TeamRosterCard({
             type="button"
             onClick={(e) => { e.stopPropagation(); onDeleteTeam(team); }}
             disabled={deletingTeam}
-            aria-label={`Eliminar ${team.name}`}
+            aria-label={resolvedDeleteLabel}
+            title={resolvedDeleteLabel}
             className="p-2 bg-spk-red/10 text-spk-red rounded-sm hover:bg-spk-red/20 transition-colors disabled:opacity-50"
           >
             {deletingTeam ? (

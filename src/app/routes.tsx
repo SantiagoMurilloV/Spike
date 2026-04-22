@@ -31,9 +31,6 @@ const AdminTournaments = lazy(() =>
 const AdminMatches = lazy(() =>
   import('./pages/admin/AdminMatches').then((m) => ({ default: m.AdminMatches })),
 );
-const AdminTeams = lazy(() =>
-  import('./pages/admin/AdminTeams').then((m) => ({ default: m.AdminTeams })),
-);
 const AdminJudges = lazy(() =>
   import('./pages/admin/AdminJudges').then((m) => ({ default: m.AdminJudges })),
 );
@@ -119,7 +116,6 @@ export const router = createBrowserRouter([
       { path: 'tournaments', element: withSuspense(<AdminTournaments />) },
       { path: 'tournaments/:id', element: withSuspense(<AdminTournamentDetail />) },
       { path: 'matches', element: withSuspense(<AdminMatches />) },
-      { path: 'teams', element: withSuspense(<AdminTeams />) },
       { path: 'judges', element: withSuspense(<AdminJudges />) },
       { path: 'settings', element: withSuspense(<AdminSettings />) },
     ],

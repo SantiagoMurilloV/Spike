@@ -95,6 +95,17 @@ export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModal
       setErrors({});
       setSubmitting(false);
       if (!team) {
+        // Reopening for create — wipe both the file preview and any
+        // formData left over from a previous edit session.
+        setFormData({
+          name: '',
+          initials: '',
+          primaryColor: '#E31E24',
+          secondaryColor: '#003087',
+          city: '',
+          department: '',
+          category: '',
+        });
         setLogoFile(null);
         setLogoPreview(null);
       }
