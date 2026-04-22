@@ -26,6 +26,19 @@ const REGULAR_SET_TARGET = 25;
 const FIFTH_SET_TARGET = 15;
 
 /**
+ * A set is "decided" once one team reaches the target (25 for sets 1-4,
+ * 15 for the 5th) with at least 2 points of difference. Used on hydration
+ * to figure out whether the last persisted set is a closed set or the
+ * in-progress one.
+ */
+function isSetDecided(set: SetScore, setNumber: number): boolean {
+  const target = setNumber >= 5 ? FIFTH_SET_TARGET : REGULAR_SET_TARGET;
+  const top = Math.max(set.team1, set.team2);
+  const diff = Math.abs(set.team1 - set.team2);
+  return top >= target && diff >= MIN_DIFF_TO_WIN_SET;
+}
+
+/**
  * RefereeScore — full-bleed live scoring console for a single match.
  *
  * Loads the match by id, tracks current-set points locally and commits
@@ -90,9 +103,32 @@ export function RefereeScore() {
         const data = await api.getMatch(matchId);
         if (cancelled) return;
         setMatch(data);
-        setSets(data.sets ?? []);
-        setScoreH(data.score?.team1 ?? 0);
-        setScoreA(data.score?.team2 ?? 0);
+        // Rebuild (closed sets, in-progress set) from what the server has.
+        //
+        // Persistence model: the autosave writes closed sets AND the
+        // current in-progress set as the last row in set_scores, so re-
+        // entering the match restores exactly where we left off.
+        //
+        // Rules:
+        //   • 0-0 phantom sets (leftover from an earlier buggy version
+        //     where empty sets could get persisted) are dropped on load.
+        //   • If the last persisted set is not yet "decided" by volleyball
+        //     rules, treat it as the live set and pop it into scoreH/A.
+        //   • Otherwise every persisted set is closed and we start a new
+        //     one from 0-0.
+        const persisted = (data.sets ?? []).filter(
+          (s) => s.team1 > 0 || s.team2 > 0,
+        );
+        const last = persisted[persisted.length - 1];
+        if (last && !isSetDecided(last, persisted.length)) {
+          setSets(persisted.slice(0, -1));
+          setScoreH(last.team1);
+          setScoreA(last.team2);
+        } else {
+          setSets(persisted);
+          setScoreH(0);
+          setScoreA(0);
+        }
         // If the match already has a persisted duration, rehydrate the timer
         // so "seconds since opened" isn't out of sync with reality.
         if (data.duration && data.duration > 0) {
@@ -147,11 +183,21 @@ export function RefereeScore() {
         // live 22–18 score as a "22–18 sweep" for standings purposes.
         const setsWonH = sets.filter((s) => s.team1 > s.team2).length;
         const setsWonA = sets.filter((s) => s.team2 > s.team1).length;
+
+        // Persist closed sets AND the in-progress one as the trailing row
+        // so (a) the public MatchDetail can render live set points and
+        // (b) a judge who exits the match can come back and pick up where
+        // they left off. A trailing 0-0 is skipped so we don't create a
+        // phantom "Set N" before the first rally is scored.
+        const persistedSets: SetScore[] = [...sets];
+        if (scoreH > 0 || scoreA > 0) {
+          persistedSets.push({ team1: scoreH, team2: scoreA });
+        }
         const payload: Parameters<typeof api.updateMatchScore>[1] = {
           status: 'live',
           scoreTeam1: setsWonH,
           scoreTeam2: setsWonA,
-          sets: sets.map((s, i) => ({
+          sets: persistedSets.map((s, i) => ({
             setNumber: i + 1,
             team1Points: s.team1,
             team2Points: s.team2,
