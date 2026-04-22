@@ -9,13 +9,9 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
-import {
-  api,
-  ApiError,
-  type PlatformUser,
-  type CreatePlatformUserDto,
-} from '../../services/api';
+import { api, type PlatformUser } from '../../services/api';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { CreateUserModal } from '../../components/super-admin/CreateUserModal';
 import { useAuth } from '../../context/AuthContext';
 
 /**
@@ -30,15 +26,7 @@ export function SuperAdminUsers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [form, setForm] = useState<CreatePlatformUserDto>({
-    username: '',
-    password: '',
-    role: 'admin',
-    displayName: '',
-    tournamentQuota: 1,
-    createdBy: null,
-  });
-  const [creating, setCreating] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -62,38 +50,6 @@ export function SuperAdminUsers() {
   useEffect(() => {
     load();
   }, [load]);
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreating(true);
-    try {
-      const dto: CreatePlatformUserDto = {
-        username: form.username.trim(),
-        password: form.password,
-        role: form.role,
-        displayName: form.displayName?.trim() || undefined,
-        tournamentQuota:
-          form.role === 'admin' ? Number(form.tournamentQuota ?? 1) : undefined,
-        createdBy: form.role === 'judge' ? form.createdBy ?? null : null,
-      };
-      await api.createPlatformUser(dto);
-      toast.success(`Usuario ${dto.username} creado`);
-      setForm({
-        username: '',
-        password: '',
-        role: 'admin',
-        displayName: '',
-        tournamentQuota: 1,
-        createdBy: null,
-      });
-      await load();
-    } catch (err) {
-      const msg = err instanceof ApiError ? err.message : (err as Error).message;
-      toast.error(msg);
-    } finally {
-      setCreating(false);
-    }
-  };
 
   const handleDelete = async () => {
     if (!pendingDeleteId) return;
@@ -162,126 +118,35 @@ export function SuperAdminUsers() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
-      <div>
-        <h1
-          className="text-2xl sm:text-3xl font-bold"
-          style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+      {/* Header with create-user CTA */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <h1
+            className="text-2xl sm:text-3xl font-bold"
+            style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+          >
+            USUARIOS
+          </h1>
+          <p className="text-black/60">
+            Creá, editá y eliminá administradores, jueces y otros super administradores.
+          </p>
+        </div>
+        <motion.button
+          type="button"
+          onClick={() => setCreateModalOpen(true)}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-spk-red hover:bg-spk-red-dark text-white rounded-sm font-bold transition-colors whitespace-nowrap"
         >
-          USUARIOS
-        </h1>
-        <p className="text-black/60">
-          Creá, editá y eliminá administradores, jueces y otros super administradores.
-        </p>
-      </div>
-
-      {/* Create user form */}
-      <section className="bg-white border-2 border-black/10 rounded-sm overflow-hidden">
-        <div className="bg-black text-white px-4 sm:px-5 py-3">
-          <h2
-            className="font-bold uppercase text-sm sm:text-base"
-            style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
+          <Plus className="w-4 h-4" />
+          <span
+            style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.05em' }}
+            className="uppercase"
           >
             Crear usuario
-          </h2>
-        </div>
-        <form
-          onSubmit={handleCreate}
-          className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-          noValidate
-        >
-          <Field label="Usuario *">
-            <input
-              type="text"
-              required
-              value={form.username}
-              onChange={(e) => setForm({ ...form, username: e.target.value })}
-              placeholder="Ej: juan.perez"
-              autoComplete="off"
-              className="w-full px-3 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
-            />
-          </Field>
-          <Field label="Contraseña *">
-            <input
-              type="password"
-              required
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              placeholder="Mín 8 chars, con letra y número"
-              autoComplete="new-password"
-              className="w-full px-3 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
-            />
-          </Field>
-          <Field label="Nombre visible">
-            <input
-              type="text"
-              value={form.displayName ?? ''}
-              onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-              placeholder="Opcional"
-              className="w-full px-3 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
-            />
-          </Field>
-          <Field label="Rol *">
-            <select
-              value={form.role}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  role: e.target.value as CreatePlatformUserDto['role'],
-                })
-              }
-              className="w-full px-3 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red bg-white"
-            >
-              <option value="admin">Administrador de torneos</option>
-              <option value="judge">Juez</option>
-              <option value="super_admin">Super administrador</option>
-            </select>
-          </Field>
-          {form.role === 'admin' && (
-            <Field label="Cupo de torneos">
-              <input
-                type="number"
-                min={0}
-                value={form.tournamentQuota ?? 1}
-                onChange={(e) =>
-                  setForm({ ...form, tournamentQuota: Number(e.target.value) })
-                }
-                className="w-full px-3 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
-              />
-            </Field>
-          )}
-          {form.role === 'judge' && (
-            <Field label="Admin dueño del juez">
-              <select
-                value={form.createdBy ?? ''}
-                onChange={(e) =>
-                  setForm({ ...form, createdBy: e.target.value || null })
-                }
-                className="w-full px-3 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red bg-white"
-              >
-                <option value="">Sin admin (plataforma)</option>
-                {admins.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.username}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          )}
-          <div className="md:col-span-2 lg:col-span-3 flex justify-end">
-            <motion.button
-              type="submit"
-              disabled={creating}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="inline-flex items-center gap-2 px-5 py-3 bg-spk-red hover:bg-spk-red-dark text-white rounded-sm font-bold uppercase disabled:opacity-50"
-              style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
-            >
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              Crear usuario
-            </motion.button>
-          </div>
-        </form>
-      </section>
+          </span>
+        </motion.button>
+      </div>
 
       {/* Users table */}
       <section className="bg-white border-2 border-black/10 rounded-sm overflow-hidden">
@@ -419,6 +284,13 @@ export function SuperAdminUsers() {
         </div>
       </section>
 
+      <CreateUserModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onCreated={load}
+        admins={admins}
+      />
+
       <ConfirmDialog
         open={pendingDeleteId !== null}
         onOpenChange={(openDialog) => {
@@ -435,20 +307,6 @@ export function SuperAdminUsers() {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span
-        className="block text-xs font-bold uppercase tracking-wider mb-1"
-        style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
-      >
-        {label}
-      </span>
-      {children}
-    </label>
-  );
-}
 
 function Th({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
