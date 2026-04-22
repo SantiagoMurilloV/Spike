@@ -43,6 +43,13 @@ export interface PlatformUser {
   tournamentQuota: number;
   createdBy?: string | null;
   ownedTournamentsCount: number;
+  /**
+   * Free-form note only visible to super_admin. Lives in the users
+   * table (`admin_note` column). NOT a password substitute — intended
+   * as a memory aid the platform owner can use to remember what they
+   * assigned to each account.
+   */
+  adminNote?: string | null;
   createdAt?: string;
 }
 
@@ -54,6 +61,7 @@ export interface CreatePlatformUserDto {
   tournamentQuota?: number;
   /** Only meaningful for judges — which admin they belong to. */
   createdBy?: string | null;
+  adminNote?: string | null;
 }
 
 export interface UpdatePlatformUserDto {
@@ -64,6 +72,7 @@ export interface UpdatePlatformUserDto {
   username?: string;
   /** Optional password reset. Must pass the same strength policy as create. */
   password?: string;
+  adminNote?: string | null;
 }
 
 function mapUser(row: Record<string, unknown>): PlatformUser {
@@ -75,6 +84,7 @@ function mapUser(row: Record<string, unknown>): PlatformUser {
     tournamentQuota: (row.tournament_quota as number | null) ?? 0,
     createdBy: (row.created_by as string | null) ?? null,
     ownedTournamentsCount: Number(row.owned_count ?? 0),
+    adminNote: (row.admin_note as string | null) ?? null,
     createdAt: row.created_at as string | undefined,
   };
 }
@@ -122,7 +132,7 @@ export class PlatformService {
     const pool = getPool();
     const result = await pool.query(`
       SELECT u.id, u.username, u.role, u.display_name, u.tournament_quota,
-             u.created_by, u.created_at,
+             u.created_by, u.created_at, u.admin_note,
              COUNT(t.id) AS owned_count
       FROM users u
       LEFT JOIN tournaments t ON t.owner_id = u.id
@@ -171,12 +181,13 @@ export class PlatformService {
     const tournamentQuota =
       role === 'admin' ? (data.tournamentQuota ?? 1) : 0;
     const createdBy = role === 'judge' ? (data.createdBy ?? null) : null;
+    const adminNote = data.adminNote?.trim() || null;
 
     const result = await pool.query(
-      `INSERT INTO users (username, password_hash, role, display_name, tournament_quota, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO users (username, password_hash, role, display_name, tournament_quota, created_by, admin_note)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [username, hash, role, displayName, tournamentQuota, createdBy],
+      [username, hash, role, displayName, tournamentQuota, createdBy, adminNote],
     );
     return mapUser({ ...result.rows[0], owned_count: 0 });
   }
@@ -238,6 +249,11 @@ export class PlatformService {
       const hash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
       fields.push(`password_hash = $${idx}`);
       values.push(hash);
+      idx++;
+    }
+    if (data.adminNote !== undefined) {
+      fields.push(`admin_note = $${idx}`);
+      values.push(data.adminNote?.trim() || null);
       idx++;
     }
 

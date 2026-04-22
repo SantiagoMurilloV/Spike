@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, Loader2, Check, Pencil } from 'lucide-react';
+import { X, Loader2, Check, Pencil, Zap, Eye, EyeOff, Lock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import {
@@ -8,60 +8,82 @@ import {
   type PlatformUser,
   type UpdatePlatformUserDto,
 } from '../../services/api';
+import { generatePassword } from '../../lib/passwordGen';
 
 interface EditUserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Called after a successful update so the parent can refresh its list. */
-  onSaved: () => void | Promise<void>;
+  /**
+   * Called after a successful update. If a password was set during this
+   * save, `newPassword` holds the plaintext so the caller can open a
+   * show-once confirmation modal with it. Otherwise it's null.
+   */
+  onSaved: (args: { newPassword: string | null }) => void | Promise<void>;
   user: PlatformUser | null;
 }
 
 /**
- * Modal for super-admin to edit an existing user's identity + password.
+ * Edit an existing user's identity + credentials.
  *
- * Fields:
- *   · username      — must be unique, url-safe, ≥3 chars
- *   · display name  — free text, optional
- *   · new password  — blank leaves the current password untouched;
- *                     when filled must pass the 8-char/letter+digit policy
+ * The password field starts "locked": it displays a fake masked
+ * placeholder so the super_admin sees there's a password on file,
+ * but the real value is impossible to retrieve (bcrypt, one-way).
+ * Clicking Reemplazar unlocks the field — they can either type one
+ * manually or hit Generar for a random readable one.
  *
- * Role and quota are NOT exposed here — those already have dedicated
- * editors in the table (RoleBadge is read-only today; quota has inline
- * pencil). Keeping the modal focused on "identity + credentials" avoids
- * accidental role-change clicks.
+ * On save, if a new password was set we pass it back to the parent
+ * so it can show the NewPasswordModal receipt.
  */
 export function EditUserModal({ isOpen, onClose, onSaved, user }: EditUserModalProps) {
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [adminNote, setAdminNote] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  /** When `false` the password input shows a locked placeholder and
+   *  disables editing — matches the "not retrievable" reality but
+   *  still gives a clear "click to replace" affordance. */
+  const [passwordUnlocked, setPasswordUnlocked] = useState(false);
+  const [showPasswordValue, setShowPasswordValue] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen && user) {
       setUsername(user.username);
       setDisplayName(user.displayName ?? '');
+      setAdminNote(user.adminNote ?? '');
       setNewPassword('');
+      setPasswordUnlocked(false);
+      setShowPasswordValue(false);
       setSubmitting(false);
     }
   }, [isOpen, user]);
+
+  const handleGenerate = () => {
+    setNewPassword(generatePassword());
+    setPasswordUnlocked(true);
+    // Show the generated value so the super_admin can verify / memorize
+    // before they hit Guardar. The post-save receipt repeats it anyway.
+    setShowPasswordValue(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     setSubmitting(true);
     try {
-      // Only send fields that actually changed so the server can keep its
-      // partial-update semantics (username uniqueness check only runs if
-      // a new username was supplied, etc.).
       const dto: UpdatePlatformUserDto = {};
       const trimmedUsername = username.trim();
       const trimmedDisplay = displayName.trim();
+      const trimmedNote = adminNote.trim();
       if (trimmedUsername !== user.username) dto.username = trimmedUsername;
       if (trimmedDisplay !== (user.displayName ?? '')) {
         dto.displayName = trimmedDisplay;
       }
-      if (newPassword.trim()) dto.password = newPassword;
+      if (trimmedNote !== (user.adminNote ?? '')) {
+        dto.adminNote = trimmedNote;
+      }
+      const willChangePassword = passwordUnlocked && newPassword.trim().length > 0;
+      if (willChangePassword) dto.password = newPassword;
 
       if (Object.keys(dto).length === 0) {
         toast.info('No hay cambios para guardar');
@@ -71,7 +93,9 @@ export function EditUserModal({ isOpen, onClose, onSaved, user }: EditUserModalP
 
       await api.updatePlatformUser(user.id, dto);
       toast.success('Usuario actualizado');
-      await onSaved();
+      await onSaved({
+        newPassword: willChangePassword ? newPassword : null,
+      });
       onClose();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : (err as Error).message;
@@ -94,7 +118,6 @@ export function EditUserModal({ isOpen, onClose, onSaved, user }: EditUserModalP
         role="dialog"
         aria-labelledby="edit-user-title"
       >
-        {/* Header */}
         <div className="sticky top-0 bg-white border-b border-black/10 px-4 sm:px-6 py-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-2">
             <Pencil className="w-5 h-5 text-spk-blue" aria-hidden="true" />
@@ -139,21 +162,84 @@ export function EditUserModal({ isOpen, onClose, onSaved, user }: EditUserModalP
             />
           </Field>
 
-          <Field label="Nueva contraseña">
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Dejar vacío para no cambiarla"
-              autoComplete="new-password"
-              className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
+          {/* Password — locked by default, replaceable via button */}
+          <Field label="Contraseña">
+            {!passwordUnlocked ? (
+              <div className="flex items-stretch gap-2">
+                <div className="flex-1 px-4 py-2 border-2 border-black/10 bg-black/[0.03] rounded-sm flex items-center gap-2 text-black/50">
+                  <Lock className="w-4 h-4" aria-hidden="true" />
+                  <span className="font-mono tracking-[0.3em] select-none">••••••••</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPasswordUnlocked(true)}
+                  className="px-3 py-2 bg-black/5 hover:bg-black/10 rounded-sm text-xs font-bold uppercase whitespace-nowrap"
+                  style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
+                >
+                  Reemplazar
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-stretch gap-2">
+                  <div className="flex-1 relative">
+                    <input
+                      type={showPasswordValue ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Mín 8 chars, con letra y número"
+                      autoComplete="new-password"
+                      className="w-full px-4 py-2 pr-10 border-2 border-spk-red/40 rounded-sm focus:outline-none focus:border-spk-red font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordValue((v) => !v)}
+                      aria-label={showPasswordValue ? 'Ocultar' : 'Mostrar'}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-black/40 hover:text-black"
+                    >
+                      {showPasswordValue ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    className="px-3 py-2 bg-spk-red text-white hover:bg-spk-red-dark rounded-sm text-xs font-bold uppercase whitespace-nowrap inline-flex items-center gap-1"
+                    style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
+                  >
+                    <Zap className="w-3.5 h-3.5" aria-hidden="true" />
+                    Generar
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPasswordUnlocked(false);
+                    setNewPassword('');
+                    setShowPasswordValue(false);
+                  }}
+                  className="text-xs text-black/50 hover:text-black/80 underline"
+                >
+                  Cancelar cambio de contraseña
+                </button>
+              </div>
+            )}
+          </Field>
+
+          {/* Super_admin's private note */}
+          <Field label="Nota privada (solo vos la ves)">
+            <textarea
+              value={adminNote}
+              onChange={(e) => setAdminNote(e.target.value)}
+              placeholder='Ej: "cliente del Cup Sub-14, contraseña basada en su año"'
+              rows={2}
+              className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red resize-y"
             />
             <p className="mt-1 text-xs text-black/50">
-              Mínimo 8 caracteres, con al menos una letra y un número.
+              Memoria personal. No es la contraseña — es solo texto para que
+              te acuerdes qué usaste. Nunca se muestra a nadie más.
             </p>
           </Field>
 
-          {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-black/10">
             <button
               type="button"

@@ -14,6 +14,7 @@ import { api, type PlatformUser } from '../../services/api';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { CreateUserModal } from '../../components/super-admin/CreateUserModal';
 import { EditUserModal } from '../../components/super-admin/EditUserModal';
+import { NewPasswordModal } from '../../components/super-admin/NewPasswordModal';
 import { useAuth } from '../../context/AuthContext';
 
 /**
@@ -31,6 +32,12 @@ export function SuperAdminUsers() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   /** Set when the super_admin clicks the pencil on a row. null = closed. */
   const [editingUser, setEditingUser] = useState<PlatformUser | null>(null);
+  /** When a create/reset generates a new plaintext password we hold it
+   *  here just long enough for NewPasswordModal to show it once. */
+  const [newPasswordReceipt, setNewPasswordReceipt] = useState<{
+    username: string;
+    password: string;
+  } | null>(null);
 
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -295,7 +302,20 @@ export function SuperAdminUsers() {
       <CreateUserModal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
-        onCreated={load}
+        onCreated={async ({ newPassword }) => {
+          // Reload the table first so the new row is visible underneath,
+          // then surface the show-once password receipt on top.
+          await load();
+          // We don't have the username from the server response here,
+          // but listUsers() just reloaded — find the freshest row.
+          const created = (await api.listPlatformUsers())
+            .slice()
+            .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))[0];
+          setNewPasswordReceipt({
+            username: created?.username ?? 'nuevo usuario',
+            password: newPassword,
+          });
+        }}
         admins={admins}
       />
 
@@ -303,7 +323,21 @@ export function SuperAdminUsers() {
         isOpen={editingUser !== null}
         user={editingUser}
         onClose={() => setEditingUser(null)}
-        onSaved={load}
+        onSaved={async ({ newPassword }) => {
+          await load();
+          if (newPassword && editingUser) {
+            setNewPasswordReceipt({
+              username: editingUser.username,
+              password: newPassword,
+            });
+          }
+        }}
+      />
+
+      <NewPasswordModal
+        username={newPasswordReceipt?.username ?? ''}
+        password={newPasswordReceipt?.password ?? null}
+        onClose={() => setNewPasswordReceipt(null)}
       />
 
       <ConfirmDialog

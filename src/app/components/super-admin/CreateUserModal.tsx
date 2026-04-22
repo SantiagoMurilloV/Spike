@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, Loader2, Plus, UserPlus } from 'lucide-react';
+import { X, Loader2, Plus, UserPlus, Zap, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import {
@@ -8,21 +8,24 @@ import {
   type CreatePlatformUserDto,
   type PlatformUser,
 } from '../../services/api';
+import { generatePassword } from '../../lib/passwordGen';
 
 interface CreateUserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Called after a successful create so the parent can refresh its list. */
-  onCreated: () => void | Promise<void>;
+  /**
+   * Called after a successful create. `newPassword` holds the plaintext
+   * that was just assigned so the caller can show it in the receipt modal.
+   */
+  onCreated: (args: { newPassword: string }) => void | Promise<void>;
   /** Admin options shown in the "Admin dueño del juez" dropdown when role=judge. */
   admins: PlatformUser[];
 }
 
 /**
- * Modal form for the super-admin "Crear usuario" flow. Keeps the
- * SuperAdminUsers page clean by moving the 6-field form out of the
- * main layout. Mirrors the styling / spacing of TeamFormModal /
- * PlayerFormModal so modal chrome is consistent across the app.
+ * Create-user modal. The password can either be typed or generated on
+ * the spot; either way the plaintext is handed back to the parent so
+ * it can surface a show-once receipt with a copy button.
  */
 export function CreateUserModal({ isOpen, onClose, onCreated, admins }: CreateUserModalProps) {
   const [form, setForm] = useState<CreatePlatformUserDto>({
@@ -32,11 +35,11 @@ export function CreateUserModal({ isOpen, onClose, onCreated, admins }: CreateUs
     displayName: '',
     tournamentQuota: 1,
     createdBy: null,
+    adminNote: '',
   });
+  const [showPasswordValue, setShowPasswordValue] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Reset the form whenever the modal reopens so stale values don't leak
-  // between sessions (e.g. opened → cancel → reopened).
   useEffect(() => {
     if (isOpen) {
       setForm({
@@ -46,10 +49,17 @@ export function CreateUserModal({ isOpen, onClose, onCreated, admins }: CreateUs
         displayName: '',
         tournamentQuota: 1,
         createdBy: null,
+        adminNote: '',
       });
+      setShowPasswordValue(false);
       setSubmitting(false);
     }
   }, [isOpen]);
+
+  const handleGenerate = () => {
+    setForm((f) => ({ ...f, password: generatePassword() }));
+    setShowPasswordValue(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,15 +70,14 @@ export function CreateUserModal({ isOpen, onClose, onCreated, admins }: CreateUs
         password: form.password,
         role: form.role,
         displayName: form.displayName?.trim() || undefined,
-        // Server ignores fields that don't apply to the role, but sending
-        // only the relevant ones keeps wire payloads clean.
         tournamentQuota:
           form.role === 'admin' ? Number(form.tournamentQuota ?? 1) : undefined,
         createdBy: form.role === 'judge' ? form.createdBy ?? null : null,
+        adminNote: form.adminNote?.trim() || null,
       };
       await api.createPlatformUser(dto);
       toast.success(`Usuario ${dto.username} creado`);
-      await onCreated();
+      await onCreated({ newPassword: dto.password });
       onClose();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : (err as Error).message;
@@ -91,7 +100,6 @@ export function CreateUserModal({ isOpen, onClose, onCreated, admins }: CreateUs
         role="dialog"
         aria-labelledby="create-user-title"
       >
-        {/* Header */}
         <div className="sticky top-0 bg-white border-b border-black/10 px-4 sm:px-6 py-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-2">
             <UserPlus className="w-5 h-5 text-spk-red" aria-hidden="true" />
@@ -128,15 +136,36 @@ export function CreateUserModal({ isOpen, onClose, onCreated, admins }: CreateUs
           </Field>
 
           <Field label="Contraseña *">
-            <input
-              type="password"
-              required
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              placeholder="Mínimo 8 caracteres, con letra y número"
-              autoComplete="new-password"
-              className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
-            />
+            <div className="flex items-stretch gap-2">
+              <div className="flex-1 relative">
+                <input
+                  type={showPasswordValue ? 'text' : 'password'}
+                  required
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  placeholder="Mín 8 chars, con letra y número"
+                  autoComplete="new-password"
+                  className="w-full px-4 py-2 pr-10 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordValue((v) => !v)}
+                  aria-label={showPasswordValue ? 'Ocultar' : 'Mostrar'}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-black/40 hover:text-black"
+                >
+                  {showPasswordValue ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={handleGenerate}
+                className="px-3 py-2 bg-spk-red text-white hover:bg-spk-red-dark rounded-sm text-xs font-bold uppercase whitespace-nowrap inline-flex items-center gap-1"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
+              >
+                <Zap className="w-3.5 h-3.5" aria-hidden="true" />
+                Generar
+              </button>
+            </div>
           </Field>
 
           <Field label="Nombre visible">
@@ -199,7 +228,19 @@ export function CreateUserModal({ isOpen, onClose, onCreated, admins }: CreateUs
             </Field>
           )}
 
-          {/* Actions */}
+          <Field label="Nota privada (solo vos la ves)">
+            <textarea
+              value={form.adminNote ?? ''}
+              onChange={(e) => setForm({ ...form, adminNote: e.target.value })}
+              placeholder='Ej: "cliente del Cup Sub-14, usa su año de nacimiento"'
+              rows={2}
+              className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red resize-y"
+            />
+            <p className="mt-1 text-xs text-black/50">
+              Memoria personal. No es la contraseña.
+            </p>
+          </Field>
+
           <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-black/10">
             <button
               type="button"

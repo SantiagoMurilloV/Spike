@@ -137,6 +137,8 @@ export interface PlatformUser {
   tournamentQuota: number;
   createdBy?: string | null;
   ownedTournamentsCount: number;
+  /** Free-text note, only visible to super_admin. Memory aid only. */
+  adminNote?: string | null;
   createdAt?: string;
 }
 
@@ -147,6 +149,7 @@ export interface CreatePlatformUserDto {
   displayName?: string;
   tournamentQuota?: number;
   createdBy?: string | null;
+  adminNote?: string | null;
 }
 
 export interface UpdatePlatformUserDto {
@@ -155,6 +158,7 @@ export interface UpdatePlatformUserDto {
   displayName?: string;
   username?: string;
   password?: string;
+  adminNote?: string | null;
 }
 
 // ── Backend response shapes (raw from API) ─────────────────────────
