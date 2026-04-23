@@ -1,0 +1,47 @@
+import type { Tournament } from '../../types';
+
+/** Pre-persistence shape of a round-robin / league match. */
+export interface MatchFixture {
+  team1Id: string;
+  team2Id: string;
+  phase: string;
+  groupName?: string;
+  status: 'upcoming';
+}
+
+/** Pre-persistence shape of a bracket-match slot. */
+export interface BracketFixture {
+  round: number;
+  position: number;
+  team1Id: string | null;
+  team2Id: string | null;
+  roundName: string;
+  team1Placeholder?: string;
+  team2Placeholder?: string;
+}
+
+/** Schedule-generation knobs the admin picks on the Cruces modal. */
+export interface ScheduleConfig {
+  startTime?: string;
+  endTime?: string;
+  matchDuration?: number;
+  breakDuration?: number;
+  courtCount?: number;
+}
+
+/** Minimum team count required to generate fixtures for each format. */
+export const MIN_TEAMS: Record<Tournament['format'], number> = {
+  groups: 4,
+  knockout: 2,
+  'groups+knockout': 4,
+  league: 3,
+};
+
+/** User-facing error message when MIN_TEAMS isn't met. */
+export const MIN_TEAMS_MESSAGES: Record<Tournament['format'], string> = {
+  groups: 'Se necesitan al menos 4 equipos inscritos para generar cruces en formato de grupos',
+  knockout: 'Se necesitan al menos 2 equipos inscritos para generar cruces en formato de eliminación',
+  'groups+knockout':
+    'Se necesitan al menos 4 equipos inscritos para generar cruces en formato de grupos + eliminación',
+  league: 'Se necesitan al menos 3 equipos inscritos para generar cruces en formato de liga',
+};
