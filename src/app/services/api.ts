@@ -537,6 +537,19 @@ export const api = {
     await request<void>('/admin/reset-data', { method: 'POST' });
   },
 
+  /**
+   * Lightweight stats for the admin home — just the three numbers the
+   * simplified dashboard needs. Polled every ~30 s so the presence
+   * counters stay reasonably fresh.
+   */
+  async getAdminDashboardStats(): Promise<{
+    liveMatches: number;
+    activeJudges: number;
+    activeVisitors: number;
+  }> {
+    return request('/admin/dashboard-stats');
+  },
+
   // ── Push notifications ─────────────────────────────────────────
   async getVapidPublicKey(): Promise<{ publicKey: string }> {
     return request<{ publicKey: string }>('/push/vapid-public-key');

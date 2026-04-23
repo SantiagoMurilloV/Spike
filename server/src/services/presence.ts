@@ -52,6 +52,25 @@ export function getPresence(): { activeUsers: number; activeVisitors: number } {
   };
 }
 
+/**
+ * Returns the set of userIds considered "active" right now. Callers use
+ * this to filter their own population (e.g. admin wants to know which of
+ * ITS judges are online) without leaking the whole map.
+ */
+export function getActiveUserIds(): Set<string> {
+  const cutoff = Date.now() - ACTIVE_WINDOW_MS;
+  const ids = new Set<string>();
+  for (const [id, ts] of users) {
+    if (ts > cutoff) ids.add(id);
+  }
+  return ids;
+}
+
+/** Count of unique visitor fingerprints active in the last 5 min. */
+export function getActiveVisitorsCount(): number {
+  return countActive(visitors);
+}
+
 /** Drop stale entries so the maps don't grow forever. */
 function prune(): void {
   const cutoff = Date.now() - ACTIVE_WINDOW_MS;

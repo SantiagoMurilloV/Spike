@@ -1,274 +1,172 @@
-import { Trophy, Calendar, Users, Eye, Plus, ArrowRight, Loader2 } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import { MatchCard } from '../../components/MatchCard';
+import { UserCheck, Eye } from 'lucide-react';
 import { motion } from 'motion/react';
+import { MatchCard } from '../../components/MatchCard';
 import { useData } from '../../context/DataContext';
+import { api } from '../../services/api';
+
+/**
+ * Minimal admin home. The old dashboard was a wall of stats + lists;
+ * this version only surfaces what the admin actually acts on from the
+ * landing page:
+ *
+ *   · Live matches (hidden entirely if there are none)
+ *   · Jueces activos — scoped to this admin's own judges, polls every 30s
+ *   · Visitantes — unique fingerprints hitting the public site in the
+ *                  last 5 min (shared presence tracker, same number
+ *                  the super-admin sees)
+ *
+ * Everything else (upcoming matches, active tournaments, stats grid)
+ * moved to its dedicated page in the sidebar or to the tournament
+ * detail — nothing is being removed, just consolidated.
+ */
+const STATS_REFRESH_MS = 30_000;
 
 export function AdminDashboard() {
   const navigate = useNavigate();
-  const { tournaments, matches, teams, loading } = useData();
+  const { matches } = useData();
 
-  const liveMatches = matches.filter(m => m.status === 'live');
-  const upcomingMatches = matches.filter(m => m.status === 'upcoming').slice(0, 5);
-  const activeTournaments = tournaments.filter(t => t.status === 'ongoing');
-  const completedMatches = matches.filter(m => m.status === 'completed');
+  const [stats, setStats] = useState<{
+    liveMatches: number;
+    activeJudges: number;
+    activeVisitors: number;
+  } | null>(null);
 
-  const isLoading = loading.tournaments || loading.matches || loading.teams;
+  const loadStats = useCallback(async () => {
+    try {
+      const s = await api.getAdminDashboardStats();
+      setStats(s);
+    } catch {
+      // non-fatal: the live-matches list below still renders from useData
+    }
+  }, []);
 
-  const stats = [
-    {
-      icon: Trophy,
-      label: 'Torneos Activos',
-      value: activeTournaments.length,
-      color: 'bg-spk-gold',
-      trend: `${tournaments.length} total`,
-    },
-    {
-      icon: Calendar,
-      label: 'Partidos Programados',
-      value: matches.filter(m => m.status === 'upcoming').length,
-      color: 'bg-spk-blue',
-      trend: `${completedMatches.length} finalizados`,
-    },
-    {
-      icon: Users,
-      label: 'Equipos Registrados',
-      value: teams.length,
-      color: 'bg-spk-win',
-      trend: `${matches.length} partidos`,
-    },
-    {
-      icon: Eye,
-      label: 'Partidos en Vivo',
-      value: liveMatches.length,
-      color: 'bg-spk-red',
-      trend: liveMatches.length > 0 ? 'Ahora' : 'Ninguno',
-    },
-  ];
+  useEffect(() => {
+    loadStats();
+    const id = setInterval(loadStats, STATS_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [loadStats]);
+
+  // Local live matches — derived from the DataContext feed so they
+  // update alongside everything else (no separate fetch).
+  const liveMatches = matches.filter((m) => m.status === 'live');
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <div className="border-b-2 border-black/10 bg-black text-white">
-        <div className="p-4 sm:p-6 md:p-12">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <div>
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter mb-3" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                DASHBOARD
-              </h1>
-              <div className="w-20 h-1 bg-spk-red mb-4" />
-              <p className="text-white/60 text-base sm:text-lg">Vista general del sistema de torneos</p>
-            </div>
-            <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-              <motion.button
-                onClick={() => navigate('/admin/matches')}
-                whileHover={{ scale: 1.05, backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-                whileTap={{ scale: 0.98 }}
-                className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3 border border-white/20 rounded-sm transition-colors"
-                style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
-              >
-                <Plus className="w-5 h-5" />
-                <span className="font-bold uppercase tracking-wider text-sm" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                  Nuevo Partido
-                </span>
-              </motion.button>
-              <motion.button
-                onClick={() => navigate('/admin/tournaments')}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.98 }}
-                className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-spk-red hover:bg-spk-red/90 rounded-sm transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-                <span className="font-bold uppercase tracking-wider text-sm" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                  Nuevo Torneo
-                </span>
-              </motion.button>
-            </div>
-          </div>
-        </div>
+    <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
+      {/* Header — subtle, matches the tournament detail page style. */}
+      <div>
+        <h1
+          className="text-lg sm:text-xl font-bold uppercase tracking-wider text-black/80"
+          style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
+        >
+          Dashboard
+        </h1>
+        <p className="text-xs text-black/50 mt-0.5">
+          Resumen rápido: tus partidos en vivo, jueces conectados y visitas.
+        </p>
       </div>
 
-      <div className="p-4 sm:p-6 md:p-12 space-y-8 sm:space-y-12">
-        {/* Loading indicator */}
-        {isLoading && (
-          <div className="flex items-center justify-center gap-2 text-black/60">
-            <Loader2 className="w-5 h-5 animate-spin" />
-            <span className="text-sm">Cargando datos...</span>
-          </div>
-        )}
+      {/* Two presence cards — judges + visitors */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <LiveCard
+          label="Jueces activos"
+          value={stats?.activeJudges ?? 0}
+          hint="Tus jueces con actividad en los últimos 5 minutos"
+          Icon={UserCheck}
+          accent="bg-spk-win/10 text-spk-win"
+        />
+        <LiveCard
+          label="Visitantes"
+          value={stats?.activeVisitors ?? 0}
+          hint="Personas navegando el sitio público ahora mismo"
+          Icon={Eye}
+          accent="bg-spk-blue/10 text-spk-blue"
+        />
+      </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          {stats.map((stat, index) => {
-            const Icon = stat.icon;
-            return (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                whileHover={{ y: -4 }}
-                className="border-2 p-4 md:p-6 transition-all"
-                style={{ backgroundColor: 'rgba(0, 0, 0, 0.05)', borderColor: 'rgba(0, 0, 0, 0.1)' }}
-              >
-                <div className="flex items-center justify-between mb-3 md:mb-4">
-                  <div className={`w-10 h-10 md:w-12 md:h-12 ${stat.color} rounded-sm flex items-center justify-center`}>
-                    <Icon className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                  </div>
-                  {stat.trend && (
-                    <div className="text-xs md:text-sm text-black/50 uppercase tracking-wider font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                      {stat.trend}
-                    </div>
-                  )}
-                </div>
-                <div className="text-3xl md:text-4xl font-bold mb-1 md:mb-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                  {stat.value}
-                </div>
-                <div className="text-xs md:text-sm text-black/60 uppercase tracking-wider font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                  {stat.label}
-                </div>
-              </motion.div>
-            );
-          })}
+      {/* Live matches — shown only if any exist, matches the subtle
+          "En vivo" pattern used inside the tournament Partidos tab. */}
+      {liveMatches.length > 0 && (
+        <section>
+          <h2
+            className="flex items-center gap-2 text-xs font-semibold uppercase text-spk-red mb-3"
+            style={{
+              fontFamily: 'Barlow Condensed, sans-serif',
+              letterSpacing: '0.14em',
+            }}
+          >
+            <span className="relative inline-flex w-2 h-2">
+              <span className="absolute inline-flex w-full h-full rounded-full bg-spk-red opacity-75 animate-ping" />
+              <span className="relative inline-flex w-2 h-2 rounded-full bg-spk-red" />
+            </span>
+            En vivo
+            <span className="text-black/40 font-medium tabular-nums">
+              ({liveMatches.length})
+            </span>
+          </h2>
+          <div className="space-y-3">
+            {liveMatches.map((m) => (
+              <MatchCard
+                key={m.id}
+                match={m}
+                onClick={() => navigate(`/admin/referee/${m.id}`)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+// ── Presence card ─────────────────────────────────────────────────
+
+function LiveCard({
+  label,
+  value,
+  hint,
+  Icon,
+  accent,
+}: {
+  label: string;
+  value: number;
+  hint: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  accent: string;
+}) {
+  return (
+    <div className="bg-white border-2 border-black/10 rounded-sm p-5 relative overflow-hidden">
+      <div className="flex items-start gap-4">
+        <div
+          className={`relative w-11 h-11 rounded-sm flex items-center justify-center flex-shrink-0 ${accent}`}
+        >
+          <Icon className="w-5 h-5" aria-hidden="true" />
+          <motion.span
+            className="absolute inset-0 rounded-sm"
+            style={{ backgroundColor: 'currentColor', opacity: 0.2 }}
+            animate={{ scale: [1, 1.35, 1], opacity: [0.2, 0, 0.2] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            aria-hidden="true"
+          />
         </div>
-
-        {/* Live Matches */}
-        {liveMatches.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-3xl font-bold tracking-tighter flex items-center gap-3" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                  <motion.div
-                    className="w-3 h-3 bg-spk-red rounded-full"
-                    animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  />
-                  PARTIDOS EN VIVO
-                </h2>
-                <div className="w-16 h-1 bg-spk-red mt-2" />
-              </div>
-              <motion.button
-                whileHover={{ x: 5 }}
-                onClick={() => navigate('/admin/matches')}
-                className="text-sm font-bold text-black/60 hover:text-black flex items-center gap-2 uppercase tracking-wider"
-                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-              >
-                Ver todos <ArrowRight className="w-4 h-4" />
-              </motion.button>
-            </div>
-            <div className="space-y-4">
-              {liveMatches.map(match => (
-                // Admin shortcut: clicking a live match opens the referee
-                // console directly, which is the action an organizer wants.
-                <MatchCard
-                  key={match.id}
-                  match={match}
-                  onClick={() => navigate(`/admin/referee/${match.id}`)}
-                />
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {/* Upcoming Matches */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-3xl font-bold tracking-tighter" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                PRÓXIMOS PARTIDOS
-              </h2>
-              <div className="w-16 h-1 bg-black mt-2" />
-            </div>
-            <motion.button
-              whileHover={{ x: 5 }}
-              onClick={() => navigate('/admin/matches')}
-              className="text-sm font-bold text-black/60 hover:text-black flex items-center gap-2 uppercase tracking-wider"
-              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-            >
-              Ver todos <ArrowRight className="w-4 h-4" />
-            </motion.button>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-wider text-black/60 font-bold">
+              {label}
+            </span>
+            <span className="inline-block w-2 h-2 rounded-full bg-spk-win animate-pulse" />
           </div>
-          {upcomingMatches.length > 0 ? (
-            <div className="space-y-4">
-              {upcomingMatches.map(match => (
-                // Upcoming matches jump straight into the referee console so
-                // an organizer can start live-scoring without going through
-                // /admin/matches first.
-                <MatchCard
-                  key={match.id}
-                  match={match}
-                  onClick={() => navigate(`/admin/referee/${match.id}`)}
-                />
-              ))}
-            </div>
-          ) : (
-            <p className="text-black/40 text-center py-8">No hay partidos próximos programados</p>
-          )}
-        </motion.div>
-
-        {/* Active Tournaments */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-3xl font-bold tracking-tighter" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                TORNEOS ACTIVOS
-              </h2>
-              <div className="w-16 h-1 bg-black mt-2" />
-            </div>
-            <motion.button
-              whileHover={{ x: 5 }}
-              onClick={() => navigate('/admin/tournaments')}
-              className="text-sm font-bold text-black/60 hover:text-black flex items-center gap-2 uppercase tracking-wider"
-              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-            >
-              Ver todos <ArrowRight className="w-4 h-4" />
-            </motion.button>
+          <div
+            className="text-4xl sm:text-5xl font-bold mt-1 tabular-nums leading-none"
+            style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+          >
+            {value}
           </div>
-          {activeTournaments.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {activeTournaments.map((tournament, index) => (
-                <motion.div
-                  key={tournament.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.7 + index * 0.1 }}
-                  whileHover={{ y: -4 }}
-                  onClick={() => navigate(`/admin/tournaments/${tournament.id}`)}
-                  className="bg-white border-2 p-6 rounded-sm cursor-pointer transition-all group shadow-sm hover:shadow-md"
-                  style={{ borderColor: 'rgba(0, 0, 0, 0.1)' }}
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-12 h-12 bg-black rounded-sm flex items-center justify-center shadow-sm">
-                      <Trophy className="w-6 h-6 text-white" />
-                    </div>
-                    <div className="px-3 py-1 bg-spk-red text-white rounded-sm shadow-sm">
-                      <span className="text-xs font-bold uppercase tracking-wider" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                        En Curso
-                      </span>
-                    </div>
-                  </div>
-                  <h3 className="text-xl font-bold mb-2 group-hover:text-black transition-colors" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                    {tournament.name}
-                  </h3>
-                  <p className="text-sm text-black/60 mb-4 line-clamp-2">{tournament.description}</p>
-                  <div className="flex items-center gap-4 text-xs text-black/60 uppercase tracking-wider font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                    <div className="flex items-center gap-1">
-                      <Users className="w-4 h-4" />
-                      <span>{tournament.teamsCount} equipos</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      <span>{matches.filter(m => m.tournamentId === tournament.id).length} partidos</span>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-black/40 text-center py-8">No hay torneos activos actualmente</p>
-          )}
-        </motion.div>
+          <div className="text-[11px] text-black/50 mt-2">{hint}</div>
+        </div>
       </div>
     </div>
   );
 }
+
