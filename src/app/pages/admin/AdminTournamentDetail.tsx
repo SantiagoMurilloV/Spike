@@ -4,11 +4,9 @@ import { toast } from 'sonner';
 import {
   Loader2,
   Users,
-  Calendar,
   MapPin,
   Trophy,
   Shuffle,
-  X,
   Plus,
   Filter,
   Edit,
@@ -18,7 +16,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { api } from '../../services/api';
-import type { ScoreUpdate, CreateTeamDto, UpdateTournamentDto } from '../../services/api';
+import type { CreateTeamDto, UpdateTournamentDto } from '../../services/api';
 import { Tournament, Team, Match, BracketMatch, FixtureResult, StandingsRow } from '../../types';
 import { TeamAvatar } from '../../components/TeamAvatar';
 import { GroupMatrix } from '../../components/GroupMatrix';
@@ -26,6 +24,7 @@ import { CategorySection } from '../../components/admin/CategorySection';
 import { TeamFormModal } from '../../components/admin/TeamFormModal';
 import { TournamentFormModal } from '../../components/admin/TournamentFormModal';
 import { TeamRosterCard } from '../../components/admin/TeamRosterCard';
+import { ScoreSetsEditor } from '../../components/admin/ScoreSetsEditor';
 import { useData } from '../../context/DataContext';
 import type { UpdateTeamDto } from '../../services/api';
 import { Tabs, TabsContent } from '../../components/ui/tabs';
@@ -56,20 +55,22 @@ import {
   BracketCrossingsModal,
   type ScheduleConfig,
 } from '../../components/admin/ManualFixtureModal';
+import { useScoreEditor } from '../../hooks/useScoreEditor';
+import { hydrateSetsFromMatch } from '../../lib/scoring';
+import {
+  categoryOfMatchPhase,
+  categoryOfGroupName,
+  categoryOfBracketRound,
+  bracketRoundName,
+  humanizePhase,
+} from '../../lib/phase';
+import {
+  tournamentStatusColor,
+  tournamentStatusLabel,
+  matchStatusLabel,
+} from '../../lib/status';
 
 // ── Helpers ────────────────────────────────────────────────────────
-
-const STATUS_LABELS: Record<string, string> = {
-  ongoing: 'En Curso',
-  upcoming: 'Próximo',
-  completed: 'Finalizado',
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  ongoing: 'bg-spk-win/10 text-spk-win border-[#00C853]/20',
-  upcoming: 'bg-spk-blue/10 text-spk-blue border-spk-blue/20',
-  completed: 'bg-black/10 text-black/60 border-black/20',
-};
 
 const FORMAT_LABELS: Record<string, string> = {
   groups: 'Fase de Grupos',
@@ -78,23 +79,16 @@ const FORMAT_LABELS: Record<string, string> = {
   league: 'Liga (Todos contra Todos)',
 };
 
-function formatDate(d: Date) {
-  return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
-}
-
 /**
  * SpkPanel — subtle section container. The old version had a black
  * header bar that duplicated what the sidebar nav already conveys, so
  * we stripped it. Now it's just a lightweight wrapper with breathing
- * room and an optional action slot. `title` is kept in the signature
- * but unused — passing it is a no-op, kept so call sites remain valid
- * while we migrate them.
+ * room and an optional action slot.
  */
 function SpkPanel({
   children,
   headerAction,
 }: {
-  title?: string;
   children: React.ReactNode;
   headerAction?: React.ReactNode;
 }) {
@@ -105,6 +99,36 @@ function SpkPanel({
       )}
       <div>{children}</div>
     </div>
+  );
+}
+
+/**
+ * Big sets-won number shown at the center of a match card. When no
+ * score is persisted yet (upcoming match) the "VS" placeholder hints
+ * at the two teams about to play.
+ */
+function ScoreBigNumber({
+  displayScore,
+}: {
+  displayScore: { team1: number; team2: number } | null | undefined;
+}) {
+  if (displayScore) {
+    return (
+      <span
+        className="text-2xl font-bold"
+        style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+      >
+        {displayScore.team1} — {displayScore.team2}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="text-xl text-black/20 font-bold"
+      style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+    >
+      VS
+    </span>
   );
 }
 
@@ -202,17 +226,39 @@ export function AdminTournamentDetail() {
   const [groupFilter, setGroupFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // Score editing
-  const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
-  const [editSets, setEditSets] = useState<Array<{ team1: number; team2: number }>>([]);
-  const [editStatus, setEditStatus] = useState<string>('upcoming');
-  const [savingScore, setSavingScore] = useState(false);
-
-  // Bracket match editing
-  const [editingBracketId, setEditingBracketId] = useState<string | null>(null);
-  const [bracketEditSets, setBracketEditSets] = useState<Array<{ team1: number; team2: number }>>([]);
-  const [bracketEditStatus, setBracketEditStatus] = useState<string>('upcoming');
-  const [savingBracketScore, setSavingBracketScore] = useState(false);
+  // Score editing — match + bracket rows share the useScoreEditor
+  // state machine. The two hook instances only differ in how they
+  // persist: matches hit updateMatchScore and patch one row in-place;
+  // bracket rows hit updateBracketMatch and replace the full bracket
+  // because winner-advancement cascades touch other rows.
+  const matchEditor = useScoreEditor<Match>({
+    getId: (m) => m.id,
+    getStatus: (m) => m.status,
+    getInitialSets: hydrateSetsFromMatch,
+    save: async (match, payload) => {
+      const updated = await api.updateMatchScore(match.id, {
+        scoreTeam1: payload.scoreTeam1,
+        scoreTeam2: payload.scoreTeam2,
+        status: payload.status as 'live' | 'completed',
+        sets: payload.sets,
+      });
+      setMatches((prev) => prev.map((m) => (m.id === match.id ? updated : m)));
+    },
+  });
+  const bracketEditor = useScoreEditor<BracketMatch>({
+    getId: (bm) => bm.id,
+    getStatus: (bm) => bm.status,
+    getInitialSets: () => [{ team1: 0, team2: 0 }],
+    save: async (bm, payload) => {
+      if (!id) return;
+      const fresh = await api.updateBracketMatch(id, bm.id, payload);
+      setBracketMatches(fresh);
+    },
+    labels: {
+      success: 'Marcador de bracket actualizado',
+      error: 'Error al actualizar marcador de bracket',
+    },
+  });
 
   // ── Data fetching ──────────────────────────────────────────────
 
@@ -307,9 +353,7 @@ export function AdminTournamentDetail() {
         live.push(m);
         continue;
       }
-      const category = m.phase.includes('|')
-        ? m.phase.split('|').slice(1).join('|').trim()
-        : m.phase;
+      const category = categoryOfMatchPhase(m.phase);
       const bucket = byCategory.get(category) ?? [];
       bucket.push(m);
       byCategory.set(category, bucket);
@@ -703,84 +747,18 @@ export function AdminTournamentDetail() {
     }
   };
 
-  // ── Score editing ──────────────────────────────────────────────
-
-  const startEditScore = (match: Match) => {
-    setEditingMatchId(match.id);
-    // Hydrate the set inputs with the best representation of the match's
-    // current state, so pressing "Editar marcador" never feels like it
-    // wiped anything. Priority:
-    //   1. Real per-set scores (the RefereeScore flow writes these).
-    //   2. Synthetic placeholders reconstructed from the sets-won total
-    //      (match.score): a won set becomes 25-0, a lost one 0-25. This
-    //      covers matches finalized with a total but no set breakdown
-    //      (walkovers, admin-entered final scores, legacy data). The
-    //      admin can overwrite the placeholder numbers to the real points.
-    //   3. A single empty set for brand-new / upcoming matches.
-    if (match.sets && match.sets.length > 0) {
-      setEditSets(match.sets.map((s) => ({ team1: s.team1, team2: s.team2 })));
-    } else if (
-      match.score &&
-      (match.score.team1 > 0 || match.score.team2 > 0)
-    ) {
-      const synth: Array<{ team1: number; team2: number }> = [];
-      for (let i = 0; i < match.score.team1; i++) synth.push({ team1: 25, team2: 0 });
-      for (let i = 0; i < match.score.team2; i++) synth.push({ team1: 0, team2: 25 });
-      setEditSets(synth);
-    } else {
-      setEditSets([{ team1: 0, team2: 0 }]);
-    }
-    setEditStatus(match.status);
-  };
-
-  const cancelEditScore = () => {
-    setEditingMatchId(null);
-  };
-
-  const addSet = () => {
-    if (editSets.length < 5) {
-      setEditSets((prev) => [...prev, { team1: 0, team2: 0 }]);
-    }
-  };
-
-  const removeSet = (index: number) => {
-    setEditSets((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const updateSetScore = (index: number, team: 'team1' | 'team2', value: number) => {
-    setEditSets((prev) =>
-      prev.map((s, i) => (i === index ? { ...s, [team]: value } : s)),
-    );
-  };
-
-  // Calculate match score (sets won) from individual set scores
-  const calcMatchScore = (sets: Array<{ team1: number; team2: number }>) => {
-    let team1Won = 0;
-    let team2Won = 0;
-    for (const s of sets) {
-      if (s.team1 > s.team2) team1Won++;
-      else if (s.team2 > s.team1) team2Won++;
-    }
-    return { team1: team1Won, team2: team2Won };
-  };
-
   /**
-   * Renders a single match card. Kept as a closure inside the component
-   * so it has access to the edit state (editingMatchId, editSets, etc.)
-   * without a deep prop drill. Called from both the live-matches
-   * section and the by-category accordions.
+   * Render a single match card. Owns no state — all score-editor
+   * interaction is delegated to `matchEditor` (useScoreEditor instance
+   * declared above).
    *
-   * Bug-fix: during editing the big sets-won number stays pinned to
-   * the persisted `m.score` rather than recomputing from `editSets`.
-   * The old version showed `calcMatchScore(editSets)`, which meant a
-   * match whose set_scores rows were empty (but whose match.score had
-   * a 2-0 fallback) would "reset" to 0-0 the moment the admin opened
-   * the editor. The preview of the new sets-won total is shown as a
-   * smaller helper line below the set inputs.
+   * During editing the big sets-won number reflects `matchEditor.editedScore`
+   * live, so corrections are visible as the admin types. Opening the
+   * editor never "resets" to 0-0 because hydrateSetsFromMatch
+   * reconstructs synthetic sets when only a total is persisted.
    */
   const renderMatchCard = (m: Match) => {
-    const isEditing = editingMatchId === m.id;
-    const editedScore = isEditing ? calcMatchScore(editSets) : null;
+    const isEditing = matchEditor.isEditing(m);
     return (
       <div
         key={m.id}
@@ -799,7 +777,7 @@ export function AdminTournamentDetail() {
                     : 'outline'
               }
             >
-              {STATUS_LABELS[m.status] || m.status}
+              {matchStatusLabel(m.status)}
             </Badge>
             <span className="text-xs text-black/50">
               {m.phase}
@@ -817,14 +795,6 @@ export function AdminTournamentDetail() {
           </div>
         </div>
 
-        {/* Teams + Score — during editing the big number reflects the
-            live editedScore so the admin sees their correction take shape
-            in real time. The previous "reset to 0-0" bug is now prevented
-            upstream by startEditScore: when real per-set scores exist they
-            hydrate editSets directly; when only a total exists we rebuild
-            synthetic sets that reproduce it. Either way editedScore on
-            open equals the persisted m.score, so opening the editor never
-            looks like a wipe. */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div
@@ -837,27 +807,7 @@ export function AdminTournamentDetail() {
           </div>
 
           <div className="px-4 text-center flex-shrink-0">
-            {(() => {
-              const displayScore = isEditing ? editedScore : m.score;
-              if (displayScore) {
-                return (
-                  <span
-                    className="text-2xl font-bold"
-                    style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                  >
-                    {displayScore.team1} — {displayScore.team2}
-                  </span>
-                );
-              }
-              return (
-                <span
-                  className="text-xl text-black/20 font-bold"
-                  style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                >
-                  VS
-                </span>
-              );
-            })()}
+            <ScoreBigNumber displayScore={isEditing ? matchEditor.editedScore : m.score} />
           </div>
 
           <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
@@ -871,88 +821,22 @@ export function AdminTournamentDetail() {
           </div>
         </div>
 
-        {/* Edit controls */}
         {isEditing ? (
-          <div className="mt-3 pt-3 border-t border-black/10 space-y-3">
-            <div className="space-y-2">
-              <div className="text-[11px] uppercase text-black/50 tracking-wider font-semibold"
-                style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.12em' }}>
-                Puntos por set
-              </div>
-              {editSets.map((set, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <span className="text-xs text-black/50 w-12 flex-shrink-0">
-                    Set {idx + 1}:
-                  </span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={set.team1}
-                    onChange={(e) =>
-                      updateSetScore(idx, 'team1', parseInt(e.target.value) || 0)
-                    }
-                    className="w-14 px-2 py-1 border border-black/20 rounded text-center text-sm font-bold"
-                  />
-                  <span className="text-black/30 text-sm">—</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={set.team2}
-                    onChange={(e) =>
-                      updateSetScore(idx, 'team2', parseInt(e.target.value) || 0)
-                    }
-                    className="w-14 px-2 py-1 border border-black/20 rounded text-center text-sm font-bold"
-                  />
-                  {editSets.length > 1 && (
-                    <button
-                      onClick={() => removeSet(idx)}
-                      className="p-1 text-red-400 hover:text-red-600 transition-colors"
-                      title="Eliminar set"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              ))}
-              {editSets.length < 5 && (
-                <button
-                  onClick={addSet}
-                  className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
-                >
-                  <Plus className="w-3 h-3" />
-                  Agregar Set
-                </button>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Select value={editStatus} onValueChange={setEditStatus}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="upcoming">Próximo</SelectItem>
-                  <SelectItem value="live">En Vivo</SelectItem>
-                  <SelectItem value="completed">Finalizado</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                size="sm"
-                onClick={() => saveScore(m.id)}
-                disabled={savingScore}
-                className="bg-spk-win hover:bg-spk-win/90"
-              >
-                {savingScore && <Loader2 className="w-3 h-3 animate-spin" />}
-                Guardar
-              </Button>
-              <Button size="sm" variant="outline" onClick={cancelEditScore}>
-                Cancelar
-              </Button>
-            </div>
-          </div>
+          <ScoreSetsEditor
+            sets={matchEditor.sets}
+            status={matchEditor.status}
+            saving={matchEditor.saving}
+            onAddSet={matchEditor.addSet}
+            onRemoveSet={matchEditor.removeSet}
+            onUpdateSet={matchEditor.updateSet}
+            onStatusChange={matchEditor.setStatus}
+            onSave={() => matchEditor.commit(m)}
+            onCancel={matchEditor.cancel}
+          />
         ) : (
           <div className="flex justify-end mt-2">
             <button
-              onClick={() => startEditScore(m)}
+              onClick={() => matchEditor.start(m)}
               className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
             >
               <Edit className="w-3 h-3" />
@@ -962,84 +846,6 @@ export function AdminTournamentDetail() {
         )}
       </div>
     );
-  };
-
-  const saveScore = async (matchId: string) => {
-    setSavingScore(true);
-    try {
-      const matchScore = calcMatchScore(editSets);
-      const update: ScoreUpdate = {
-        scoreTeam1: matchScore.team1,
-        scoreTeam2: matchScore.team2,
-        status: editStatus as 'live' | 'completed',
-        sets: editSets.map((s, i) => ({
-          setNumber: i + 1,
-          team1Points: s.team1,
-          team2Points: s.team2,
-        })),
-      };
-      const updated = await api.updateMatchScore(matchId, update);
-      setMatches((prev) => prev.map((m) => (m.id === matchId ? updated : m)));
-      setEditingMatchId(null);
-      toast.success('Marcador actualizado');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al actualizar marcador');
-    } finally {
-      setSavingScore(false);
-    }
-  };
-
-  // ── Bracket score editing ──────────────────────────────────────
-
-  const startEditBracket = (bm: BracketMatch) => {
-    setEditingBracketId(bm.id);
-    setBracketEditSets([{ team1: 0, team2: 0 }]);
-    setBracketEditStatus(bm.status);
-  };
-
-  const cancelEditBracket = () => {
-    setEditingBracketId(null);
-  };
-
-  const addBracketSet = () => {
-    if (bracketEditSets.length < 5) {
-      setBracketEditSets((prev) => [...prev, { team1: 0, team2: 0 }]);
-    }
-  };
-
-  const removeBracketSet = (index: number) => {
-    setBracketEditSets((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const updateBracketSetScore = (index: number, team: 'team1' | 'team2', value: number) => {
-    setBracketEditSets((prev) =>
-      prev.map((s, i) => (i === index ? { ...s, [team]: value } : s)),
-    );
-  };
-
-  const saveBracketScore = async (bracketMatchId: string) => {
-    if (!id) return;
-    setSavingBracketScore(true);
-    try {
-      const matchScore = calcMatchScore(bracketEditSets);
-      const updatedBracket = await api.updateBracketMatch(id, bracketMatchId, {
-        scoreTeam1: matchScore.team1,
-        scoreTeam2: matchScore.team2,
-        status: bracketEditStatus,
-        sets: bracketEditSets.map((s, i) => ({
-          setNumber: i + 1,
-          team1Points: s.team1,
-          team2Points: s.team2,
-        })),
-      });
-      setBracketMatches(updatedBracket);
-      setEditingBracketId(null);
-      toast.success('Marcador de bracket actualizado');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al actualizar marcador de bracket');
-    } finally {
-      setSavingBracketScore(false);
-    }
   };
 
   // ── Loading / Error states ─────────────────────────────────────
@@ -1095,9 +901,9 @@ export function AdminTournamentDetail() {
           <span className="font-medium">Copa {tournament.name}</span>
           <span className="text-black/20">·</span>
           <span
-            className={`px-2 py-0.5 rounded-full border text-[10px] font-medium ${STATUS_COLORS[tournament.status] || STATUS_COLORS.completed}`}
+            className={`px-2 py-0.5 rounded-full border text-[10px] font-medium ${tournamentStatusColor(tournament.status)}`}
           >
-            {STATUS_LABELS[tournament.status] || tournament.status}
+            {tournamentStatusLabel(tournament.status)}
           </span>
           <span className="text-black/20">·</span>
           <span>{FORMAT_LABELS[tournament.format] || tournament.format}</span>
@@ -1406,7 +1212,7 @@ export function AdminTournamentDetail() {
                     (() => {
                       const categoryMap = new Map<string, string[]>();
                       for (const gName of groupNames) {
-                        const category = gName.includes('|') ? gName.split('|')[0] : '';
+                        const category = categoryOfGroupName(gName);
                         if (!categoryMap.has(category)) categoryMap.set(category, []);
                         categoryMap.get(category)!.push(gName);
                       }
@@ -1464,7 +1270,7 @@ export function AdminTournamentDetail() {
                       scannable. First block opens by default, the rest
                       fold. */}
                   {matchesByPhaseGroup.map(([label, groupMatches], idx) => {
-                    const displayLabel = label.includes('|') ? label.replace(/\|/g, ' · ') : label;
+                    const displayLabel = humanizePhase(label);
                     return (
                       <CategorySection
                         key={label}
@@ -1516,7 +1322,7 @@ export function AdminTournamentDetail() {
                     (() => {
                       const categoryMap = new Map<string, BracketMatch[]>();
                       for (const bm of bracketMatches) {
-                        const category = bm.round.includes('|') ? bm.round.split('|')[0] : '';
+                        const category = categoryOfBracketRound(bm.round);
                         if (!categoryMap.has(category)) categoryMap.set(category, []);
                         categoryMap.get(category)!.push(bm);
                       }
@@ -1528,9 +1334,7 @@ export function AdminTournamentDetail() {
                       const renderBracket = (catBracketMatches: BracketMatch[]) => (
                         <div className="space-y-2">
                           {catBracketMatches.map((bm) => {
-                            const displayRound = bm.round.includes('|')
-                              ? bm.round.split('|').slice(1).join('|')
-                              : bm.round;
+                            const displayRound = bracketRoundName(bm.round);
                             return (
                           <div
                             key={bm.id}
@@ -1589,85 +1393,23 @@ export function AdminTournamentDetail() {
                               </div>
                             </div>
 
-                            {/* Bracket match edit controls */}
-                            {editingBracketId === bm.id ? (
-                              <div className="mt-3 pt-3 border-t border-black/10 space-y-3">
-                                <div className="space-y-2">
-                                  {bracketEditSets.map((set, idx) => (
-                                    <div key={idx} className="flex items-center gap-2">
-                                      <span className="text-xs text-black/50 w-12 flex-shrink-0">
-                                        Set {idx + 1}:
-                                      </span>
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        value={set.team1}
-                                        onChange={(e) =>
-                                          updateBracketSetScore(idx, 'team1', parseInt(e.target.value) || 0)
-                                        }
-                                        className="w-14 px-2 py-1 border border-black/20 rounded text-center text-sm font-bold"
-                                      />
-                                      <span className="text-black/30 text-sm">—</span>
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        value={set.team2}
-                                        onChange={(e) =>
-                                          updateBracketSetScore(idx, 'team2', parseInt(e.target.value) || 0)
-                                        }
-                                        className="w-14 px-2 py-1 border border-black/20 rounded text-center text-sm font-bold"
-                                      />
-                                      {bracketEditSets.length > 1 && (
-                                        <button
-                                          onClick={() => removeBracketSet(idx)}
-                                          className="p-1 text-red-400 hover:text-red-600 transition-colors"
-                                          title="Eliminar set"
-                                        >
-                                          <X className="w-3.5 h-3.5" />
-                                        </button>
-                                      )}
-                                    </div>
-                                  ))}
-                                  {bracketEditSets.length < 5 && (
-                                    <button
-                                      onClick={addBracketSet}
-                                      className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
-                                    >
-                                      <Plus className="w-3 h-3" />
-                                      Agregar Set
-                                    </button>
-                                  )}
-                                </div>
-                                <div className="flex items-center justify-center gap-3">
-                                  <Select value={bracketEditStatus} onValueChange={setBracketEditStatus}>
-                                    <SelectTrigger className="w-[140px]">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="upcoming">Próximo</SelectItem>
-                                      <SelectItem value="live">En Vivo</SelectItem>
-                                      <SelectItem value="completed">Finalizado</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => saveBracketScore(bm.id)}
-                                    disabled={savingBracketScore}
-                                    className="bg-spk-win hover:bg-spk-win/90"
-                                  >
-                                    {savingBracketScore && <Loader2 className="w-3 h-3 animate-spin" />}
-                                    Guardar
-                                  </Button>
-                                  <Button size="sm" variant="outline" onClick={cancelEditBracket}>
-                                    Cancelar
-                                  </Button>
-                                </div>
-                              </div>
+                            {bracketEditor.isEditing(bm) ? (
+                              <ScoreSetsEditor
+                                sets={bracketEditor.sets}
+                                status={bracketEditor.status}
+                                saving={bracketEditor.saving}
+                                onAddSet={bracketEditor.addSet}
+                                onRemoveSet={bracketEditor.removeSet}
+                                onUpdateSet={bracketEditor.updateSet}
+                                onStatusChange={bracketEditor.setStatus}
+                                onSave={() => bracketEditor.commit(bm)}
+                                onCancel={bracketEditor.cancel}
+                              />
                             ) : (
                               bm.team1 && bm.team2 && (
                                 <div className="flex justify-end mt-2">
                                   <button
-                                    onClick={() => startEditBracket(bm)}
+                                    onClick={() => bracketEditor.start(bm)}
                                     className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
                                   >
                                     <Edit className="w-3 h-3" />
