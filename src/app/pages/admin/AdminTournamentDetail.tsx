@@ -15,6 +15,7 @@ import {
   Clock,
   Trash2,
   RefreshCw,
+  CheckCircle2,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import type { ScoreUpdate, CreateTeamDto, UpdateTournamentDto } from '../../services/api';
@@ -162,6 +163,11 @@ export function AdminTournamentDetail() {
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
+  /** "Finalizar torneo" confirmation + submit state — lives on the
+   *  Ajustes Generales tab so the admin has a clear way to close out
+   *  a tournament from the same surface where they edit everything else. */
+  const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   // "Crear equipo nuevo" flow inside the Equipos tab. Opens TeamFormModal
   // in create mode; the submit handler auto-enrols the result in this
   // tournament. Team management lives entirely inside the tournament now
@@ -430,6 +436,26 @@ export function AdminTournamentDetail() {
     // without a full reload.
     setTournament(fresh);
     toast.success('Torneo actualizado');
+  };
+
+  /**
+   * "Finalizar torneo" — flips status to 'completed' via updateTournament.
+   * Confirmation-gated from AlertDialog since this is a destructive-ish
+   * intent (standings / bracket calculations treat completed differently).
+   */
+  const handleFinalizeTournament = async () => {
+    if (!tournament) return;
+    setFinalizing(true);
+    try {
+      const fresh = await updateTournament(tournament.id, { status: 'completed' });
+      setTournament(fresh);
+      toast.success('Torneo finalizado');
+      setShowFinalizeDialog(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al finalizar el torneo');
+    } finally {
+      setFinalizing(false);
+    }
   };
 
   const handleTeamFormSubmit = async (team: Team) => {
@@ -1076,6 +1102,71 @@ export function AdminTournamentDetail() {
             onSubmit={handleTournamentEditSubmit}
             tournament={tournament}
           />
+
+          {/* Finalizar torneo — destructive action kept visually separate
+              from the normal save flow so the admin only hits it on
+              purpose. Hidden once the tournament is already completed. */}
+          {tournament.status !== 'completed' && (
+            <div className="mt-8 pt-6 border-t border-black/10">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3
+                    className="text-sm font-bold uppercase tracking-wider text-black/70"
+                    style={{
+                      fontFamily: 'Barlow Condensed, sans-serif',
+                      letterSpacing: '0.1em',
+                    }}
+                  >
+                    Finalizar torneo
+                  </h3>
+                  <p className="text-xs text-black/50 mt-0.5">
+                    Marca el torneo como completado. Podés seguir
+                    consultándolo, pero no aparecerá como "en curso" en
+                    listas y paneles.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowFinalizeDialog(true)}
+                  disabled={finalizing}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-spk-win text-white hover:bg-spk-win/90 rounded-sm text-sm font-bold uppercase transition-colors disabled:opacity-50 flex-shrink-0"
+                  style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
+                >
+                  {finalizing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4" />
+                  )}
+                  Finalizar torneo
+                </button>
+              </div>
+            </div>
+          )}
+
+          <AlertDialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Finalizar este torneo?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  El torneo pasará a estado <strong>Finalizado</strong>. Los
+                  marcadores, clasificaciones y brackets quedan como están —
+                  solo cambia el estado público. Podés revertirlo editando
+                  el estado desde este mismo formulario.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={finalizing}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleFinalizeTournament}
+                  disabled={finalizing}
+                  className="bg-spk-win hover:bg-spk-win/90"
+                >
+                  {finalizing && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                  Finalizar torneo
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </TabsContent>
 
         {/* ── Equipos Tab ──────────────────────────────────────── */}
