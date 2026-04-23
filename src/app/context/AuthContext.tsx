@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode,
 } from 'react';
 import { api, setAuthToken, setOnUnauthorized } from '../services/api';
@@ -35,31 +36,39 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
 
+/**
+ * Read token + user synchronously from localStorage on module init.
+ * Runs once at bootstrap — before AuthProvider renders, before any
+ * DataContext mounts, before any API call leaves. This is what keeps
+ * the Authorization header present on the very first fetches after
+ * a page refresh; otherwise those anonymous-looking requests would
+ * be counted as fresh "visitors" in the presence tracker and the
+ * admin dashboard would show you as a new visitor on every reload.
+ */
+function readStoredSession(): { token: string | null; user: AuthUser | null } {
+  if (typeof window === 'undefined') return { token: null, user: null };
+  const storedToken = localStorage.getItem(TOKEN_KEY);
+  const storedUser = localStorage.getItem(USER_KEY);
+  if (!storedToken || !storedUser) return { token: null, user: null };
+  try {
+    const parsed = JSON.parse(storedUser) as AuthUser;
+    setAuthToken(storedToken); // side-effect: module-level token in api.ts
+    return { token: storedToken, user: parsed };
+  } catch {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    return { token: null, user: null };
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Eager restore so the first render of DataContext's fetches already
+  // carries the bearer token.
+  const initialSession = useRef(readStoredSession());
+  const [user, setUser] = useState<AuthUser | null>(initialSession.current.user);
+  const [token, setToken] = useState<string | null>(initialSession.current.token);
+  const [isLoading, setIsLoading] = useState(false);
   const [sessionMessage, setSessionMessage] = useState<string | null>(null);
-
-  // Restore session from localStorage on mount
-  useEffect(() => {
-    const storedToken = localStorage.getItem(TOKEN_KEY);
-    const storedUser = localStorage.getItem(USER_KEY);
-
-    if (storedToken && storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser) as AuthUser;
-        setToken(storedToken);
-        setUser(parsed);
-        setAuthToken(storedToken);
-      } catch {
-        // Corrupted data — clear it
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
-      }
-    }
-    setIsLoading(false);
-  }, []);
 
   const logout = useCallback((message?: string) => {
     // Tell the server to revoke this JWT so it stops working even if

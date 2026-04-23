@@ -62,6 +62,14 @@ const corsOptions: cors.CorsOptions = IS_PROD
     }
   : { origin: true, credentials: true };
 
+// Express is behind Vercel's rewrite proxy in production. Without this,
+// `req.ip` would report the Vercel edge IP (which rotates per request
+// across edges), so the visitor fingerprint would treat every page
+// refresh as a brand-new visitor. Trusting the proxy makes Express
+// read the client IP from X-Forwarded-For, keeping the fingerprint
+// stable across refreshes for the same human.
+app.set('trust proxy', true);
+
 app.use(cors(corsOptions));
 // JSON body limit raised so team / tournament payloads can carry a
 // base64-encoded logo (up to ~10 MB raw → ~14 MB encoded plus room for
