@@ -1,0 +1,355 @@
+import { useCallback, useEffect, useState } from 'react';
+import {
+  Loader2,
+  Plus,
+  Edit,
+  Trash2,
+  User,
+  FileText,
+  Users,
+  Info,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import type { Player } from '../../types';
+import { api, ApiError } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { PlayerFormModal } from '../../components/admin/PlayerFormModal';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
+
+/**
+ * TeamPanel — the captain's home. Shows the team identity plus the full
+ * roster with add / edit / delete. Reuses PlayerFormModal so the captain
+ * gets the exact same input UI the admin gets, and the backend endpoint
+ * (POST/PUT/DELETE /api/teams/:teamId/players) is gated by requireTeamAccess
+ * so a captain can only touch THEIR team.
+ *
+ * Phase 3 intentionally keeps this page minimal: one team + its roster.
+ * A later iteration will surface the enrollment_deadline of each enrolled
+ * tournament and actually lock edits once those deadlines pass.
+ */
+export function TeamPanel() {
+  const { user, logout } = useAuth();
+  const [teamInfo, setTeamInfo] = useState<{
+    id: string;
+    name: string;
+    initials: string;
+    logo?: string;
+    primaryColor: string;
+    secondaryColor: string;
+    category?: string;
+  } | null>(null);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingPlayer, setEditingPlayer] = useState<Player | undefined>();
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const teamId = user?.teamId;
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // /auth/me returns the team payload for captains; use it as the
+      // source of truth so a stale teamId in localStorage gets corrected.
+      const me = await api.getMe();
+      if (me.role !== 'team_captain' || !me.team) {
+        throw new Error('Sesión no válida para panel de equipo');
+      }
+      setTeamInfo({
+        id: me.team.id,
+        name: me.team.name,
+        initials: me.team.initials,
+        logo: me.team.logo,
+        primaryColor: me.team.primaryColor,
+        secondaryColor: me.team.secondaryColor,
+        category: me.team.category,
+      });
+      const roster = await api.listTeamPlayers(me.team.id);
+      setPlayers(roster);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        // Token rejected server-side — log out so the user sees /login.
+        logout('Sesión expirada. Iniciá sesión de nuevo.');
+        return;
+      }
+      setError(err instanceof Error ? err.message : 'Error al cargar el panel');
+    } finally {
+      setLoading(false);
+    }
+  }, [logout]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const handleCreate = () => {
+    setEditingPlayer(undefined);
+    setFormOpen(true);
+  };
+
+  const handleEdit = (p: Player) => {
+    setEditingPlayer(p);
+    setFormOpen(true);
+  };
+
+  const handleSaved = (saved: Player) => {
+    setPlayers((prev) => {
+      const idx = prev.findIndex((p) => p.id === saved.id);
+      if (idx === -1) {
+        return [...prev, saved].sort((a, b) => {
+          const ln = a.lastName.localeCompare(b.lastName);
+          return ln !== 0 ? ln : a.firstName.localeCompare(b.firstName);
+        });
+      }
+      const next = prev.slice();
+      next[idx] = saved;
+      return next;
+    });
+    toast.success(editingPlayer ? 'Jugador@ actualizad@' : 'Jugador@ agregad@');
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDeleteId || !teamId) return;
+    const id = pendingDeleteId;
+    setDeletingId(id);
+    try {
+      await api.deletePlayer(teamId, id);
+      setPlayers((prev) => prev.filter((p) => p.id !== id));
+      toast.success('Jugador@ eliminad@');
+      setPendingDeleteId(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al eliminar');
+      throw err;
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-spk-red" aria-hidden="true" />
+      </div>
+    );
+  }
+
+  if (error || !teamInfo) {
+    return (
+      <div className="max-w-xl mx-auto mt-16 p-6 text-center">
+        <div className="text-sm text-red-600 mb-3">{error ?? 'No hay equipo asociado a esta sesión'}</div>
+        <button
+          type="button"
+          onClick={() => load()}
+          className="px-4 py-2 bg-spk-red text-white rounded-sm font-bold uppercase"
+          style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
+        >
+          Reintentar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-[1200px] mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+      {/* Team identity banner */}
+      <section className="bg-white border border-black/10 rounded-sm p-4 sm:p-6 flex items-center gap-4 sm:gap-5">
+        {teamInfo.logo ? (
+          <img
+            src={teamInfo.logo}
+            alt={teamInfo.name}
+            className="w-16 h-16 sm:w-20 sm:h-20 rounded-sm object-cover border border-black/10 flex-shrink-0"
+          />
+        ) : (
+          <div
+            className="w-16 h-16 sm:w-20 sm:h-20 rounded-sm flex items-center justify-center text-white font-bold text-xl sm:text-2xl flex-shrink-0"
+            style={{
+              backgroundColor: teamInfo.primaryColor,
+              fontFamily: 'Barlow Condensed, sans-serif',
+            }}
+          >
+            {teamInfo.initials}
+          </div>
+        )}
+        <div className="min-w-0">
+          <h1
+            className="text-xl sm:text-3xl font-bold uppercase truncate"
+            style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '-0.01em' }}
+          >
+            {teamInfo.name}
+          </h1>
+          <div className="flex items-center gap-2 mt-1 text-xs text-black/60 flex-wrap">
+            <span className="font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+              {teamInfo.initials}
+            </span>
+            {teamInfo.category && (
+              <>
+                <span className="text-black/30">·</span>
+                <span>{teamInfo.category}</span>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Informational note — enrollment_deadline enforcement ships in a
+          later phase; for now surface the intent so the captain knows the
+          window matters. */}
+      <div className="flex items-start gap-2 rounded-sm bg-spk-gold/10 border border-spk-gold/40 px-4 py-3 text-xs text-black/70">
+        <Info className="w-4 h-4 flex-shrink-0 text-spk-gold mt-0.5" aria-hidden="true" />
+        <span>
+          Completá el plantel antes de la fecha límite de inscripción que te
+          indicó el organizador. Cada cambio se guarda al instante.
+        </span>
+      </div>
+
+      {/* Roster */}
+      <section className="bg-white border border-black/10 rounded-sm overflow-hidden">
+        <div className="px-4 sm:px-5 py-3 border-b border-black/10 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Users className="w-4 h-4 text-black/60 flex-shrink-0" aria-hidden="true" />
+            <h2
+              className="text-sm sm:text-base font-bold uppercase"
+              style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
+            >
+              Plantel{' '}
+              <span className="text-black/50 font-normal tabular-nums">({players.length})</span>
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={handleCreate}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-spk-red text-white hover:bg-spk-red-dark rounded-sm text-xs sm:text-sm font-bold uppercase"
+            style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.05em' }}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Agregar jugador@
+          </button>
+        </div>
+
+        {players.length === 0 ? (
+          <div className="py-10 text-center text-sm text-black/60 px-4">
+            Aún no hay jugador@s registrad@s. Empezá agregando el plantel.
+          </div>
+        ) : (
+          <ul className="divide-y divide-black/10">
+            {players.map((p) => (
+              <li key={p.id} className="flex items-center gap-3 p-3 sm:p-4">
+                {p.photo ? (
+                  <img
+                    src={p.photo}
+                    alt={`${p.firstName} ${p.lastName}`}
+                    className="w-11 h-11 sm:w-12 sm:h-12 rounded-sm object-cover border border-black/10 flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-sm bg-black/5 border border-black/10 flex items-center justify-center flex-shrink-0">
+                    <User className="w-5 h-5 text-black/40" aria-hidden="true" />
+                  </div>
+                )}
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {p.shirtNumber != null && (
+                      <span
+                        className="inline-flex items-center justify-center min-w-[26px] h-[22px] px-1.5 rounded-sm bg-black text-white text-[11px] font-bold tabular-nums flex-shrink-0"
+                        style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                      >
+                        {p.shirtNumber}
+                      </span>
+                    )}
+                    <span
+                      className="font-bold truncate"
+                      style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                    >
+                      {p.firstName} {p.lastName}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-black/60 flex-wrap">
+                    {p.position && <span>{p.position}</span>}
+                    {p.position && (p.category || p.birthYear) && (
+                      <span className="text-black/30">·</span>
+                    )}
+                    {p.category && <span>{p.category}</span>}
+                    {p.category && p.birthYear && <span className="text-black/30">·</span>}
+                    {p.birthYear && <span>{p.birthYear}</span>}
+                    {p.documentNumber && (
+                      <>
+                        <span className="text-black/30">·</span>
+                        <span>
+                          {p.documentType ?? 'DOC'} {p.documentNumber}
+                        </span>
+                      </>
+                    )}
+                    {p.documentFile && (
+                      <>
+                        <span className="text-black/30">·</span>
+                        <a
+                          href={p.documentFile}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-spk-blue hover:underline"
+                        >
+                          <FileText className="w-3 h-3" aria-hidden="true" />
+                          PDF
+                        </a>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleEdit(p)}
+                    aria-label={`Editar ${p.firstName} ${p.lastName}`}
+                    className="p-2 bg-spk-blue/10 text-spk-blue rounded-sm hover:bg-spk-blue/20 transition-colors"
+                  >
+                    <Edit className="w-3.5 h-3.5" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingDeleteId(p.id)}
+                    disabled={deletingId === p.id}
+                    aria-label={`Eliminar ${p.firstName} ${p.lastName}`}
+                    className="p-2 bg-spk-red/10 text-spk-red rounded-sm hover:bg-spk-red/20 transition-colors disabled:opacity-50"
+                  >
+                    {deletingId === p.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {teamId && (
+        <PlayerFormModal
+          isOpen={formOpen}
+          onClose={() => setFormOpen(false)}
+          onSaved={handleSaved}
+          teamId={teamId}
+          player={editingPlayer}
+        />
+      )}
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(openDialog) => {
+          if (!openDialog) setPendingDeleteId(null);
+        }}
+        title="Eliminar jugador@"
+        description="¿Estás seguro de que querés eliminar a este/a jugador/a? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        loading={deletingId !== null}
+        onConfirm={confirmDelete}
+      />
+    </div>
+  );
+}

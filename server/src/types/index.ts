@@ -218,9 +218,15 @@ export interface ScoreUpdate {
 
 // === Auth ===
 
-export type AppRole = 'super_admin' | 'admin' | 'judge';
+export type AppRole = 'super_admin' | 'admin' | 'judge' | 'team_captain';
 
 export interface JwtPayload {
+  /**
+   * For admin/judge/super_admin: users.id.
+   * For team_captain: teams.id (we don't create a users row for captains —
+   * the team itself is the account). Consumers decide what to do with it
+   * using the `role` field.
+   */
   userId: string;
   role: AppRole | string;
   /**
@@ -228,6 +234,12 @@ export interface JwtPayload {
    * scope their match feed. Null for admins / super_admins.
    */
   createdBy?: string | null;
+  /**
+   * For team_captain: the team's id (same as userId for captains, kept
+   * as a named field so routes that already read `teamId` from params can
+   * compare against `req.user.teamId` unambiguously).
+   */
+  teamId?: string | null;
   iat: number;
   exp: number;
 }
@@ -239,7 +251,13 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   token: string;
-  user: { id: string; username: string; role: string };
+  user: {
+    id: string;
+    username: string;
+    role: string;
+    /** Team id when role is team_captain; absent for app-side users. */
+    teamId?: string;
+  };
 }
 
 // === Validation ===

@@ -37,6 +37,46 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
     }
     const { getPool } = await import('../config/database');
     const pool = getPool();
+
+    // Team captains don't have a users row — their "account" is the team.
+    // Return a captain-shaped profile so the /team-panel can render team
+    // name, initials, and enrollment deadlines it needs to gate roster
+    // edits in later phases.
+    if (req.user.role === 'team_captain') {
+      const teamResult = await pool.query(
+        `SELECT id, name, initials, logo, primary_color, secondary_color,
+                category, captain_username, credentials_generated_at
+         FROM teams
+         WHERE id = $1`,
+        [req.user.userId],
+      );
+      if (teamResult.rows.length === 0) {
+        res.status(404).json({ error: 'Equipo no encontrado' });
+        return;
+      }
+      const t = teamResult.rows[0];
+      res.json({
+        id: t.id,
+        username: t.captain_username,
+        role: 'team_captain',
+        teamId: t.id,
+        team: {
+          id: t.id,
+          name: t.name,
+          initials: t.initials,
+          logo: t.logo ?? undefined,
+          primaryColor: t.primary_color,
+          secondaryColor: t.secondary_color,
+          category: t.category ?? undefined,
+          credentialsGeneratedAt:
+            t.credentials_generated_at instanceof Date
+              ? t.credentials_generated_at.toISOString()
+              : t.credentials_generated_at ?? undefined,
+        },
+      });
+      return;
+    }
+
     const result = await pool.query(
       `SELECT u.id, u.username, u.role, u.display_name, u.tournament_quota,
               u.created_by,

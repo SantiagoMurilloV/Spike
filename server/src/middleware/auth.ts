@@ -107,6 +107,64 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
  *   router.get('/…',  requireRole('admin'),         handler)
  *   router.post('/…', requireRole('admin','judge'), handler)
  */
+/**
+ * Require the caller to have access to the team referenced by
+ * `req.params.teamId` (or `req.params.id` if absent). Rules:
+ *
+ *   · admin / super_admin  → always allowed (global access).
+ *   · team_captain         → allowed only if their JWT's teamId matches
+ *                            the route's teamId. This is how we prevent
+ *                            one captain from touching another team's
+ *                            roster after learning the /teams/:id URL.
+ *   · judge / other        → denied.
+ *
+ * Use on POST/PUT/DELETE of /teams/:teamId/players/* so the captain has
+ * a real scoped panel while admins keep their bird's-eye view.
+ */
+export function requireTeamAccess(req: Request, res: Response, next: NextFunction): void {
+  // Ensure req.user is populated (GET requests skip the global middleware).
+  if (!req.user) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ error: 'Token de autenticación requerido' });
+      return;
+    }
+    const token = authHeader.substring(7);
+    if (isRevoked(token)) {
+      res.status(401).json({ error: 'Sesión cerrada. Iniciá sesión de nuevo.' });
+      return;
+    }
+    try {
+      req.user = authService.verifyToken(token);
+    } catch {
+      res.status(401).json({ error: 'Token inválido o expirado' });
+      return;
+    }
+  }
+
+  const role = req.user?.role;
+  if (role === 'admin' || role === 'super_admin') {
+    next();
+    return;
+  }
+
+  if (role === 'team_captain') {
+    const teamId = (req.params.teamId ?? req.params.id) as string | undefined;
+    if (!teamId || teamId !== req.user?.teamId) {
+      res.status(403).json({
+        error: 'Solo podés gestionar tu propio equipo',
+      });
+      return;
+    }
+    next();
+    return;
+  }
+
+  res.status(403).json({
+    error: 'No tenés permiso para realizar esta acción',
+  });
+}
+
 export function requireRole(...allowed: string[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     // If the token wasn't validated earlier (e.g. this is a GET), do it now.

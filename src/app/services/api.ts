@@ -104,7 +104,13 @@ export interface SystemSettings {
 
 export interface LoginResponse {
   token: string;
-  user: { id: string; username: string; role: string };
+  user: {
+    id: string;
+    username: string;
+    role: string;
+    /** Team id when role is team_captain. */
+    teamId?: string;
+  };
 }
 
 export interface Judge {
@@ -534,9 +540,22 @@ export const api = {
     username: string;
     role: string;
     displayName?: string;
-    tournamentQuota: number;
+    tournamentQuota?: number;
     createdBy?: string | null;
-    ownedTournamentsCount: number;
+    ownedTournamentsCount?: number;
+    /** Populated when role is team_captain — links the session to a team. */
+    teamId?: string;
+    /** Captain-scoped team info. Present only when role is team_captain. */
+    team?: {
+      id: string;
+      name: string;
+      initials: string;
+      logo?: string;
+      primaryColor: string;
+      secondaryColor: string;
+      category?: string;
+      credentialsGeneratedAt?: string;
+    };
   }> {
     return request('/auth/me');
   },

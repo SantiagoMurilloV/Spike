@@ -46,35 +46,76 @@ const DUMMY_BCRYPT_HASH = bcrypt.hashSync(
 export class AuthService {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const pool = getPool();
-    const result = await pool.query(
+
+    // Two-tier lookup. First the `users` table (admin / judge / super_admin);
+    // if no hit there, try the `teams` table (team captain credentials,
+    // stored directly on teams.captain_username / .captain_password_hash
+    // since captains don't have their own users row). At most ONE bcrypt
+    // compare runs per request — the hash we check is whichever match
+    // we found, or a dummy hash if neither did, so timing stays constant
+    // regardless of which table (if any) contained the username.
+    const userResult = await pool.query(
       'SELECT id, username, password_hash, role, created_by FROM users WHERE username = $1',
       [credentials.username],
     );
+    const user = userResult.rows[0];
 
-    // Constant-time path: always run bcrypt.compare() once, regardless of
-    // whether the user exists. Otherwise a "user not found" shortcut
-    // returns in ~1 ms vs ~150 ms for a wrong password, which leaks
-    // username enumeration through timing.
-    const user = result.rows[0];
-    const hashToCheck = user?.password_hash ?? DUMMY_BCRYPT_HASH;
+    let team: {
+      id: string;
+      username: string;
+      password_hash: string;
+    } | undefined;
+    if (!user) {
+      const teamResult = await pool.query(
+        `SELECT id, captain_username AS username, captain_password_hash AS password_hash
+         FROM teams
+         WHERE captain_username = $1 AND captain_password_hash IS NOT NULL`,
+        [credentials.username],
+      );
+      team = teamResult.rows[0];
+    }
+
+    const hashToCheck =
+      user?.password_hash ?? team?.password_hash ?? DUMMY_BCRYPT_HASH;
     const validPassword = await bcrypt.compare(credentials.password, hashToCheck);
 
-    if (!user || !validPassword) {
+    if (!validPassword || (!user && !team)) {
       throw new UnauthorizedError('Credenciales incorrectas');
     }
 
-    // `createdBy` goes into the token so judge-scoped queries (live
-    // match feed) don't have to hit the users table on every request.
+    if (user) {
+      // `createdBy` goes into the token so judge-scoped queries (live
+      // match feed) don't have to hit the users table on every request.
+      const payload = {
+        userId: user.id,
+        role: user.role,
+        createdBy: user.created_by ?? null,
+      };
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRATION });
+      return {
+        token,
+        user: { id: user.id, username: user.username, role: user.role },
+      };
+    }
+
+    // Captain login. The JWT's `userId` is set to the team id so downstream
+    // middleware that reads req.user.userId still works; a dedicated
+    // `teamId` field is also embedded for ownership checks on roster
+    // endpoints (POST /teams/:teamId/players must match this).
     const payload = {
-      userId: user.id,
-      role: user.role,
-      createdBy: user.created_by ?? null,
+      userId: team!.id,
+      role: 'team_captain' as const,
+      teamId: team!.id,
     };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRATION });
-
     return {
       token,
-      user: { id: user.id, username: user.username, role: user.role },
+      user: {
+        id: team!.id,
+        username: team!.username,
+        role: 'team_captain',
+        teamId: team!.id,
+      },
     };
   }
 

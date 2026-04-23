@@ -13,6 +13,8 @@ interface AuthUser {
   id: string;
   username: string;
   role: string;
+  /** Present when role is team_captain — id of the team the user manages. */
+  teamId?: string;
 }
 
 interface LoginResult {

@@ -15,7 +15,7 @@ import {
   update as updatePlayer,
   remove as removePlayer,
 } from '../controllers/player.controller';
-import { requireRole } from '../middleware/auth';
+import { requireRole, requireTeamAccess } from '../middleware/auth';
 
 const router = Router();
 
@@ -38,11 +38,12 @@ router.post(
 );
 
 // Roster — nested under /teams/:teamId/players
-// GET is public (read-only); POST/PUT/DELETE go through authMiddleware.
+// GET is public (read-only); POST/PUT/DELETE require an authenticated caller
+// who either has global access (admin/super_admin) or is the team's captain.
 router.get('/:teamId/players', listPlayers);
 router.get('/:teamId/players/:playerId', getPlayerById);
-router.post('/:teamId/players', createPlayer);
-router.put('/:teamId/players/:playerId', updatePlayer);
-router.delete('/:teamId/players/:playerId', removePlayer);
+router.post('/:teamId/players', requireTeamAccess, createPlayer);
+router.put('/:teamId/players/:playerId', requireTeamAccess, updatePlayer);
+router.delete('/:teamId/players/:playerId', requireTeamAccess, removePlayer);
 
 export default router;

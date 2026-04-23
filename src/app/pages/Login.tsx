@@ -15,6 +15,7 @@ import { ApiError } from '../services/api';
 function homeForRole(role: string | undefined): string {
   if (role === 'super_admin') return '/super-admin';
   if (role === 'judge') return '/judge';
+  if (role === 'team_captain') return '/team-panel';
   return '/admin';
 }
 
