@@ -1,76 +1,29 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
-import {
-  Loader2,
-  Users,
-  MapPin,
-  Trophy,
-  Shuffle,
-  Plus,
-  Filter,
-  Edit,
-  Clock,
-  Trash2,
-  RefreshCw,
-  CheckCircle2,
-} from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { api } from '../../services/api';
-import type { CreateTeamDto, UpdateTournamentDto } from '../../services/api';
-import { Tournament, Team, Match, BracketMatch, FixtureResult, StandingsRow } from '../../types';
-import { TeamAvatar } from '../../components/TeamAvatar';
-import { GroupMatrix } from '../../components/GroupMatrix';
-import { CategorySection } from '../../components/admin/CategorySection';
-import { TeamFormModal } from '../../components/admin/TeamFormModal';
-import { TournamentFormModal } from '../../components/admin/TournamentFormModal';
-import { TeamRosterCard } from '../../components/admin/TeamRosterCard';
-import { ScoreSetsEditor } from '../../components/admin/ScoreSetsEditor';
+import type { CreateTeamDto, UpdateTeamDto, UpdateTournamentDto } from '../../services/api';
+import {
+  Tournament,
+  Team,
+  Match,
+  BracketMatch,
+  FixtureResult,
+  StandingsRow,
+} from '../../types';
 import { useData } from '../../context/DataContext';
-import type { UpdateTeamDto } from '../../services/api';
 import { Tabs, TabsContent } from '../../components/ui/tabs';
-import { Badge } from '../../components/ui/badge';
-import { Button } from '../../components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../../components/ui/select';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../../components/ui/alert-dialog';
-import {
-  FixtureModeDialog,
-  AutomaticScheduleModal,
-  ManualGroupsModal,
-  ManualBracketModal,
-  BracketCrossingsModal,
-  type ScheduleConfig,
-} from '../../components/admin/ManualFixtureModal';
 import { useScoreEditor } from '../../hooks/useScoreEditor';
 import { hydrateSetsFromMatch } from '../../lib/scoring';
 import {
-  categoryOfMatchPhase,
-  categoryOfGroupName,
-  categoryOfBracketRound,
-  bracketRoundName,
-  humanizePhase,
-} from '../../lib/phase';
-import {
   tournamentStatusColor,
   tournamentStatusLabel,
-  matchStatusLabel,
 } from '../../lib/status';
-
-// ── Helpers ────────────────────────────────────────────────────────
+import { InfoTab } from './tournament-detail/InfoTab';
+import { TeamsTab } from './tournament-detail/TeamsTab';
+import { FixturesTab } from './tournament-detail/FixturesTab';
+import { MatchesTab } from './tournament-detail/MatchesTab';
 
 const FORMAT_LABELS: Record<string, string> = {
   groups: 'Fase de Grupos',
@@ -79,88 +32,49 @@ const FORMAT_LABELS: Record<string, string> = {
   league: 'Liga (Todos contra Todos)',
 };
 
-/**
- * SpkPanel — subtle section container. The old version had a black
- * header bar that duplicated what the sidebar nav already conveys, so
- * we stripped it. Now it's just a lightweight wrapper with breathing
- * room and an optional action slot.
- */
-function SpkPanel({
-  children,
-  headerAction,
-}: {
-  children: React.ReactNode;
-  headerAction?: React.ReactNode;
-}) {
-  return (
-    <div>
-      {headerAction && (
-        <div className="flex items-center justify-end mb-3">{headerAction}</div>
-      )}
-      <div>{children}</div>
-    </div>
-  );
-}
+const VALID_TABS = ['info', 'teams', 'fixtures', 'matches'] as const;
+type TabId = (typeof VALID_TABS)[number];
+
+const SECTION_TITLE: Record<TabId, string> = {
+  info: 'Ajustes generales',
+  teams: 'Inscripción equipos y plantel',
+  fixtures: 'Cruces',
+  matches: 'Partidos',
+};
 
 /**
- * Big sets-won number shown at the center of a match card. When no
- * score is persisted yet (upcoming match) the "VS" placeholder hints
- * at the two teams about to play.
+ * AdminTournamentDetail — orchestrator for the four tournament-detail
+ * tabs. Owns the authoritative data slices (tournament, enrolledTeams,
+ * matches, bracketMatches, standings) + the two score-editor hook
+ * instances, and wires them into each tab component.
+ *
+ * Each tab renders its own section UI in a file under ./tournament-detail/
+ * so this orchestrator stays under the 500-line budget. URL-driven tab
+ * state (?tab=…) lets the admin sidebar deep-link into a specific
+ * section while keeping the existing /admin/tournaments/:id bookmark.
  */
-function ScoreBigNumber({
-  displayScore,
-}: {
-  displayScore: { team1: number; team2: number } | null | undefined;
-}) {
-  if (displayScore) {
-    return (
-      <span
-        className="text-2xl font-bold"
-        style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-      >
-        {displayScore.team1} — {displayScore.team2}
-      </span>
-    );
-  }
-  return (
-    <span
-      className="text-xl text-black/20 font-bold"
-      style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-    >
-      VS
-    </span>
-  );
-}
-
-// ── Main Component ─────────────────────────────────────────────────
-
 export function AdminTournamentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  // Tab selection is URL-driven so the AdminLayout sidebar can deep-link
-  // straight into "Equipos" / "Cruces" / "Partidos" for a specific
-  // tournament. Query param form (?tab=…) instead of nested routes
-  // keeps this change minimal and backwards-compatible with any bookmark
-  // pointing at /admin/tournaments/:id.
   const [searchParams, setSearchParams] = useSearchParams();
-  const validTabs = ['info', 'teams', 'fixtures', 'matches'] as const;
-  type TabId = (typeof validTabs)[number];
+  const { addTeam, updateTeam, updateTournament } = useData();
+
+  // ── Tab routing ─────────────────────────────────────────────────
+
   const rawTab = searchParams.get('tab');
-  const activeTab: TabId = (validTabs as readonly string[]).includes(rawTab ?? '')
+  const activeTab: TabId = (VALID_TABS as readonly string[]).includes(rawTab ?? '')
     ? (rawTab as TabId)
     : 'info';
+
   const handleTabChange = (next: string) => {
     const params = new URLSearchParams(searchParams);
     if (next === 'info') params.delete('tab');
     else params.set('tab', next);
     setSearchParams(params, { replace: true });
   };
-  // Used by the "Crear equipo nuevo" flow inside the Equipos tab — we go
-  // through the shared DataContext action so the global teams list stays
-  // in sync with the one we just created for this tournament.
-  const { addTeam, updateTeam, updateTournament } = useData();
 
-  // Data state
+  // ── Data state ──────────────────────────────────────────────────
+
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [enrolledTeams, setEnrolledTeams] = useState<Team[]>([]);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
@@ -169,68 +83,15 @@ export function AdminTournamentDetail() {
   const [standings, setStandings] = useState<StandingsRow[]>([]);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
 
-  // UI state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [enrolling, setEnrolling] = useState(false);
-  const [selectedTeamId, setSelectedTeamId] = useState<string>('');
   const [unenrollingId, setUnenrollingId] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
-  const [showModeDialog, setShowModeDialog] = useState(false);
-  const [showManualGroups, setShowManualGroups] = useState(false);
-  const [showManualBracket, setShowManualBracket] = useState(false);
-  const [showBracketCrossings, setShowBracketCrossings] = useState(false);
-  const [pendingGroups, setPendingGroups] = useState<Record<string, string[]>>({});
-  const [pendingSchedule, setPendingSchedule] = useState<ScheduleConfig | undefined>(undefined);
-  const [showAutoSchedule, setShowAutoSchedule] = useState(false);
-  const [showClearDialog, setShowClearDialog] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
-  /** "Finalizar torneo" confirmation + submit state — lives on the
-   *  Ajustes Generales tab so the admin has a clear way to close out
-   *  a tournament from the same surface where they edit everything else. */
-  const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
-  const [finalizing, setFinalizing] = useState(false);
-  // "Crear equipo nuevo" flow inside the Equipos tab. Opens TeamFormModal
-  // in create mode; the submit handler auto-enrols the result in this
-  // tournament. Team management lives entirely inside the tournament now
-  // — there is no separate /admin/teams page.
-  const [showNewTeamModal, setShowNewTeamModal] = useState(false);
-  /** Team currently being edited (opens the same TeamFormModal). */
-  const [editingTeam, setEditingTeam] = useState<Team | undefined>();
 
-  const handleRecalculateStandings = useCallback(async () => {
-    if (!id) return;
-    setRecalculating(true);
-    try {
-      // The backend recalc also re-resolves any bracket placeholders from
-      // the fresh standings, so we refetch both streams here to update the
-      // UI in a single shot.
-      const [fresh, bracket] = await Promise.all([
-        api.recalculateStandings(id),
-        api.getTournamentBracket(id),
-      ]);
-      setStandings(fresh);
-      setBracketMatches(bracket);
-      toast.success('Tabla y bracket actualizados');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo recalcular la tabla');
-    } finally {
-      setRecalculating(false);
-    }
-  }, [id]);
+  // ── Score editors ───────────────────────────────────────────────
 
-  // Match filters
-  const [phaseFilter, setPhaseFilter] = useState<string>('all');
-  const [groupFilter, setGroupFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-
-  // Score editing — match + bracket rows share the useScoreEditor
-  // state machine. The two hook instances only differ in how they
-  // persist: matches hit updateMatchScore and patch one row in-place;
-  // bracket rows hit updateBracketMatch and replace the full bracket
-  // because winner-advancement cascades touch other rows.
   const matchEditor = useScoreEditor<Match>({
     getId: (m) => m.id,
     getStatus: (m) => m.status,
@@ -245,6 +106,7 @@ export function AdminTournamentDetail() {
       setMatches((prev) => prev.map((m) => (m.id === match.id ? updated : m)));
     },
   });
+
   const bracketEditor = useScoreEditor<BracketMatch>({
     getId: (bm) => bm.id,
     getStatus: (bm) => bm.status,
@@ -260,7 +122,7 @@ export function AdminTournamentDetail() {
     },
   });
 
-  // ── Data fetching ──────────────────────────────────────────────
+  // ── Data fetch ──────────────────────────────────────────────────
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -292,171 +154,21 @@ export function AdminTournamentDetail() {
     fetchData();
   }, [fetchData]);
 
-  // ── Derived data ───────────────────────────────────────────────
+  // ── Derived ─────────────────────────────────────────────────────
 
   const enrolledIds = useMemo(() => new Set(enrolledTeams.map((t) => t.id)), [enrolledTeams]);
 
   const availableTeams = useMemo(() => {
-    // Filter out already-enrolled teams first, then apply the
-    // tournament's category whitelist (if set). Empty list = no filter,
-    // which preserves the legacy behaviour for tournaments created before
-    // this feature shipped.
     const notEnrolled = allTeams.filter((t) => !enrolledIds.has(t.id));
     const allowed = tournament?.categories ?? [];
     if (allowed.length === 0) return notEnrolled;
     const normalize = (s: string) => s.trim().toLowerCase();
     const allowedSet = new Set(allowed.map(normalize));
-    return notEnrolled.filter(
-      (t) => t.category && allowedSet.has(normalize(t.category)),
-    );
+    return notEnrolled.filter((t) => t.category && allowedSet.has(normalize(t.category)));
   }, [allTeams, enrolledIds, tournament?.categories]);
 
-  const teamsByCategory = useMemo(() => {
-    const groups: Record<string, Team[]> = {};
-    for (const team of enrolledTeams) {
-      const cat = team.category || 'Sin Categoría';
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(team);
-    }
-    return Object.entries(groups).sort(([a], [b]) => {
-      if (a === 'Sin Categoría') return 1;
-      if (b === 'Sin Categoría') return -1;
-      return a.localeCompare(b);
-    });
-  }, [enrolledTeams]);
+  // ── Handlers — tournament ───────────────────────────────────────
 
-  // Filter options derived from matches
-  const phases = useMemo(() => [...new Set(matches.map((m) => m.phase))], [matches]);
-  const groups = useMemo(() => [...new Set(matches.filter((m) => m.group).map((m) => m.group!))], [matches]);
-
-  const filteredMatches = useMemo(() => {
-    return matches.filter((m) => {
-      if (phaseFilter !== 'all' && m.phase !== phaseFilter) return false;
-      if (groupFilter !== 'all' && m.group !== groupFilter) return false;
-      if (statusFilter !== 'all' && m.status !== statusFilter) return false;
-      return true;
-    });
-  }, [matches, phaseFilter, groupFilter, statusFilter]);
-
-  /**
-   * Split the filtered match list into "en vivo" vs everything else
-   * grouped by category (extracted from m.phase — the phase field
-   * stores things like "Grupos | Category"; we take what's
-   * after the first '|' as the category name). This drives the
-   * Partidos tab's live-first layout.
-   */
-  const matchesSplit = useMemo(() => {
-    const live: Match[] = [];
-    const byCategory = new Map<string, Match[]>();
-    for (const m of filteredMatches) {
-      if (m.status === 'live') {
-        live.push(m);
-        continue;
-      }
-      const category = categoryOfMatchPhase(m.phase);
-      const bucket = byCategory.get(category) ?? [];
-      bucket.push(m);
-      byCategory.set(category, bucket);
-    }
-    return {
-      live,
-      categories: Array.from(byCategory.entries()).sort(([a], [b]) =>
-        a.localeCompare(b),
-      ),
-    };
-  }, [filteredMatches]);
-
-  // Group matches by phase+group for Cruces tab
-  const matchesByPhaseGroup = useMemo(() => {
-    const grouped: Record<string, Match[]> = {};
-    for (const m of matches) {
-      const key = m.group ? `${m.phase} — ${m.group}` : m.phase;
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(m);
-    }
-    return Object.entries(grouped);
-  }, [matches]);
-
-  // Group names for matrix display
-  const groupNames = useMemo(() => {
-    const names = new Set<string>();
-    for (const m of matches) {
-      if (m.group) names.add(m.group);
-    }
-    return Array.from(names).sort();
-  }, [matches]);
-
-  const matchesByGroup = useMemo(() => {
-    const map: Record<string, Match[]> = {};
-    for (const m of matches) {
-      if (m.group) {
-        if (!map[m.group]) map[m.group] = [];
-        map[m.group].push(m);
-      }
-    }
-    return map;
-  }, [matches]);
-
-  const standingsByGroup = useMemo(() => {
-    const map: Record<string, StandingsRow[]> = {};
-    for (const s of standings) {
-      // StandingsRow doesn't have groupName on frontend, but we can match by team
-      // Actually we need to figure out which group each team is in from matches
-    }
-    // Build from matches: figure out which group each team belongs to
-    const teamGroup = new Map<string, string>();
-    for (const m of matches) {
-      if (m.group) {
-        teamGroup.set(m.team1.id, m.group);
-        teamGroup.set(m.team2.id, m.group);
-      }
-    }
-    for (const s of standings) {
-      const group = teamGroup.get(s.team.id);
-      if (group) {
-        if (!map[group]) map[group] = [];
-        map[group].push(s);
-      }
-    }
-    return map;
-  }, [matches, standings]);
-
-  // ── Enrollment handlers ────────────────────────────────────────
-
-  const handleEnroll = async () => {
-    if (!id || !selectedTeamId) return;
-    setEnrolling(true);
-    try {
-      await api.enrollTeam(id, selectedTeamId);
-      const updated = await api.getEnrolledTeams(id);
-      setEnrolledTeams(updated);
-      setSelectedTeamId('');
-      toast.success('Equipo inscrito correctamente');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al inscribir equipo');
-    } finally {
-      setEnrolling(false);
-    }
-  };
-
-  /**
-   * Create-a-new-team flow. Fires from the TeamFormModal submit callback:
-   *   1. Create the team via DataContext (so the global list updates)
-   *   2. Auto-enrol it in the current tournament
-   *   3. Refresh the enrolled list + mirror into local allTeams so the
-   *      enrolment dropdown drops it right away.
-   * Errors are thrown so the modal stays open and shows the message.
-   */
-  /**
-   * Routes the TeamFormModal submit to create-and-enrol or plain update
-   * depending on whether `editingTeam` is set. Centralised here so the
-   * same modal renders once and handles both flows.
-   */
-  /**
-   * Submit handler for the Tournament edit modal shown from the Ajustes
-   * Generales tab. Shape-matches the one in AdminTournaments so both
-   * entry points write identical DTOs.
-   */
   const handleTournamentEditSubmit = async (updated: Tournament) => {
     if (!tournament) return;
     const dto: UpdateTournamentDto = {
@@ -478,33 +190,44 @@ export function AdminTournamentDetail() {
       playersPerTeam: updated.playersPerTeam,
     };
     const fresh = await updateTournament(tournament.id, dto);
-    // Also refresh the locally-held tournament so the page repaints
-    // without a full reload.
     setTournament(fresh);
     toast.success('Torneo actualizado');
   };
 
-  /**
-   * "Finalizar torneo" — flips status to 'completed' via updateTournament.
-   * Confirmation-gated from AlertDialog since this is a destructive-ish
-   * intent (standings / bracket calculations treat completed differently).
-   */
-  const handleFinalizeTournament = async () => {
-    if (!tournament) return;
-    setFinalizing(true);
+  const finalizeTournament = async (t: Tournament) => updateTournament(t.id, { status: 'completed' });
+
+  // ── Handlers — teams ────────────────────────────────────────────
+
+  const handleEnroll = async (teamId: string) => {
+    if (!id) return;
+    setEnrolling(true);
     try {
-      const fresh = await updateTournament(tournament.id, { status: 'completed' });
-      setTournament(fresh);
-      toast.success('Torneo finalizado');
-      setShowFinalizeDialog(false);
+      await api.enrollTeam(id, teamId);
+      const updated = await api.getEnrolledTeams(id);
+      setEnrolledTeams(updated);
+      toast.success('Equipo inscrito correctamente');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al finalizar el torneo');
+      toast.error(err instanceof Error ? err.message : 'Error al inscribir equipo');
     } finally {
-      setFinalizing(false);
+      setEnrolling(false);
     }
   };
 
-  const handleTeamFormSubmit = async (team: Team) => {
+  const handleUnenroll = async (teamId: string) => {
+    if (!id) return;
+    setUnenrollingId(teamId);
+    try {
+      await api.unenrollTeam(id, teamId);
+      setEnrolledTeams((prev) => prev.filter((t) => t.id !== teamId));
+      toast.success('Equipo desinscrito correctamente');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al desinscribir equipo');
+    } finally {
+      setUnenrollingId(null);
+    }
+  };
+
+  const handleTeamFormSubmit = async (team: Team, editingTeam: Team | undefined) => {
     if (editingTeam) {
       const dto: UpdateTeamDto = {
         name: team.name,
@@ -517,17 +240,11 @@ export function AdminTournamentDetail() {
         category: team.category,
       };
       const updated = await updateTeam(editingTeam.id, dto);
-      // Keep the tournament-scoped copies in sync so the card re-renders
-      // immediately without waiting for a refresh.
       setEnrolledTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       setAllTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
       toast.success('Equipo actualizado');
       return;
     }
-    await handleCreateAndEnrollTeam(team);
-  };
-
-  const handleCreateAndEnrollTeam = async (team: Team) => {
     if (!id) return;
     const dto: CreateTeamDto = {
       name: team.name,
@@ -547,189 +264,23 @@ export function AdminTournamentDetail() {
     toast.success(`${created.name} creado e inscrito`);
   };
 
-  const handleUnenroll = async (teamId: string) => {
-    if (!id) return;
-    setUnenrollingId(teamId);
-    try {
-      await api.unenrollTeam(id, teamId);
-      setEnrolledTeams((prev) => prev.filter((t) => t.id !== teamId));
-      toast.success('Equipo desinscrito correctamente');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al desinscribir equipo');
-    } finally {
-      setUnenrollingId(null);
-    }
+  // ── Handlers — fixtures ─────────────────────────────────────────
+
+  const handleGenerated = (
+    result: FixtureResult,
+    tournamentMatches: Match[],
+    bracket: BracketMatch[],
+  ) => {
+    setGeneratedAt(result.generatedAt);
+    setMatches(tournamentMatches);
+    setBracketMatches(bracket);
   };
 
-  // ── Fixture generation ─────────────────────────────────────────
-
-  const handleGenerateFixtures = async () => {
-    if (!id) return;
-    // If matches already exist, show confirmation dialog
-    if (matches.length > 0 || bracketMatches.length > 0) {
-      setShowRegenerateDialog(true);
-      return;
-    }
-    setShowModeDialog(true);
-  };
-
-  const doGenerateFixtures = async (schedule?: ScheduleConfig) => {
-    if (!id) return;
-    setGenerating(true);
-    setShowRegenerateDialog(false);
-    setShowModeDialog(false);
-    try {
-      const result: FixtureResult = await api.generateFixtures(id, schedule);
-      setGeneratedAt(result.generatedAt);
-      // Refresh matches and bracket
-      const [tournamentMatches, bracket] = await Promise.all([
-        api.getTournamentMatches(id),
-        api.getTournamentBracket(id),
-      ]);
-      setMatches(tournamentMatches);
-      setBracketMatches(bracket);
-      toast.success(`Cruces generados: ${tournamentMatches.length} partidos`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al generar cruces');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const handleSelectAutomatic = () => {
-    setShowModeDialog(false);
-    setShowAutoSchedule(true);
-  };
-
-  const handleAutoScheduleGenerate = (schedule: ScheduleConfig) => {
-    setShowAutoSchedule(false);
-    doGenerateFixtures(schedule);
-  };
-
-  const handleSelectManual = () => {
-    setShowModeDialog(false);
-    if (!tournament) return;
-    const format = tournament.format;
-    if (format === 'knockout') {
-      setShowManualBracket(true);
-    } else {
-      // groups, league, groups+knockout → show groups modal
-      setShowManualGroups(true);
-    }
-  };
-
-  const handleManualGroupsGenerate = async (groups: Record<string, string[]>, schedule: ScheduleConfig) => {
-    if (!id) return;
-
-    if (tournament?.format === 'groups+knockout') {
-      // Save groups & schedule, then let admin define the elimination crossings
-      setPendingGroups(groups);
-      setPendingSchedule(schedule);
-      setShowManualGroups(false);
-      setShowBracketCrossings(true);
-      return;
-    }
-
-    setGenerating(true);
-    try {
-      const result = await api.generateManualFixtures(id, { groups, schedule });
-      setGeneratedAt(result.generatedAt);
-      const [tournamentMatches, bracket] = await Promise.all([
-        api.getTournamentMatches(id),
-        api.getTournamentBracket(id),
-      ]);
-      setMatches(tournamentMatches);
-      setBracketMatches(bracket);
-      setShowManualGroups(false);
-      toast.success(`Cruces generados: ${tournamentMatches.length} partidos`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al generar cruces');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const handleManualBracketGenerate = async (seeds: Array<{ position: number; teamId: string | null; label?: string }>) => {
-    if (!id) return;
-    setGenerating(true);
-    try {
-      const result = await api.generateManualFixtures(id, { bracketSeeds: seeds });
-      setGeneratedAt(result.generatedAt);
-      const [tournamentMatches, bracket] = await Promise.all([
-        api.getTournamentMatches(id),
-        api.getTournamentBracket(id),
-      ]);
-      setMatches(tournamentMatches);
-      setBracketMatches(bracket);
-      setShowManualBracket(false);
-      toast.success(`Bracket generado con ${bracket.length} partidos`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al generar bracket');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  /**
-   * Called from BracketCrossingsModal when groups are being created (initial flow).
-   * pendingGroups contains simple letter keys (A, B, C…); the backend rewrites
-   * the labels to full category-prefixed names before storing placeholders.
-   */
-  const handleInitialBracketCrossings = async (seeds: Array<{ position: number; label: string }>) => {
-    if (!id) return;
-    setGenerating(true);
-    try {
-      const bracketSeeds = seeds.map((s) => ({ position: s.position, teamId: null as string | null, label: s.label }));
-      const result = await api.generateManualFixtures(id, {
-        groups: pendingGroups,
-        schedule: pendingSchedule,
-        bracketSeeds,
-      });
-      setGeneratedAt(result.generatedAt);
-      const [tournamentMatches, bracket] = await Promise.all([
-        api.getTournamentMatches(id),
-        api.getTournamentBracket(id),
-      ]);
-      setMatches(tournamentMatches);
-      setBracketMatches(bracket);
-      setShowBracketCrossings(false);
-      setPendingGroups({});
-      toast.success('Grupos y Bracket generados correctamente');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al generar formato completo');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  /**
-   * Called from the standalone "Definir Eliminación Directa" button.
-   * Groups already exist in DB; group names include category prefix.
-   */
-  const handlePostGroupsBracketCrossings = async (seeds: Array<{ position: number; label: string }>) => {
-    if (!id) return;
-    setGenerating(true);
-    try {
-      const bracket = await api.generateBracketCrossings(id, seeds);
-      setBracketMatches(bracket);
-      setShowBracketCrossings(false);
-      toast.success(`Bracket generado con ${bracket.length} partidos`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al generar bracket');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const handleRegenerateConfirm = () => {
-    setShowRegenerateDialog(false);
-    setShowModeDialog(true);
-  };
+  const handleBracketUpdated = (bracket: BracketMatch[]) => setBracketMatches(bracket);
 
   const handleClearFixtures = async () => {
     if (!id) return;
     setClearing(true);
-    setShowClearDialog(false);
     try {
       await api.clearFixtures(id);
       const [tournamentMatches, bracket] = await Promise.all([
@@ -747,108 +298,25 @@ export function AdminTournamentDetail() {
     }
   };
 
-  /**
-   * Render a single match card. Owns no state — all score-editor
-   * interaction is delegated to `matchEditor` (useScoreEditor instance
-   * declared above).
-   *
-   * During editing the big sets-won number reflects `matchEditor.editedScore`
-   * live, so corrections are visible as the admin types. Opening the
-   * editor never "resets" to 0-0 because hydrateSetsFromMatch
-   * reconstructs synthetic sets when only a total is persisted.
-   */
-  const renderMatchCard = (m: Match) => {
-    const isEditing = matchEditor.isEditing(m);
-    return (
-      <div
-        key={m.id}
-        className={`p-4 bg-white border rounded-sm ${
-          m.status === 'live' ? 'border-spk-red border-2' : 'border-black/10'
-        }`}
-      >
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Badge
-              variant={
-                m.status === 'live'
-                  ? 'destructive'
-                  : m.status === 'completed'
-                    ? 'secondary'
-                    : 'outline'
-              }
-            >
-              {matchStatusLabel(m.status)}
-            </Badge>
-            <span className="text-xs text-black/50">
-              {m.phase}
-              {m.group ? ` • ${m.group}` : ''}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-black/50">
-            {m.court && (
-              <span className="flex items-center gap-1">
-                <MapPin className="w-3 h-3" />
-                {m.court}
-              </span>
-            )}
-            <span>{m.time}</span>
-          </div>
-        </div>
+  const handleRecalculateStandings = useCallback(async () => {
+    if (!id) return;
+    setRecalculating(true);
+    try {
+      const [fresh, bracket] = await Promise.all([
+        api.recalculateStandings(id),
+        api.getTournamentBracket(id),
+      ]);
+      setStandings(fresh);
+      setBracketMatches(bracket);
+      toast.success('Tabla y bracket actualizados');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo recalcular la tabla');
+    } finally {
+      setRecalculating(false);
+    }
+  }, [id]);
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div
-              className="w-10 h-10 rounded-sm flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-              style={{ backgroundColor: m.team1.colors.primary }}
-            >
-              {m.team1.initials}
-            </div>
-            <span className="font-medium truncate">{m.team1.name}</span>
-          </div>
-
-          <div className="px-4 text-center flex-shrink-0">
-            <ScoreBigNumber displayScore={isEditing ? matchEditor.editedScore : m.score} />
-          </div>
-
-          <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
-            <span className="font-medium truncate text-right">{m.team2.name}</span>
-            <div
-              className="w-10 h-10 rounded-sm flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-              style={{ backgroundColor: m.team2.colors.primary }}
-            >
-              {m.team2.initials}
-            </div>
-          </div>
-        </div>
-
-        {isEditing ? (
-          <ScoreSetsEditor
-            sets={matchEditor.sets}
-            status={matchEditor.status}
-            saving={matchEditor.saving}
-            onAddSet={matchEditor.addSet}
-            onRemoveSet={matchEditor.removeSet}
-            onUpdateSet={matchEditor.updateSet}
-            onStatusChange={matchEditor.setStatus}
-            onSave={() => matchEditor.commit(m)}
-            onCancel={matchEditor.cancel}
-          />
-        ) : (
-          <div className="flex justify-end mt-2">
-            <button
-              onClick={() => matchEditor.start(m)}
-              className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
-            >
-              <Edit className="w-3 h-3" />
-              Editar marcador
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // ── Loading / Error states ─────────────────────────────────────
+  // ── Loading / error ─────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -872,30 +340,16 @@ export function AdminTournamentDetail() {
     );
   }
 
-  // ── Render ─────────────────────────────────────────────────────
-
-  // Section title changes per active tab. Sidebar already shows the
-  // tournament name + which section is active, so the in-page heading
-  // is kept subtle — it's a wayfinding reminder, not a page title.
-  const sectionTitle =
-    activeTab === 'teams'
-      ? 'Inscripción equipos y plantel'
-      : activeTab === 'fixtures'
-        ? 'Cruces'
-        : activeTab === 'matches'
-          ? 'Partidos'
-          : 'Ajustes generales';
+  // ── Render ──────────────────────────────────────────────────────
 
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-      {/* Header — subtle wayfinding: section name + "Copa X" underline,
-          no giant page title, no back arrow (sidebar handles navigation). */}
       <div>
         <h1
           className="text-lg sm:text-xl font-bold uppercase tracking-wider text-black/80"
           style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
         >
-          {sectionTitle}
+          {SECTION_TITLE[activeTab]}
         </h1>
         <div className="flex items-center gap-2 mt-0.5 text-xs text-black/50">
           <span className="font-medium">Copa {tournament.name}</span>
@@ -910,763 +364,49 @@ export function AdminTournamentDetail() {
         </div>
       </div>
 
-      {/* Tabs — the horizontal tab strip was removed because the admin
-          sidebar already deep-links to every section (?tab=info|teams|
-          fixtures|matches). `<Tabs>` stays as the content-switcher so
-          the URL param still drives which panel is visible, it just
-          renders without a visible trigger row. */}
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-
-        {/* ── Info Tab ──────────────────────────────────────────── */}
         <TabsContent value="info">
-          {/* Fully editable form, same inputs as the modal, pre-filled
-              with the tournament's current values. Admin edits in place
-              and hits Guardar; inline variant skips the modal chrome. */}
-          <TournamentFormModal
-            variant="inline"
-            isOpen
-            onClose={() => {}}
-            onSubmit={handleTournamentEditSubmit}
+          <InfoTab
             tournament={tournament}
+            onSubmit={handleTournamentEditSubmit}
+            onFinalize={finalizeTournament}
+            onFinalized={(fresh) => setTournament(fresh)}
           />
-
-          {/* Finalizar torneo — destructive action kept visually separate
-              from the normal save flow so the admin only hits it on
-              purpose. Hidden once the tournament is already completed. */}
-          {tournament.status !== 'completed' && (
-            <div className="mt-8 pt-6 border-t border-black/10">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                  <h3
-                    className="text-sm font-bold uppercase tracking-wider text-black/70"
-                    style={{
-                      fontFamily: 'Barlow Condensed, sans-serif',
-                      letterSpacing: '0.1em',
-                    }}
-                  >
-                    Finalizar torneo
-                  </h3>
-                  <p className="text-xs text-black/50 mt-0.5">
-                    Marca el torneo como completado. Podés seguir
-                    consultándolo, pero no aparecerá como "en curso" en
-                    listas y paneles.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowFinalizeDialog(true)}
-                  disabled={finalizing}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-spk-win text-white hover:bg-spk-win/90 rounded-sm text-sm font-bold uppercase transition-colors disabled:opacity-50 flex-shrink-0"
-                  style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
-                >
-                  {finalizing ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-4 h-4" />
-                  )}
-                  Finalizar torneo
-                </button>
-              </div>
-            </div>
-          )}
-
-          <AlertDialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Finalizar este torneo?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  El torneo pasará a estado <strong>Finalizado</strong>. Los
-                  marcadores, clasificaciones y brackets quedan como están —
-                  solo cambia el estado público. Podés revertirlo editando
-                  el estado desde este mismo formulario.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={finalizing}>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleFinalizeTournament}
-                  disabled={finalizing}
-                  className="bg-spk-win hover:bg-spk-win/90"
-                >
-                  {finalizing && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                  Finalizar torneo
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </TabsContent>
 
-        {/* ── Equipos Tab ──────────────────────────────────────── */}
         <TabsContent value="teams">
-          <SpkPanel title={`Equipos Inscritos (${enrolledTeams.length})`}>
-              {/* Enrolment controls — two paths for registering a team:
-                  (A) pick one that already exists via the select, or
-                  (B) fire "Crear equipo nuevo" which opens the TeamFormModal
-                  and auto-enrols the result. All team management lives in
-                  this tab now; there's no separate /admin/teams page. */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
-                <div className="flex-1">
-                  <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Inscribir equipo existente..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableTeams.length === 0 ? (
-                        <SelectItem value="_none" disabled>
-                          No hay equipos disponibles
-                        </SelectItem>
-                      ) : (
-                        availableTeams.map((team) => (
-                          <SelectItem key={team.id} value={team.id}>
-                            {team.name}
-                            {team.category ? ` (${team.category})` : ''}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  onClick={handleEnroll}
-                  disabled={!selectedTeamId || enrolling}
-                  className="bg-spk-red hover:bg-spk-red-dark w-full sm:w-auto flex-shrink-0"
-                >
-                  {enrolling ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Plus className="w-4 h-4" />
-                  )}
-                  Inscribir
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => setShowNewTeamModal(true)}
-                  variant="outline"
-                  className="w-full sm:w-auto flex-shrink-0 border-black/20 hover:bg-black/5"
-                >
-                  <Plus className="w-4 h-4" />
-                  Crear Equipo Nuevo
-                </Button>
-              </div>
-
-              {/* Teams grouped by category — each category is a
-                  collapsible accordion so the page doesn't grow into an
-                  endless scroll when a tournament has many divisions.
-                  First category opens by default; the rest start folded. */}
-              {teamsByCategory.length === 0 ? (
-                <div className="text-center py-12">
-                  <Users className="w-12 h-12 text-black/20 mx-auto mb-3" />
-                  <p className="text-black/60">No hay equipos inscritos aún</p>
-                  <p className="text-sm text-black/40 mt-1">
-                    Usa el selector de arriba para inscribir equipos
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {teamsByCategory.map(([category, teams]) => (
-                    <CategorySection
-                      key={category}
-                      title={category}
-                      count={teams.length}
-                      subtitle={`${teams.length} ${teams.length === 1 ? 'equipo' : 'equipos'}`}
-                      defaultOpen
-                    >
-                      {/* Each enrolled team is itself a collapsible row so
-                          admins can see/edit its roster without leaving
-                          this screen. The delete button unenrols the team
-                          from this tournament (doesn't remove it globally). */}
-                      <div className="space-y-3">
-                        {teams.map((team) => (
-                          <TeamRosterCard
-                            key={team.id}
-                            team={team}
-                            onEditTeam={(t) => setEditingTeam(t)}
-                            onDeleteTeam={(t) => handleUnenroll(t.id)}
-                            deletingTeam={unenrollingId === team.id}
-                            deleteButtonLabel={(t) => `Desinscribir ${t.name} del torneo`}
-                          />
-                        ))}
-                      </div>
-                    </CategorySection>
-                  ))}
-                </div>
-              )}
-          </SpkPanel>
-
-          {/* Team form modal — dual purpose:
-              · create + auto-enrol when `editingTeam` is undefined (the
-                "Crear Equipo Nuevo" button)
-              · edit-in-place when the admin clicks the pencil on a
-                TeamRosterCard (sets `editingTeam`) */}
-          <TeamFormModal
-            isOpen={showNewTeamModal || editingTeam !== undefined}
-            onClose={() => {
-              setShowNewTeamModal(false);
-              setEditingTeam(undefined);
-            }}
-            onSubmit={handleTeamFormSubmit}
-            team={editingTeam}
-            allowedCategories={tournament.categories}
+          <TeamsTab
+            tournament={tournament}
+            enrolledTeams={enrolledTeams}
+            availableTeams={availableTeams}
+            unenrollingId={unenrollingId}
+            enrolling={enrolling}
+            onEnroll={handleEnroll}
+            onUnenroll={handleUnenroll}
+            onTeamFormSubmit={handleTeamFormSubmit}
           />
         </TabsContent>
 
-        {/* ── Cruces Tab ───────────────────────────────────────── */}
         <TabsContent value="fixtures">
-          <SpkPanel title="Cruces / Fixtures">
-              {/* Generate button + timestamp — stacks on mobile so the 2–3
-                  action buttons don't squeeze or spill off-screen. */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-                <div>
-                  {generatedAt && (
-                    <div className="flex items-center gap-2 text-sm text-black/60">
-                      <Clock className="w-4 h-4" />
-                      <span>
-                        Generados:{' '}
-                        {new Date(generatedAt).toLocaleString('es-CO')}
-                      </span>
-                    </div>
-                  )}
-                  {!generatedAt && matches.length > 0 && (
-                    <p className="text-sm text-black/60">
-                      {matches.length} partidos generados
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 flex-wrap">
-                <Button
-                  onClick={handleGenerateFixtures}
-                  disabled={generating || enrolledTeams.length < 2}
-                  className="bg-spk-blue hover:bg-spk-blue/90 w-full sm:w-auto"
-                >
-                  {generating ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Shuffle className="w-4 h-4" />
-                  )}
-                  Creación de Grupos
-                </Button>
-                {tournament.format === 'groups+knockout' && matches.length > 0 && (
-                  <Button
-                    onClick={() => setShowBracketCrossings(true)}
-                    disabled={generating}
-                    className="bg-spk-win hover:bg-spk-win/90 text-white w-full sm:w-auto"
-                  >
-                    {generating ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Trophy className="w-4 h-4" />
-                    )}
-                    Definir Eliminación Directa
-                  </Button>
-                )}
-                {(matches.length > 0 || bracketMatches.length > 0) && (
-                  <Button
-                    onClick={handleRecalculateStandings}
-                    disabled={recalculating}
-                    variant="outline"
-                    className="border-spk-blue text-spk-blue hover:bg-spk-blue/10 w-full sm:w-auto"
-                    title="Fuerza un recálculo de la tabla con la lógica actual"
-                  >
-                    {recalculating ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4" />
-                    )}
-                    Recalcular Tabla y Bracket
-                  </Button>
-                )}
-                {(matches.length > 0 || bracketMatches.length > 0) && (
-                  <Button
-                    onClick={() => setShowClearDialog(true)}
-                    disabled={clearing}
-                    variant="outline"
-                    className="border-spk-red text-spk-red hover:bg-spk-red/10 w-full sm:w-auto"
-                  >
-                    {clearing ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
-                    )}
-                    Limpiar Cruces
-                  </Button>
-                )}
-                </div>
-              </div>
-
-              {/* Fixtures display */}
-              {matches.length === 0 && bracketMatches.length === 0 ? (
-                <div className="text-center py-12">
-                  <Trophy className="w-12 h-12 text-black/20 mx-auto mb-3" />
-                  <p className="text-black/60">No hay cruces generados</p>
-                  <p className="text-sm text-black/40 mt-1">
-                    Inscribe equipos y presiona "Generar Cruces"
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Group matrices — organized by category. Each category
-                      collapses into an accordion (single-category
-                      tournaments skip the wrapper). First one opens by
-                      default. */}
-                  {groupNames.length > 0 && (
-                    (() => {
-                      const categoryMap = new Map<string, string[]>();
-                      for (const gName of groupNames) {
-                        const category = categoryOfGroupName(gName);
-                        if (!categoryMap.has(category)) categoryMap.set(category, []);
-                        categoryMap.get(category)!.push(gName);
-                      }
-                      const categories = [...categoryMap.entries()].sort(([a], [b]) => a.localeCompare(b));
-                      const hasMultipleCategories =
-                        categories.length > 1 ||
-                        (categories.length === 1 && categories[0][0] !== '');
-
-                      if (!hasMultipleCategories) {
-                        // Single category (or none) → skip the accordion
-                        // and render groups inline, same as before.
-                        const catGroupNames = categories[0]?.[1] ?? [];
-                        return (
-                          <div className="space-y-6">
-                            {catGroupNames.map((gName) => (
-                              <GroupMatrix
-                                key={gName}
-                                groupName={gName}
-                                matches={matchesByGroup[gName] || []}
-                                standings={standingsByGroup[gName] || []}
-                              />
-                            ))}
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div className="space-y-3">
-                          {categories.map(([category, catGroupNames], idx) => (
-                            <CategorySection
-                              key={category || '_default'}
-                              title={category || 'Sin categoría'}
-                              count={catGroupNames.length}
-                              subtitle={`${catGroupNames.length} ${catGroupNames.length === 1 ? 'grupo' : 'grupos'}`}
-                                    >
-                              <div className="space-y-6">
-                                {catGroupNames.map((gName) => (
-                                  <GroupMatrix
-                                    key={gName}
-                                    groupName={gName}
-                                    matches={matchesByGroup[gName] || []}
-                                    standings={standingsByGroup[gName] || []}
-                                  />
-                                ))}
-                              </div>
-                            </CategorySection>
-                          ))}
-                        </div>
-                      );
-                    })()
-                  )}
-
-                  {/* Match list (enfrentamientos) — each phase / group
-                      block is a CategorySection so the Cruces tab stays
-                      scannable. First block opens by default, the rest
-                      fold. */}
-                  {matchesByPhaseGroup.map(([label, groupMatches], idx) => {
-                    const displayLabel = humanizePhase(label);
-                    return (
-                      <CategorySection
-                        key={label}
-                        title={`Enfrentamientos — ${displayLabel}`}
-                        count={groupMatches.length}
-                        subtitle={`${groupMatches.length} ${groupMatches.length === 1 ? 'partido' : 'partidos'}`}
-                        >
-                        <div className="space-y-2">
-                          {groupMatches.map((m) => (
-                            <div
-                              key={m.id}
-                              className="flex items-center justify-between p-3 bg-white border border-black/10 rounded-sm"
-                            >
-                              <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <TeamAvatar team={m.team1} size="sm" />
-                                <span className="text-sm font-medium truncate">
-                                  {m.team1.name}
-                                </span>
-                              </div>
-                              <div className="px-4 text-center flex-shrink-0">
-                                {m.score ? (
-                                  <span
-                                    className="text-lg font-bold"
-                                    style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                                  >
-                                    {m.score.team1} - {m.score.team2}
-                                  </span>
-                                ) : (
-                                  <span className="text-sm text-black/40 font-bold">VS</span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
-                                <span className="text-sm font-medium truncate text-right">
-                                  {m.team2.name}
-                                </span>
-                                <TeamAvatar team={m.team2} size="sm" />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CategorySection>
-                    );
-                  })}
-
-                  {/* Bracket matches — organized by category. Collapsed
-                      into an accordion per-category when there's more than
-                      one so the page stays scannable. */}
-                  {bracketMatches.length > 0 && (
-                    (() => {
-                      const categoryMap = new Map<string, BracketMatch[]>();
-                      for (const bm of bracketMatches) {
-                        const category = categoryOfBracketRound(bm.round);
-                        if (!categoryMap.has(category)) categoryMap.set(category, []);
-                        categoryMap.get(category)!.push(bm);
-                      }
-                      const categories = [...categoryMap.entries()].sort(([a], [b]) => a.localeCompare(b));
-                      const hasMultipleCategories =
-                        categories.length > 1 ||
-                        (categories.length === 1 && categories[0][0] !== '');
-
-                      const renderBracket = (catBracketMatches: BracketMatch[]) => (
-                        <div className="space-y-2">
-                          {catBracketMatches.map((bm) => {
-                            const displayRound = bracketRoundName(bm.round);
-                            return (
-                          <div
-                            key={bm.id}
-                            className="p-3 bg-white border border-black/10 rounded-sm"
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3 flex-1 min-w-0">
-                                {bm.team1 ? (
-                                  <>
-                                    <div
-                                      className="w-8 h-8 rounded-sm flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
-                                      style={{ backgroundColor: bm.team1.colors.primary }}
-                                    >
-                                      {bm.team1.initials}
-                                    </div>
-                                    <span className="text-sm font-medium truncate">
-                                      {bm.team1.name}
-                                    </span>
-                                  </>
-                                ) : (
-                                  <span className="text-sm text-black/40 italic">
-                                    Por definir
-                                  </span>
-                                )}
-                              </div>
-                              <div className="px-4 text-center flex-shrink-0">
-                                {bm.score ? (
-                                  <span
-                                    className="text-lg font-bold"
-                                    style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                                  >
-                                    {bm.score.team1} — {bm.score.team2}
-                                  </span>
-                                ) : (
-                                  <Badge variant="outline">{displayRound}</Badge>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
-                                {bm.team2 ? (
-                                  <>
-                                    <span className="text-sm font-medium truncate text-right">
-                                      {bm.team2.name}
-                                    </span>
-                                    <div
-                                      className="w-8 h-8 rounded-sm flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
-                                      style={{ backgroundColor: bm.team2.colors.primary }}
-                                    >
-                                      {bm.team2.initials}
-                                    </div>
-                                  </>
-                                ) : (
-                                  <span className="text-sm text-black/40 italic">
-                                    Por definir
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            {bracketEditor.isEditing(bm) ? (
-                              <ScoreSetsEditor
-                                sets={bracketEditor.sets}
-                                status={bracketEditor.status}
-                                saving={bracketEditor.saving}
-                                onAddSet={bracketEditor.addSet}
-                                onRemoveSet={bracketEditor.removeSet}
-                                onUpdateSet={bracketEditor.updateSet}
-                                onStatusChange={bracketEditor.setStatus}
-                                onSave={() => bracketEditor.commit(bm)}
-                                onCancel={bracketEditor.cancel}
-                              />
-                            ) : (
-                              bm.team1 && bm.team2 && (
-                                <div className="flex justify-end mt-2">
-                                  <button
-                                    onClick={() => bracketEditor.start(bm)}
-                                    className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
-                                  >
-                                    <Edit className="w-3 h-3" />
-                                    Editar
-                                  </button>
-                                </div>
-                              )
-                            )}
-                          </div>
-                            );
-                          })}
-                        </div>
-                      );
-
-                      if (!hasMultipleCategories) {
-                        // Single-category bracket → render inline with a
-                        // plain header instead of an accordion.
-                        const catBracketMatches = categories[0]?.[1] ?? [];
-                        return (
-                          <div>
-                            <h3
-                              className="text-lg font-bold mb-3"
-                              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                            >
-                              Bracket de Eliminación
-                            </h3>
-                            {renderBracket(catBracketMatches)}
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div className="space-y-3">
-                          {categories.map(([category, catBracketMatches], idx) => (
-                            <CategorySection
-                              key={category || '_default_bracket'}
-                              title={`Bracket · ${category}`}
-                              count={catBracketMatches.length}
-                              subtitle={`${catBracketMatches.length} ${catBracketMatches.length === 1 ? 'partido' : 'partidos'}`}
-                                    >
-                              {renderBracket(catBracketMatches)}
-                            </CategorySection>
-                          ))}
-                        </div>
-                      );
-                    })()
-                  )}
-                </div>
-              )}
-          </SpkPanel>
-
-          {/* Regenerate confirmation dialog */}
-          <AlertDialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Regenerar cruces?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Ya existen cruces generados para este torneo. Regenerar eliminará todos los
-                  cruces anteriores y sus resultados. Esta acción no se puede deshacer.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleRegenerateConfirm}
-                  className="bg-spk-red hover:bg-spk-red-dark"
-                >
-                  Regenerar Cruces
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          {/* Clear fixtures confirmation dialog */}
-          <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Limpiar cruces?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Se eliminarán todos los cruces, resultados y clasificaciones de este torneo.
-                  Esta acción no se puede deshacer.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleClearFixtures}
-                  className="bg-spk-red hover:bg-spk-red-dark"
-                >
-                  Limpiar Cruces
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          {/* Mode selection dialog */}
-          <FixtureModeDialog
-            open={showModeDialog}
-            onClose={() => setShowModeDialog(false)}
-            onSelectAutomatic={handleSelectAutomatic}
-            onSelectManual={handleSelectManual}
-          />
-
-          {/* Automatic schedule modal */}
-          <AutomaticScheduleModal
-            open={showAutoSchedule}
-            onClose={() => setShowAutoSchedule(false)}
-            onGenerate={handleAutoScheduleGenerate}
-            generating={generating}
-            defaultCourtCount={tournament.courts.length || 1}
-          />
-
-          {/* Manual groups modal */}
-          <ManualGroupsModal
-            open={showManualGroups}
-            teams={enrolledTeams}
-            onClose={() => setShowManualGroups(false)}
-            onGenerate={handleManualGroupsGenerate}
-            generating={generating}
-            defaultCourtCount={tournament.courts.length || 1}
-          />
-
-          {/* Manual bracket modal */}
-          <ManualBracketModal
-            open={showManualBracket}
-            teams={enrolledTeams}
-            onClose={() => setShowManualBracket(false)}
-            onGenerate={handleManualBracketGenerate}
-            generating={generating}
-          />
-
-          {/*
-            BracketCrossingsModal — two uses:
-            1. Initial flow (groups+knockout): pendingGroups has keys → simple letters
-            2. Post-groups standalone button: groupNames from existing matches
-          */}
-          <BracketCrossingsModal
-            open={showBracketCrossings}
-            groupNames={
-              Object.keys(pendingGroups).length > 0
-                ? Object.keys(pendingGroups)
-                : groupNames
-            }
-            onClose={() => {
-              setShowBracketCrossings(false);
-              setPendingGroups({});
-            }}
-            onGenerate={
-              Object.keys(pendingGroups).length > 0
-                ? handleInitialBracketCrossings
-                : handlePostGroupsBracketCrossings
-            }
-            generating={generating}
+          <FixturesTab
+            tournament={tournament}
+            enrolledTeams={enrolledTeams}
+            matches={matches}
+            bracketMatches={bracketMatches}
+            standings={standings}
+            generatedAt={generatedAt}
+            clearing={clearing}
+            recalculating={recalculating}
+            bracketEditor={bracketEditor}
+            onGenerated={handleGenerated}
+            onBracketUpdated={handleBracketUpdated}
+            onClear={handleClearFixtures}
+            onRecalculateStandings={handleRecalculateStandings}
           />
         </TabsContent>
 
-        {/* ── Partidos Tab ─────────────────────────────────────── */}
         <TabsContent value="matches">
-          <SpkPanel title={`Partidos (${matches.length})`}>
-              {/* Filters */}
-              <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 mb-6">
-                <Filter className="w-4 h-4 text-black/40" />
-                <Select value={phaseFilter} onValueChange={setPhaseFilter}>
-                  <SelectTrigger className="w-full sm:w-[180px]">
-                    <SelectValue placeholder="Fase" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las fases</SelectItem>
-                    {phases.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={groupFilter} onValueChange={setGroupFilter}>
-                  <SelectTrigger className="w-full sm:w-[180px]">
-                    <SelectValue placeholder="Grupo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los grupos</SelectItem>
-                    {groups.map((g) => (
-                      <SelectItem key={g} value={g}>
-                        {g}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full sm:w-[180px]">
-                    <SelectValue placeholder="Estado" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los estados</SelectItem>
-                    <SelectItem value="upcoming">Próximo</SelectItem>
-                    <SelectItem value="live">En Vivo</SelectItem>
-                    <SelectItem value="completed">Finalizado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Match list — live matches first under a subtle header,
-                  then the rest grouped by category as expandable sections. */}
-              {filteredMatches.length === 0 ? (
-                <div className="text-center py-12">
-                  <Trophy className="w-12 h-12 text-black/20 mx-auto mb-3" />
-                  <p className="text-black/60">
-                    {matches.length === 0
-                      ? 'No hay partidos generados'
-                      : 'No hay partidos que coincidan con los filtros'}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Live matches — always expanded, subtle red dot header. */}
-                  {matchesSplit.live.length > 0 && (
-                    <section>
-                      <h3
-                        className="flex items-center gap-2 text-xs font-semibold uppercase text-spk-red mb-3"
-                        style={{
-                          fontFamily: 'Barlow Condensed, sans-serif',
-                          letterSpacing: '0.14em',
-                        }}
-                      >
-                        <span className="relative inline-flex w-2 h-2">
-                          <span className="absolute inline-flex w-full h-full rounded-full bg-spk-red opacity-75 animate-ping" />
-                          <span className="relative inline-flex w-2 h-2 rounded-full bg-spk-red" />
-                        </span>
-                        En vivo
-                        <span className="text-black/40 font-medium tabular-nums">
-                          ({matchesSplit.live.length})
-                        </span>
-                      </h3>
-                      <div className="space-y-2">
-                        {matchesSplit.live.map((m) => renderMatchCard(m))}
-                      </div>
-                    </section>
-                  )}
-
-                  {/* Everything else, grouped by category. Each accordion
-                      opens by default so the admin sees all upcoming and
-                      completed matches at once. */}
-                  {matchesSplit.categories.map(([category, catMatches]) => (
-                    <CategorySection
-                      key={category || '_uncat'}
-                      title={category || 'Sin categoría'}
-                      count={catMatches.length}
-                      defaultOpen
-                    >
-                      <div className="space-y-2">
-                        {catMatches.map((m) => renderMatchCard(m))}
-                      </div>
-                    </CategorySection>
-                  ))}
-                </div>
-              )}
-          </SpkPanel>
+          <MatchesTab matches={matches} editor={matchEditor} />
         </TabsContent>
       </Tabs>
     </div>

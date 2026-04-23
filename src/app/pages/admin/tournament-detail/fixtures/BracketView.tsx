@@ -1,0 +1,151 @@
+import { Edit } from 'lucide-react';
+import { BracketMatch } from '../../../../types';
+import { Badge } from '../../../../components/ui/badge';
+import { CategorySection } from '../../../../components/admin/CategorySection';
+import { ScoreSetsEditor } from '../../../../components/admin/ScoreSetsEditor';
+import { categoryOfBracketRound, bracketRoundName } from '../../../../lib/phase';
+import type { useScoreEditor } from '../../../../hooks/useScoreEditor';
+
+type BracketEditor = ReturnType<typeof useScoreEditor<BracketMatch>>;
+
+/**
+ * Bracket-match list organized by category — collapses to accordions
+ * when there's more than one category, else renders inline. Each row
+ * has an inline score editor tied to the shared `BracketEditor` hook.
+ */
+export function BracketByCategory({
+  bracketMatches,
+  editor,
+}: {
+  bracketMatches: BracketMatch[];
+  editor: BracketEditor;
+}) {
+  const categoryMap = new Map<string, BracketMatch[]>();
+  for (const bm of bracketMatches) {
+    const category = categoryOfBracketRound(bm.round);
+    if (!categoryMap.has(category)) categoryMap.set(category, []);
+    categoryMap.get(category)!.push(bm);
+  }
+  const categories = [...categoryMap.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const hasMultipleCategories =
+    categories.length > 1 || (categories.length === 1 && categories[0][0] !== '');
+
+  const renderRows = (rows: BracketMatch[]) => (
+    <div className="space-y-2">
+      {rows.map((bm) => (
+        <BracketRow key={bm.id} match={bm} editor={editor} />
+      ))}
+    </div>
+  );
+
+  if (!hasMultipleCategories) {
+    return (
+      <div>
+        <h3
+          className="text-lg font-bold mb-3"
+          style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+        >
+          Bracket de Eliminación
+        </h3>
+        {renderRows(categories[0]?.[1] ?? [])}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {categories.map(([category, rows]) => (
+        <CategorySection
+          key={category || '_default_bracket'}
+          title={`Bracket · ${category}`}
+          count={rows.length}
+          subtitle={`${rows.length} ${rows.length === 1 ? 'partido' : 'partidos'}`}
+        >
+          {renderRows(rows)}
+        </CategorySection>
+      ))}
+    </div>
+  );
+}
+
+function BracketRow({ match: bm, editor }: { match: BracketMatch; editor: BracketEditor }) {
+  const displayRound = bracketRoundName(bm.round);
+  const isEditing = editor.isEditing(bm);
+
+  return (
+    <div className="p-3 bg-white border border-black/10 rounded-sm">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          {bm.team1 ? (
+            <>
+              <div
+                className="w-8 h-8 rounded-sm flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
+                style={{ backgroundColor: bm.team1.colors.primary }}
+              >
+                {bm.team1.initials}
+              </div>
+              <span className="text-sm font-medium truncate">{bm.team1.name}</span>
+            </>
+          ) : (
+            <span className="text-sm text-black/40 italic">Por definir</span>
+          )}
+        </div>
+        <div className="px-4 text-center flex-shrink-0">
+          {bm.score ? (
+            <span
+              className="text-lg font-bold"
+              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+            >
+              {bm.score.team1} — {bm.score.team2}
+            </span>
+          ) : (
+            <Badge variant="outline">{displayRound}</Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
+          {bm.team2 ? (
+            <>
+              <span className="text-sm font-medium truncate text-right">{bm.team2.name}</span>
+              <div
+                className="w-8 h-8 rounded-sm flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
+                style={{ backgroundColor: bm.team2.colors.primary }}
+              >
+                {bm.team2.initials}
+              </div>
+            </>
+          ) : (
+            <span className="text-sm text-black/40 italic">Por definir</span>
+          )}
+        </div>
+      </div>
+
+      {isEditing ? (
+        <ScoreSetsEditor
+          sets={editor.sets}
+          status={editor.status}
+          saving={editor.saving}
+          onAddSet={editor.addSet}
+          onRemoveSet={editor.removeSet}
+          onUpdateSet={editor.updateSet}
+          onStatusChange={editor.setStatus}
+          onSave={() => editor.commit(bm)}
+          onCancel={editor.cancel}
+        />
+      ) : (
+        bm.team1 &&
+        bm.team2 && (
+          <div className="flex justify-end mt-2">
+            <button
+              type="button"
+              onClick={() => editor.start(bm)}
+              className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
+            >
+              <Edit className="w-3 h-3" />
+              Editar
+            </button>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
