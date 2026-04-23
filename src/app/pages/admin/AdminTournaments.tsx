@@ -1,4 +1,4 @@
-import { Plus, Search, Filter, Edit, Trash2, Eye, Users, Calendar, Loader2, Lock } from 'lucide-react';
+import { Plus, Search, Filter, Trash2, Users, Calendar, Loader2, Lock } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -52,11 +52,6 @@ export function AdminTournaments() {
 
   const handleCreate = () => {
     setEditingTournament(undefined);
-    setIsModalOpen(true);
-  };
-
-  const handleEdit = (tournament: Tournament) => {
-    setEditingTournament(tournament);
     setIsModalOpen(true);
   };
 
@@ -202,12 +197,26 @@ export function AdminTournaments() {
         </button>
       </div>
 
-      {/* Tournaments Grid */}
+      {/* Tournaments Grid — each card is now a single clickable surface
+          that navigates into the tournament detail. Edit lives inside the
+          detail (Ajustes Generales tab); delete stays here but as a
+          floating icon with stopPropagation so it doesn't double-fire the
+          card navigation. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {filteredTournaments.map(tournament => (
           <div
             key={tournament.id}
-            className="bg-white border-2 border-black/10 rounded-sm overflow-hidden hover:shadow-lg transition-shadow"
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate(`/admin/tournaments/${tournament.id}`)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                navigate(`/admin/tournaments/${tournament.id}`);
+              }
+            }}
+            aria-label={`Abrir ${tournament.name}`}
+            className="group relative bg-white border-2 border-black/10 hover:border-black/30 rounded-sm overflow-hidden hover:shadow-lg transition-all cursor-pointer text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-spk-red/50"
           >
             {/* Tournament Image */}
             <div className="h-40 bg-gradient-to-br from-[#003087] to-[#E31E24] relative">
@@ -221,11 +230,31 @@ export function AdminTournaments() {
                   </div>
                 </div>
               </div>
-              <div className="absolute top-3 right-3">
+              <div className="absolute top-3 right-3 flex items-center gap-2">
                 <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(tournament.status)}`}>
                   {getStatusLabel(tournament.status)}
                 </span>
               </div>
+              {/* Floating delete — lives on top of the gradient banner so
+                  it has contrast without a solid bg on the card body.
+                  stopPropagation keeps the card click isolated. */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(tournament.id);
+                }}
+                disabled={deletingId === tournament.id}
+                aria-label={`Eliminar torneo ${tournament.name}`}
+                title="Eliminar torneo"
+                className="absolute top-3 left-3 p-1.5 bg-black/40 hover:bg-spk-red text-white rounded-sm backdrop-blur-sm transition-colors disabled:opacity-50"
+              >
+                {deletingId === tournament.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Trash2 className="w-4 h-4" aria-hidden="true" />
+                )}
+              </button>
             </div>
 
             {/* Content */}
@@ -238,7 +267,7 @@ export function AdminTournaments() {
               </p>
 
               {/* Stats */}
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-2 text-sm">
                   <Users className="w-4 h-4 text-black/60" />
                   <span>{tournament.teamsCount} equipos</span>
@@ -252,40 +281,6 @@ export function AdminTournaments() {
                     {tournament.format === 'league' && 'Liga'}
                   </span>
                 </div>
-              </div>
-
-              {/* Actions — labels hide on narrow screens so all 3 buttons fit */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => navigate(`/admin/tournaments/${tournament.id}`)}
-                  aria-label={`Ver ${tournament.name}`}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 bg-black/5 hover:bg-black/10 rounded-sm transition-colors min-w-0"
-                >
-                  <Eye className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-sm font-medium truncate">Ver</span>
-                </button>
-                <button
-                  onClick={() => handleEdit(tournament)}
-                  aria-label={`Editar ${tournament.name}`}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 bg-spk-blue text-white hover:bg-spk-blue/90 rounded-sm transition-colors min-w-0"
-                >
-                  <Edit className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-sm font-medium truncate">Editar</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(tournament.id)}
-                  disabled={deletingId === tournament.id}
-                  aria-label={`Eliminar torneo ${tournament.name}`}
-                  title="Eliminar torneo"
-                  className="flex items-center justify-center px-3 py-2 bg-spk-red/10 text-spk-red hover:bg-spk-red/20 rounded-sm transition-colors disabled:opacity-50 flex-shrink-0"
-                >
-                  {deletingId === tournament.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" aria-hidden="true" />
-                  )}
-                </button>
               </div>
             </div>
           </div>
