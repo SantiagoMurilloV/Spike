@@ -12,9 +12,15 @@ const router = Router();
 router.post('/login', loginRateLimiter, login);
 router.post('/logout', logout);
 router.put('/password', changePassword);
-// /me is authenticated (any role) and exposes the caller's own profile
-// including tournament quota — frontend uses it to render the "X/Y
-// torneos de tu plan" indicator.
-router.get('/me', requireRole('super_admin', 'admin', 'judge'), me);
+// /me is authenticated (any role) and exposes the caller's own profile.
+// For users (admin/judge/super_admin) it includes tournament quota — the
+// frontend uses that for the "X/Y torneos de tu plan" badge. For
+// team_captain it returns the captain's team info (id, initials, logo,
+// colors, category) so /team-panel has something to render.
+router.get(
+  '/me',
+  requireRole('super_admin', 'admin', 'judge', 'team_captain'),
+  me,
+);
 
 export default router;

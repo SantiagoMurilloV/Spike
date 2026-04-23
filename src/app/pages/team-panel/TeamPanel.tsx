@@ -28,7 +28,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
  * tournament and actually lock edits once those deadlines pass.
  */
 export function TeamPanel() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const [teamInfo, setTeamInfo] = useState<{
     id: string;
     name: string;
@@ -47,7 +47,10 @@ export function TeamPanel() {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const teamId = user?.teamId;
+  // Always read the team id from the freshly-fetched /auth/me payload so
+  // an old session object in localStorage (from before the `teamId` field
+  // was added to AuthUser) can't desync us from the real team identity.
+  const teamId = teamInfo?.id;
 
   const load = useCallback(async () => {
     setLoading(true);
