@@ -707,9 +707,26 @@ export function AdminTournamentDetail() {
 
   const startEditScore = (match: Match) => {
     setEditingMatchId(match.id);
-    // Initialize sets from existing match sets, or start with one empty set
+    // Hydrate the set inputs with the best representation of the match's
+    // current state, so pressing "Editar marcador" never feels like it
+    // wiped anything. Priority:
+    //   1. Real per-set scores (the RefereeScore flow writes these).
+    //   2. Synthetic placeholders reconstructed from the sets-won total
+    //      (match.score): a won set becomes 25-0, a lost one 0-25. This
+    //      covers matches finalized with a total but no set breakdown
+    //      (walkovers, admin-entered final scores, legacy data). The
+    //      admin can overwrite the placeholder numbers to the real points.
+    //   3. A single empty set for brand-new / upcoming matches.
     if (match.sets && match.sets.length > 0) {
       setEditSets(match.sets.map((s) => ({ team1: s.team1, team2: s.team2 })));
+    } else if (
+      match.score &&
+      (match.score.team1 > 0 || match.score.team2 > 0)
+    ) {
+      const synth: Array<{ team1: number; team2: number }> = [];
+      for (let i = 0; i < match.score.team1; i++) synth.push({ team1: 25, team2: 0 });
+      for (let i = 0; i < match.score.team2; i++) synth.push({ team1: 0, team2: 25 });
+      setEditSets(synth);
     } else {
       setEditSets([{ team1: 0, team2: 0 }]);
     }
@@ -800,10 +817,14 @@ export function AdminTournamentDetail() {
           </div>
         </div>
 
-        {/* Teams + Score — big number is always the persisted sets-won.
-            During editing we DON'T recompute from editSets (that was
-            the "reset" bug); we show the in-progress calculated result
-            as a subtle helper line under the inputs instead. */}
+        {/* Teams + Score — during editing the big number reflects the
+            live editedScore so the admin sees their correction take shape
+            in real time. The previous "reset to 0-0" bug is now prevented
+            upstream by startEditScore: when real per-set scores exist they
+            hydrate editSets directly; when only a total exists we rebuild
+            synthetic sets that reproduce it. Either way editedScore on
+            open equals the persisted m.score, so opening the editor never
+            looks like a wipe. */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div
@@ -816,21 +837,27 @@ export function AdminTournamentDetail() {
           </div>
 
           <div className="px-4 text-center flex-shrink-0">
-            {m.score ? (
-              <span
-                className="text-2xl font-bold"
-                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-              >
-                {m.score.team1} — {m.score.team2}
-              </span>
-            ) : (
-              <span
-                className="text-xl text-black/20 font-bold"
-                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-              >
-                VS
-              </span>
-            )}
+            {(() => {
+              const displayScore = isEditing ? editedScore : m.score;
+              if (displayScore) {
+                return (
+                  <span
+                    className="text-2xl font-bold"
+                    style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                  >
+                    {displayScore.team1} — {displayScore.team2}
+                  </span>
+                );
+              }
+              return (
+                <span
+                  className="text-xl text-black/20 font-bold"
+                  style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                >
+                  VS
+                </span>
+              );
+            })()}
           </div>
 
           <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
@@ -895,14 +922,6 @@ export function AdminTournamentDetail() {
                   <Plus className="w-3 h-3" />
                   Agregar Set
                 </button>
-              )}
-              {editedScore && (
-                <div className="text-[11px] text-black/50 pt-1">
-                  Al guardar: sets ganados{' '}
-                  <span className="font-bold text-black/70 tabular-nums">
-                    {editedScore.team1}–{editedScore.team2}
-                  </span>
-                </div>
               )}
             </div>
             <div className="flex flex-wrap items-center justify-center gap-3">
