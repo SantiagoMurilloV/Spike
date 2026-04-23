@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import type { Player } from '../../types';
 import { ApiError, api, type CreatePlayerDto, type UpdatePlayerDto } from '../../services/api';
-import { CATEGORIES } from '../../lib/categories';
+import { CATEGORIES, withCurrentCategories } from '../../lib/categories';
 
 interface PlayerFormModalProps {
   isOpen: boolean;
@@ -89,6 +89,10 @@ function validate(form: FormState): FieldErrors {
 }
 
 export function PlayerFormModal({ isOpen, onClose, onSaved, teamId, player }: PlayerFormModalProps) {
+  const categoryOptions = withCurrentCategories(
+    CATEGORIES,
+    player?.category ? [player.category] : [],
+  );
   const [form, setForm] = useState<FormState>(emptyState());
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -406,7 +410,7 @@ export function PlayerFormModal({ isOpen, onClose, onSaved, teamId, player }: Pl
                 className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red bg-white"
               >
                 <option value="">Sin categoría</option>
-                {CATEGORIES.map((c) => (
+                {categoryOptions.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>

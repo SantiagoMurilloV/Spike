@@ -18,6 +18,7 @@ import { TeamAvatar } from '../TeamAvatar';
 import { PlayerFormModal } from './PlayerFormModal';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { TeamCredentialsModal } from './TeamCredentialsModal';
+import { useTeamCaptainCredentials } from '../../hooks/useTeamCaptainCredentials';
 
 interface TeamRosterCardProps {
   team: Team;
@@ -65,16 +66,8 @@ export function TeamRosterCard({
   const [pendingDeletePlayerId, setPendingDeletePlayerId] = useState<string | null>(null);
   const [deletingPlayerId, setDeletingPlayerId] = useState<string | null>(null);
 
-  // Captain credentials — show-once receipt + regenerate confirm.
-  const [credentialsReceipt, setCredentialsReceipt] = useState<
-    { username: string; password: string } | null
-  >(null);
-  const [generatingCreds, setGeneratingCreds] = useState(false);
-  const [pendingRegenerate, setPendingRegenerate] = useState(false);
-  /** Local override so the UI shows "regenerar" immediately after the first
-   *  generation, without waiting for the parent to refetch the team. */
-  const [justGeneratedLocal, setJustGeneratedLocal] = useState(false);
-  const hasCredentials = Boolean(team.captainUsername) || justGeneratedLocal;
+  // Captain credentials — extracted to a hook so this card stays slim.
+  const creds = useTeamCaptainCredentials(team);
 
   const loadRoster = useCallback(async () => {
     setLoading(true);
@@ -124,48 +117,21 @@ export function TeamRosterCard({
   };
 
   /**
-   * Generate (or regenerate) the captain credentials. Throws on failure so
-   * ConfirmDialog can keep itself open when called from the regenerate
-   * flow; the direct-click path wraps this in try/catch.
+   * Primary credentials action: lookup if already generated, fresh if not.
+   * The KeyRound button in the header calls this; the modal shown below
+   * adapts its copy via `mode: 'fresh' | 'lookup'`.
    */
-  const doGenerateCredentials = async () => {
-    setGeneratingCreds(true);
-    try {
-      const receipt = await api.generateTeamCredentials(team.id);
-      setCredentialsReceipt({
-        username: receipt.username,
-        password: receipt.password,
-      });
-      setJustGeneratedLocal(true);
-      toast.success(
-        hasCredentials ? 'Credenciales regeneradas' : 'Credenciales generadas'
-      );
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Error al generar credenciales'
-      );
-      throw err;
-    } finally {
-      setGeneratingCreds(false);
-    }
-  };
-
-  const handleClickGenerate = async (e: React.MouseEvent) => {
+  const handleClickCredentials = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (hasCredentials) {
-      setPendingRegenerate(true);
+    if (creds.hasCredentials) {
+      await creds.reveal();
       return;
     }
     try {
-      await doGenerateCredentials();
+      await creds.generate();
     } catch {
-      // toast already shown
+      // toast already shown by the hook
     }
-  };
-
-  const confirmRegenerate = async () => {
-    await doGenerateCredentials();
-    setPendingRegenerate(false);
   };
 
   const confirmDeletePlayer = async () => {
@@ -223,6 +189,18 @@ export function TeamRosterCard({
                 <span className="truncate">{locationLine}</span>
               </>
             )}
+            {team.captainUsername && (
+              <>
+                <span className="text-black/30">·</span>
+                <span
+                  className="inline-flex items-center gap-1 text-black/50 font-mono"
+                  title="Usuario del capitán"
+                >
+                  <KeyRound className="w-3 h-3" aria-hidden="true" />
+                  {team.captainUsername}
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -242,25 +220,25 @@ export function TeamRosterCard({
         >
           <button
             type="button"
-            onClick={handleClickGenerate}
-            disabled={generatingCreds}
+            onClick={handleClickCredentials}
+            disabled={creds.busy}
             aria-label={
-              hasCredentials
-                ? `Regenerar credenciales para ${team.name}`
+              creds.hasCredentials
+                ? `Ver credenciales de ${team.name}`
                 : `Generar credenciales para ${team.name}`
             }
             title={
-              hasCredentials
-                ? 'Regenerar credenciales del capitán'
+              creds.hasCredentials
+                ? 'Ver credenciales del capitán'
                 : 'Generar credenciales del capitán'
             }
             className={`p-2 rounded-sm transition-colors disabled:opacity-50 ${
-              hasCredentials
+              creds.hasCredentials
                 ? 'bg-spk-gold/20 text-spk-gold hover:bg-spk-gold/30'
                 : 'bg-black/5 text-black/60 hover:bg-black/10'
             }`}
           >
-            {generatingCreds ? (
+            {creds.busy ? (
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
             ) : (
               <KeyRound className="w-4 h-4" aria-hidden="true" />
@@ -469,21 +447,22 @@ export function TeamRosterCard({
       />
 
       <ConfirmDialog
-        open={pendingRegenerate}
+        open={creds.pendingRegenerate}
         onOpenChange={(openDialog) => {
-          if (!openDialog && !generatingCreds) setPendingRegenerate(false);
+          if (!openDialog) creds.cancelRegenerate();
         }}
         title="Regenerar credenciales"
         description="Se van a generar un usuario y contraseña nuevos para el capitán. Las credenciales anteriores dejarán de funcionar de inmediato. ¿Continuar?"
         confirmLabel="Regenerar"
-        loading={generatingCreds}
-        onConfirm={confirmRegenerate}
+        loading={creds.busy}
+        onConfirm={creds.confirmRegenerate}
       />
 
       <TeamCredentialsModal
         teamName={team.name}
-        receipt={credentialsReceipt}
-        onClose={() => setCredentialsReceipt(null)}
+        receipt={creds.receipt}
+        onClose={creds.closeReceipt}
+        onRegenerate={creds.requestRegenerate}
       />
     </div>
   );

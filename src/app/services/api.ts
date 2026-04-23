@@ -805,6 +805,15 @@ export const api = {
     });
   },
 
+  /**
+   * Fetch the team's current captain credentials. Returns the plaintext
+   * password when PLATFORM_RECOVERY_KEY is enabled; null otherwise. Throws
+   * ApiError(404) when no credentials have ever been generated.
+   */
+  async getTeamCredentials(teamId: string): Promise<TeamCredentialsReceipt> {
+    return request<TeamCredentialsReceipt>(`/teams/${teamId}/credentials`);
+  },
+
   // ── Players (roster) ───────────────────────────────────────────
   // Nested under /teams/:teamId/players. Backend already returns camelCase
   // (see server/src/services/player.service.ts mapRow), so no transform is

@@ -15,7 +15,7 @@ interface CategorySectionProps {
 
 /**
  * CategorySection — collapsible accordion card used in the admin tournament
- * detail for each category (Sub-14 Femenino, Sub-16 Masculino, etc.) so
+ * detail for each category configured on the tournament so
  * long pages fold into a single tap-to-open list. Header is a button; body
  * animates height with motion.
  */

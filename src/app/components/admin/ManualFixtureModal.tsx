@@ -694,7 +694,7 @@ export function ManualBracketPositionsModal({ open, groups, onClose, onGenerate,
 
 export interface BracketCrossingsModalProps {
   open: boolean;
-  /** Full group names already in DB, e.g. ["Sub-14 Masculino|A", "Sub-14 Masculino|B"] */
+  /** Full group names already in DB, e.g. ["Category|A", "Category|B"] */
   groupNames: string[];
   onClose: () => void;
   onGenerate: (seeds: Array<{ position: number; label: string }>) => void;

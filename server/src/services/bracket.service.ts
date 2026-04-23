@@ -168,7 +168,7 @@ export class BracketGenerator {
 
   /**
    * Advance the winner of a bracket match to the next round.
-   * Handles compound round names with category prefix (e.g. "Sub-14|semifinal").
+   * Handles compound round names with category prefix.
    */
   async advanceWinner(bracketMatchId: string, winnerId: string): Promise<BracketMatch> {
     const pool = getPool();
@@ -327,8 +327,8 @@ export class BracketGenerator {
    * Populate bracket_matches.team1_id / team2_id from group-phase standings.
    *
    * Each first-round bracket slot carries a `team*_placeholder` in the
-   * format `"{position}|{groupName}"` (e.g. `"1|Sub-14 Masc|A"` meaning the
-   * 1st-place team of group A in "Sub-14 Masc"). This method reads the
+   * format `"{position}|{groupName}"` (meaning the 1st-place team of the
+   * given category group). This method reads the
    * current `standings` table and, for every slot that has a placeholder,
    * re-resolves it to the actual team id — always overwriting the existing
    * value so the bracket stays in sync if standings change.

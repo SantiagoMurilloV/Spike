@@ -11,7 +11,7 @@ import {
 import { NotFoundError, AppError } from '../middleware/errorHandler';
 import { validate, validateHexColor } from '../middleware/validation';
 import { BCRYPT_ROUNDS } from './password';
-import { encryptPassword } from './passwordRecovery';
+import { encryptPassword, decryptPassword } from './passwordRecovery';
 import { generatePassword, generateCaptainUsername } from '../lib/passwordGen';
 
 function normalizeIsoDate(value: unknown): string | undefined {
@@ -200,6 +200,7 @@ export class TeamService {
     const password = generatePassword();
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const recovery = encryptPassword(password);
+    const recoveryEnabled = recovery !== null;
 
     const MAX_RETRIES = 5;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -223,6 +224,7 @@ export class TeamService {
           username,
           password,
           generatedAt,
+          recoveryEnabled,
         };
       } catch (err) {
         // 23505 = unique_violation. Anything else bubbles up.
@@ -236,6 +238,43 @@ export class TeamService {
       500,
       'No se pudo generar un usuario único para el capitán. Probá de nuevo.'
     );
+  }
+
+  /**
+   * Look up the captain credentials that already live on the teams row.
+   *
+   * The password is only recoverable when PLATFORM_RECOVERY_KEY is set
+   * AND the stored AES-256-GCM blob decrypts cleanly. Otherwise the
+   * caller sees `password: null` + `recoveryEnabled` tells them which
+   * of "feature off" vs "nothing stored yet" is the case.
+   *
+   * Returns null when no credentials have been generated for this team,
+   * so the controller can send a 404.
+   */
+  async getCaptainCredentials(teamId: string): Promise<TeamCredentialsReceipt | null> {
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT id, captain_username, captain_password_recovery, credentials_generated_at
+       FROM teams
+       WHERE id = $1`,
+      [teamId]
+    );
+    if (result.rows.length === 0) {
+      throw new NotFoundError('Equipo');
+    }
+    const row = result.rows[0];
+    const username = row.captain_username as string | null;
+    if (!username) return null;
+
+    const stored = row.captain_password_recovery as string | null;
+    const password = decryptPassword(stored);
+    return {
+      teamId: row.id as string,
+      username,
+      password,
+      generatedAt: normalizeIsoDate(row.credentials_generated_at) ?? '',
+      recoveryEnabled: stored !== null && password !== null,
+    };
   }
 
   async getMatches(teamId: string): Promise<Match[]> {

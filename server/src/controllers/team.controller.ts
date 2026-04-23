@@ -86,3 +86,32 @@ export async function generateCredentials(
     next(error);
   }
 }
+
+/**
+ * GET /api/teams/:teamId/credentials
+ *
+ * Admin-only lookup that returns the team's current captain credentials.
+ * When PLATFORM_RECOVERY_KEY is set the plaintext password is decrypted
+ * on demand from the AES-256-GCM blob; otherwise `password` is null and
+ * the UI falls back to "regenerar para ver la contraseña".
+ *
+ * 404 when no credentials have been generated yet for this team.
+ */
+export async function getCredentials(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const teamId = req.params.teamId as string;
+    validateUUID(teamId, 'ID de equipo');
+    const receipt = await teamService.getCaptainCredentials(teamId);
+    if (!receipt) {
+      res.status(404).json({ error: 'Este equipo no tiene credenciales generadas' });
+      return;
+    }
+    res.json(receipt);
+  } catch (error) {
+    next(error);
+  }
+}

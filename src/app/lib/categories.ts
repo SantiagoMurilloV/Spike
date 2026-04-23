@@ -1,25 +1,65 @@
 /**
- * Canonical list of division categories used across the app. Exposed as a
- * single source of truth so the Tournament / Team / Player form modals all
- * offer the exact same options — otherwise a typo ("Sub 14" vs "Sub-14")
- * silently breaks the enrolment filter in AdminTournamentDetail because
- * team.category must match one of tournament.categories exactly.
+ * Single source of truth for division categories. Exposed here so the
+ * Tournament / Team / Player form modals and the enrolment filter all
+ * offer (and match against) the exact same strings. A typo or spacing
+ * difference would silently break enrolment because team.category must
+ * equal one of tournament.categories.
  *
- * If you add a new category here every form picks it up automatically.
- * Keep values stable — they're stored as plain strings in the DB.
+ * The canonical list is derived from two small lists (bases + genders)
+ * so adding a new age bracket means touching ONE constant. `Mixto` is
+ * intentionally ungendered — it's co-ed by definition.
+ *
+ * If you add / remove / rename here, every form picks it up automatically.
+ * Values are stored as plain strings in the DB, so renaming is a data
+ * migration — coordinate with the DB before changing established labels.
  */
-export const CATEGORIES: readonly string[] = [
-  'Sub-14 Masculino',
-  'Sub-14 Femenino',
-  'Sub-16 Masculino',
-  'Sub-16 Femenino',
-  'Sub-18 Masculino',
-  'Sub-18 Femenino',
-  'Sub-21 Masculino',
-  'Sub-21 Femenino',
-  'Mayores Masculino',
-  'Mayores Femenino',
-  'Senior Masculino',
-  'Senior Femenino',
-  'Mixto',
+
+/** Age brackets. Gendered variants derive from GENDERS below. */
+export const CATEGORY_BASES = [
+  'Benjamín',
+  'Mini',
+  'Infantil especial',
+  'Infantil',
+  'Menores',
+  'Juvenil',
+  'Mayores',
 ] as const;
+
+export const GENDERS = ['Femenino', 'Masculino'] as const;
+
+/**
+ * Categories that sit outside the age × gender matrix.
+ * `Mixto` is co-ed and has no gender suffix.
+ */
+export const EXTRA_CATEGORIES = ['Mixto'] as const;
+
+export const CATEGORIES: readonly string[] = [
+  ...CATEGORY_BASES.flatMap((base) => GENDERS.map((g) => `${base} ${g}`)),
+  ...EXTRA_CATEGORIES,
+] as const;
+
+export type Category = (typeof CATEGORIES)[number];
+
+/**
+ * Merge the canonical options with any "in-flight" current values (e.g.
+ * an existing row that predates a rename). Case-insensitive de-dup so a
+ * legacy "benjamin femenino" doesn't appear alongside the new "Benjamín
+ * Femenino".
+ */
+export function withCurrentCategories(
+  options: readonly string[],
+  currentValues: readonly (string | null | undefined)[] = [],
+): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const raw of [...options, ...currentValues]) {
+    if (!raw?.trim()) continue;
+    const key = raw.trim().toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(raw);
+  }
+
+  return result;
+}

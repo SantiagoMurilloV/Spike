@@ -39,7 +39,7 @@ const FONT = { fontFamily: 'Barlow Condensed, sans-serif' };
  *
  * Placeholders are stored in the DB as `"{position}|{groupName}"` where
  * `groupName` may itself contain a pipe if the tournament has multiple
- * categories (e.g. `"1|Sub-14 Masculino|A"`).
+ * categories (e.g. `"1|Category|A"`).
  */
 export function formatBracketPlaceholder(
   raw: string | undefined,

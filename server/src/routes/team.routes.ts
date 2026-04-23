@@ -7,6 +7,7 @@ import {
   remove,
   getMatches,
   generateCredentials,
+  getCredentials,
 } from '../controllers/team.controller';
 import {
   listByTeam as listPlayers,
@@ -29,8 +30,17 @@ router.delete('/:id', remove);
 // Team sub-resources
 router.get('/:id/matches', getMatches);
 
-// Captain credentials — admins (and super_admins) can (re)generate a team
-// captain's login. Returns the plaintext password exactly once.
+// Captain credentials — admins (and super_admins) can look up, (re)generate
+// a team captain's login.
+//   GET    → returns {username, password?, generatedAt, recoveryEnabled}.
+//            password is plaintext when PLATFORM_RECOVERY_KEY decrypts the
+//            stored AES-GCM blob; null otherwise. 404 if never generated.
+//   POST   → generates or rotates and returns the plaintext exactly once.
+router.get(
+  '/:teamId/credentials',
+  requireRole('admin', 'super_admin'),
+  getCredentials
+);
 router.post(
   '/:teamId/credentials',
   requireRole('admin', 'super_admin'),

@@ -236,7 +236,7 @@ function shortFormat(format: Tournament['format']): string {
     case 'knockout':
       return 'Direct.';
     case 'groups+knockout':
-      return 'Mixto';
+      return 'G+KO';
     case 'league':
       return 'Liga';
     default:

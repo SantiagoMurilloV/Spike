@@ -24,8 +24,19 @@ export interface Team {
 export interface TeamCredentialsReceipt {
   teamId: string;
   username: string;
-  password: string;
+  /**
+   * Plaintext password. Always present on POST (fresh generation). On GET
+   * only when the backend has PLATFORM_RECOVERY_KEY set AND decrypted the
+   * stored AES blob cleanly. Null → regenerar para ver la contraseña.
+   */
+  password: string | null;
   generatedAt: string;
+  /**
+   * Whether the server currently has the recovery key and the blob is
+   * decryptable. Lets the UI show "feature desactivada" vs "aún no
+   * generadas" with the right copy.
+   */
+  recoveryEnabled: boolean;
 }
 
 /**
@@ -108,7 +119,7 @@ export interface Tournament {
   /** Mapa opcional { nombreCancha: ubicación } (dirección o referencia). */
   courtLocations?: Record<string, string>;
   /**
-   * Divisions accepted by the tournament (e.g. `["Sub-14 Femenino"]`). When
+   * Divisions accepted by the tournament. Values come from CATEGORIES. When
    * non-empty the enrolment UI filters the team dropdown to teams whose
    * `category` matches one of these values. Empty / undefined → no filter.
    */

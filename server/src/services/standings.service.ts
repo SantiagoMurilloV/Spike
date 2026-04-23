@@ -190,7 +190,7 @@ export class StandingsCalculator {
     }
 
     // Sort + position assignment has to happen PER GROUP, not globally.
-    // The bracket resolution uses placeholders like "1|Sub-14|A" to mean
+    // The bracket resolution uses placeholders like "1|Category|A" to mean
     // "1st place of group A", and the public group table renders these
     // positions next to each team. Numbering globally (1, 2, 3 … across
     // the whole tournament) breaks both uses — every group should start

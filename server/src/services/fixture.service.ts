@@ -439,7 +439,7 @@ export class FixtureGenerator {
         if (teams.length < 2) continue; // skip categories with < 2 teams
 
         const shuffled = shuffleTeams(teams);
-        const catPrefix = category; // e.g. "Sub-14 Masculino"
+        const catPrefix = category;
 
         switch (format) {
           case 'groups': {
@@ -633,7 +633,7 @@ export class FixtureGenerator {
         // Manual groups for group phase — prefix with category
         // Track categories per group for bracket generation
         const categoriesInGroups = new Set<string>();
-        // Map: simple group letter → full prefixed group name (e.g. "A" → "Sub-14 Masculino|A")
+        // Map: simple group letter → full prefixed group name.
         const groupLetterToFullName = new Map<string, string>();
         if (options.groups) {
           for (const [groupLetter, teamIds] of Object.entries(options.groups)) {
@@ -765,7 +765,7 @@ export class FixtureGenerator {
     );
     if (tournamentResult.rows.length === 0) throw new NotFoundError('Torneo');
 
-    // Detect category prefix from existing group match names (e.g. "Sub-14 Masculino|A")
+    // Detect category prefix from existing group match names.
     const groupNamesResult = await pool.query(
       'SELECT DISTINCT group_name FROM matches WHERE tournament_id = $1 AND group_name IS NOT NULL',
       [tournamentId],

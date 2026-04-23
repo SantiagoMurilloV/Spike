@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EnrollmentService } from './enrollment.service';
+import { CATEGORIES } from '../../../src/app/lib/categories';
 
 // Mock the database module
 vi.mock('../config/database', () => ({
@@ -9,6 +10,12 @@ vi.mock('../config/database', () => ({
 import { getPool } from '../config/database';
 
 const service = new EnrollmentService();
+const CATEGORY_A = CATEGORIES[0];
+const CATEGORY_B = CATEGORIES[1];
+const CATEGORY_C = CATEGORIES[2];
+const CATEGORY_D = CATEGORIES[4];
+const CATEGORY_E = CATEGORIES[12];
+const CATEGORY_F = CATEGORIES[13];
 
 // Helper to create a mock pool with a query function
 function mockPool(queryFn: ReturnType<typeof vi.fn>) {
@@ -29,7 +36,7 @@ function enrolledRow(overrides: Record<string, unknown> = {}): Record<string, un
     team_secondary_color: '#0000FF',
     team_city: 'Bogotá',
     team_department: 'Cundinamarca',
-    team_category: 'Sub-14 Masculino',
+    team_category: CATEGORY_B,
     ...overrides,
   };
 }
@@ -46,9 +53,9 @@ describe('EnrollmentService.getEnrolledTeamsByCategory', () => {
       // Enrolled teams query
       .mockResolvedValueOnce({
         rows: [
-          enrolledRow({ id: 'e1', team_id: 't1', team_name: 'Team A', team_category: 'Sub-14 Masculino' }),
-          enrolledRow({ id: 'e2', team_id: 't2', team_name: 'Team B', team_category: 'Sub-14 Masculino' }),
-          enrolledRow({ id: 'e3', team_id: 't3', team_name: 'Team C', team_category: 'Sub-16 Femenino' }),
+          enrolledRow({ id: 'e1', team_id: 't1', team_name: 'Team A', team_category: CATEGORY_B }),
+          enrolledRow({ id: 'e2', team_id: 't2', team_name: 'Team B', team_category: CATEGORY_B }),
+          enrolledRow({ id: 'e3', team_id: 't3', team_name: 'Team C', team_category: CATEGORY_D }),
         ],
       })
     );
@@ -56,12 +63,12 @@ describe('EnrollmentService.getEnrolledTeamsByCategory', () => {
     const result = await service.getEnrolledTeamsByCategory('tourn-1');
 
     expect(result).toHaveLength(2);
-    const sub14 = result.find(g => g.category === 'Sub-14 Masculino');
-    const sub16 = result.find(g => g.category === 'Sub-16 Femenino');
-    expect(sub14).toBeDefined();
-    expect(sub14!.teams).toHaveLength(2);
-    expect(sub16).toBeDefined();
-    expect(sub16!.teams).toHaveLength(1);
+    const groupA = result.find(g => g.category === CATEGORY_B);
+    const groupB = result.find(g => g.category === CATEGORY_D);
+    expect(groupA).toBeDefined();
+    expect(groupA!.teams).toHaveLength(2);
+    expect(groupB).toBeDefined();
+    expect(groupB!.teams).toHaveLength(1);
   });
 
   it('should map null/undefined category to "Sin Categoría"', async () => {
@@ -71,7 +78,7 @@ describe('EnrollmentService.getEnrolledTeamsByCategory', () => {
         rows: [
           enrolledRow({ id: 'e1', team_id: 't1', team_name: 'Team A', team_category: null }),
           enrolledRow({ id: 'e2', team_id: 't2', team_name: 'Team B', team_category: undefined }),
-          enrolledRow({ id: 'e3', team_id: 't3', team_name: 'Team C', team_category: 'Mayores' }),
+          enrolledRow({ id: 'e3', team_id: 't3', team_name: 'Team C', team_category: CATEGORY_E }),
         ],
       })
     );
@@ -87,11 +94,11 @@ describe('EnrollmentService.getEnrolledTeamsByCategory', () => {
 
   it('should not lose or duplicate any teams during grouping', async () => {
     const inputRows = [
-      enrolledRow({ id: 'e1', team_id: 't1', team_name: 'Team 1', team_category: 'Cat A' }),
-      enrolledRow({ id: 'e2', team_id: 't2', team_name: 'Team 2', team_category: 'Cat B' }),
-      enrolledRow({ id: 'e3', team_id: 't3', team_name: 'Team 3', team_category: 'Cat A' }),
+      enrolledRow({ id: 'e1', team_id: 't1', team_name: 'Team 1', team_category: CATEGORY_A }),
+      enrolledRow({ id: 'e2', team_id: 't2', team_name: 'Team 2', team_category: CATEGORY_C }),
+      enrolledRow({ id: 'e3', team_id: 't3', team_name: 'Team 3', team_category: CATEGORY_A }),
       enrolledRow({ id: 'e4', team_id: 't4', team_name: 'Team 4', team_category: null }),
-      enrolledRow({ id: 'e5', team_id: 't5', team_name: 'Team 5', team_category: 'Cat B' }),
+      enrolledRow({ id: 'e5', team_id: 't5', team_name: 'Team 5', team_category: CATEGORY_C }),
     ];
 
     mockPool(vi.fn()
@@ -114,10 +121,10 @@ describe('EnrollmentService.getEnrolledTeamsByCategory', () => {
       .mockResolvedValueOnce({ rows: [{ id: 'tourn-1' }] })
       .mockResolvedValueOnce({
         rows: [
-          enrolledRow({ id: 'e1', team_id: 't1', team_category: 'Sub-16 Femenino' }),
+          enrolledRow({ id: 'e1', team_id: 't1', team_category: CATEGORY_C }),
           enrolledRow({ id: 'e2', team_id: 't2', team_category: null }),
-          enrolledRow({ id: 'e3', team_id: 't3', team_category: 'Mayores Masculino' }),
-          enrolledRow({ id: 'e4', team_id: 't4', team_category: 'Sub-14 Masculino' }),
+          enrolledRow({ id: 'e3', team_id: 't3', team_category: CATEGORY_F }),
+          enrolledRow({ id: 'e4', team_id: 't4', team_category: CATEGORY_B }),
         ],
       })
     );
@@ -126,9 +133,9 @@ describe('EnrollmentService.getEnrolledTeamsByCategory', () => {
 
     const categories = result.map(g => g.category);
     expect(categories).toEqual([
-      'Mayores Masculino',
-      'Sub-14 Masculino',
-      'Sub-16 Femenino',
+      ...[CATEGORY_C, CATEGORY_F, CATEGORY_B].sort((a, b) =>
+        a.localeCompare(b),
+      ),
       'Sin Categoría',
     ]);
   });

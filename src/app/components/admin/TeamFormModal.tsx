@@ -4,7 +4,7 @@ import { Team } from '../../types';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { ApiError, api } from '../../services/api';
-import { CATEGORIES } from '../../lib/categories';
+import { CATEGORIES, withCurrentCategories } from '../../lib/categories';
 
 interface TeamFormModalProps {
   isOpen: boolean;
@@ -77,15 +77,12 @@ export function TeamFormModal({
   // have an older category that's no longer in the list — we still
   // keep it as an option so the admin isn't forced to pick a new one
   // just to save an unrelated field.
-  const categoryOptions =
-    allowedCategories && allowedCategories.length > 0
-      ? Array.from(
-          new Set([
-            ...allowedCategories,
-            ...(team?.category ? [team.category] : []),
-          ]),
-        )
-      : CATEGORIES;
+  const baseCategoryOptions =
+    allowedCategories && allowedCategories.length > 0 ? allowedCategories : CATEGORIES;
+  const categoryOptions = withCurrentCategories(
+    baseCategoryOptions,
+    team?.category ? [team.category] : [],
+  );
   const [formData, setFormData] = useState({
     name: '',
     initials: '',

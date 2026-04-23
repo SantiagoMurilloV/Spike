@@ -17,7 +17,7 @@ export interface Tournament {
   /** Mapa opcional { nombreCancha: ubicación } (dirección o descripción). */
   courtLocations?: Record<string, string>;
   /**
-   * Divisions the tournament accepts (e.g. ["Sub-14 Femenino"]). Empty /
+   * Divisions the tournament accepts. Values come from the app category list. Empty /
    * omitted means "no filter" — every team is enrollable.
    */
   categories?: string[];
@@ -63,15 +63,25 @@ export interface Team {
 }
 
 /**
- * Transient payload returned ONLY from POST /teams/:teamId/credentials.
- * Plaintext password is never stored or re-fetched — after the call it
- * lives only in the bcrypt hash (and optionally the AES recovery blob).
+ * Payload returned from POST /teams/:teamId/credentials (fresh generation)
+ * and from GET /teams/:teamId/credentials (subsequent admin lookups).
+ *
+ *   · password: string          → plaintext, on POST always; on GET only
+ *                                 when PLATFORM_RECOVERY_KEY is set and
+ *                                 the AES-GCM blob decrypts cleanly.
+ *   · password: null            → recovery feature is off or the blob is
+ *                                 missing/corrupt. Admin sees the username
+ *                                 but has to regenerate to see a password.
+ *   · recoveryEnabled: false    → tells the UI to label the missing
+ *                                 password as "feature desactivada" vs
+ *                                 "credenciales no generadas".
  */
 export interface TeamCredentialsReceipt {
   teamId: string;
   username: string;
-  password: string;
+  password: string | null;
   generatedAt: string;
+  recoveryEnabled: boolean;
 }
 
 export interface Match {
@@ -164,7 +174,7 @@ export interface CreateTournamentDto {
   /** Mapa opcional { nombreCancha: ubicación } (dirección o descripción). */
   courtLocations?: Record<string, string>;
   /**
-   * Divisions the tournament accepts (e.g. ["Sub-14 Femenino"]). Empty /
+   * Divisions the tournament accepts. Values come from the app category list. Empty /
    * omitted disables the enrolment category filter.
    */
   categories?: string[];

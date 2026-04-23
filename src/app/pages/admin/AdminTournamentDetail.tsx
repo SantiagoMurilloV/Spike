@@ -295,7 +295,7 @@ export function AdminTournamentDetail() {
   /**
    * Split the filtered match list into "en vivo" vs everything else
    * grouped by category (extracted from m.phase — the phase field
-   * stores things like "Grupos | Sub-14 Femenino"; we take what's
+   * stores things like "Grupos | Category"; we take what's
    * after the first '|' as the category name). This drives the
    * Partidos tab's live-first layout.
    */

@@ -4,7 +4,7 @@ import { Tournament } from '../../types';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { api, ApiError } from '../../services/api';
-import { CATEGORIES } from '../../lib/categories';
+import { CATEGORIES, withCurrentCategories } from '../../lib/categories';
 
 interface TournamentFormModalProps {
   isOpen: boolean;
@@ -126,6 +126,7 @@ export function TournamentFormModal({
   });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const categoryOptions = withCurrentCategories(CATEGORIES, formData.categories);
 
   /**
    * Toggle a category in the selection. We keep them in the same order as
@@ -134,9 +135,13 @@ export function TournamentFormModal({
    */
   const toggleCategory = (value: string) => {
     const selected = formData.categories.includes(value);
-    const next = selected
+    const selectedValues = selected
       ? formData.categories.filter((c) => c !== value)
-      : CATEGORIES.filter((c) => c === value || formData.categories.includes(c));
+      : [...formData.categories, value];
+    const selectedSet = new Set(selectedValues);
+    const next = withCurrentCategories(CATEGORIES, selectedValues).filter((c) =>
+      selectedSet.has(c),
+    );
     setFormData({ ...formData, categories: next });
   };
 
@@ -393,7 +398,7 @@ export function TournamentFormModal({
               Categorías
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-black/[0.02] border-2 border-black/10 rounded-sm">
-              {CATEGORIES.map((c) => {
+              {categoryOptions.map((c) => {
                 const checked = formData.categories.includes(c);
                 return (
                   <label
