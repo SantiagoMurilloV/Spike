@@ -53,17 +53,21 @@ export function AdminDashboard() {
   const liveMatches = matches.filter((m) => m.status === 'live');
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
-      {/* Header — subtle, matches the tournament detail page style. */}
+    <div className="p-4 sm:p-6 md:p-12 space-y-8 sm:space-y-12">
+      {/* Header — same typography as the old dashboard (big tracking-tighter
+          H1 + red accent bar + subtitle), just without the black banner
+          behind it. Keeps the visual identity while letting the content
+          breathe on the white surface. */}
       <div>
         <h1
-          className="text-lg sm:text-xl font-bold uppercase tracking-wider text-black/80"
-          style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
+          className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter mb-3"
+          style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
         >
-          Dashboard
+          DASHBOARD
         </h1>
-        <p className="text-xs text-black/50 mt-0.5">
-          Resumen rápido: tus partidos en vivo, jueces conectados y visitas.
+        <div className="w-20 h-1 bg-spk-red mb-4" />
+        <p className="text-black/60 text-base sm:text-lg">
+          Vista general del sistema de torneos
         </p>
       </div>
 
