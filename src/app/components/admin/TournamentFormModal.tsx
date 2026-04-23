@@ -11,6 +11,14 @@ interface TournamentFormModalProps {
   onClose: () => void;
   onSubmit: (tournament: Tournament) => Promise<void>;
   tournament?: Tournament;
+  /**
+   * 'modal' (default) wraps everything in a backdrop + centered card,
+   * with a sticky header and a Cancel button. 'inline' renders the
+   * same form inline on the host page — no backdrop, no X, no Cancel.
+   * Used in AdminTournamentDetail > Ajustes Generales so the tab becomes
+   * a direct edit surface instead of a read-only display + modal button.
+   */
+  variant?: 'modal' | 'inline';
 }
 
 interface CourtEntry {
@@ -93,7 +101,14 @@ const DEFAULT_COURTS: CourtEntry[] = [
   { name: 'Cancha 2', location: '' },
 ];
 
-export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: TournamentFormModalProps) {
+export function TournamentFormModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  tournament,
+  variant = 'modal',
+}: TournamentFormModalProps) {
+  const inline = variant === 'inline';
   const [formData, setFormData] = useState({
     name: '',
     club: 'Club Deportivo Spike',
@@ -249,7 +264,9 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
 
     try {
       await onSubmit(newTournament);
-      onClose();
+      // Modal mode dismisses after save; inline stays put so the admin
+      // can keep editing without the page reflowing around a state change.
+      if (!inline) onClose();
       // Reset form if creating new
       if (!tournament) {
         setFormData({
@@ -289,31 +306,17 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
         : 'border-black/10 focus:border-spk-red'
     }`;
 
-  if (!isOpen) return null;
+  // Inline mode: the form is embedded in the host page, no backdrop,
+  // no toggle. Modal mode: the old `isOpen` gate still skips render when
+  // closed so we don't pay the form's mount cost.
+  if (!inline && !isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-white rounded-sm shadow-2xl max-w-2xl w-full max-h-[92vh] sm:max-h-[90vh] overflow-y-auto"
-      >
-        {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-black/10 px-4 sm:px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl sm:text-2xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-            {tournament ? 'EDITAR TORNEO' : 'CREAR TORNEO'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-black/5 rounded-sm transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6" noValidate>
+  const formBody = (
+    <form
+      onSubmit={handleSubmit}
+      className={inline ? 'space-y-4 sm:space-y-6' : 'p-4 sm:p-6 space-y-4 sm:space-y-6'}
+      noValidate
+    >
           {/* Server error */}
           {errors.server && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-sm text-red-700 text-sm">
@@ -623,21 +626,23 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
             {errors.courts && <p className="mt-2 text-sm text-red-500">{errors.courts}</p>}
           </div>
 
-          {/* Actions */}
+          {/* Actions — inline hides the Cancel button (nothing to close). */}
           <div className="flex gap-3 pt-4 border-t border-black/10">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="flex-1 px-4 py-3 bg-black/5 hover:bg-black/10 font-bold rounded-sm transition-colors disabled:opacity-50"
-              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-            >
-              Cancelar
-            </button>
+            {!inline && (
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={submitting}
+                className="flex-1 px-4 py-3 bg-black/5 hover:bg-black/10 font-bold rounded-sm transition-colors disabled:opacity-50"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+              >
+                Cancelar
+              </button>
+            )}
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 px-4 py-3 bg-spk-red text-white hover:bg-spk-red-dark font-bold rounded-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className={`${inline ? 'sm:flex-none sm:min-w-[200px] ml-auto' : 'flex-1'} px-4 py-3 bg-spk-red text-white hover:bg-spk-red-dark font-bold rounded-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2`}
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
               {(submitting || uploadingCover) && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -647,6 +652,32 @@ export function TournamentFormModal({ isOpen, onClose, onSubmit, tournament }: T
             </button>
           </div>
         </form>
+  );
+
+  // Inline mode returns the bare form — the host page provides the layout.
+  if (inline) return formBody;
+
+  // Modal mode: wrap in backdrop + card + sticky header.
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-white rounded-sm shadow-2xl max-w-2xl w-full max-h-[92vh] sm:max-h-[90vh] overflow-y-auto"
+      >
+        <div className="sticky top-0 bg-white border-b border-black/10 px-4 sm:px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl sm:text-2xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+            {tournament ? 'EDITAR TORNEO' : 'CREAR TORNEO'}
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-black/5 rounded-sm transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        {formBody}
       </motion.div>
     </div>
   );

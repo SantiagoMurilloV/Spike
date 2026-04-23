@@ -11,6 +11,14 @@ interface TeamFormModalProps {
   onClose: () => void;
   onSubmit: (team: Team) => Promise<void>;
   team?: Team;
+  /**
+   * Limit the Categoría dropdown to this subset. Used when the modal
+   * opens inside a tournament that already locked its categories
+   * (AdminTournamentDetail > Equipos) — we don't want admins creating
+   * teams that can't actually enrol in the tournament they're on.
+   * Undefined / empty → show the full global list.
+   */
+  allowedCategories?: string[];
 }
 
 interface FieldErrors {
@@ -57,7 +65,27 @@ function validate(formData: {
   return errors;
 }
 
-export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModalProps) {
+export function TeamFormModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  team,
+  allowedCategories,
+}: TeamFormModalProps) {
+  // When opened inside a tournament, limit the Categoría <select> to
+  // the tournament's own categories. A team the admin is editing may
+  // have an older category that's no longer in the list — we still
+  // keep it as an option so the admin isn't forced to pick a new one
+  // just to save an unrelated field.
+  const categoryOptions =
+    allowedCategories && allowedCategories.length > 0
+      ? Array.from(
+          new Set([
+            ...allowedCategories,
+            ...(team?.category ? [team.category] : []),
+          ]),
+        )
+      : CATEGORIES;
   const [formData, setFormData] = useState({
     name: '',
     initials: '',
@@ -351,7 +379,7 @@ export function TeamFormModal({ isOpen, onClose, onSubmit, team }: TeamFormModal
               className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red bg-white"
             >
               <option value="">Seleccionar categoría...</option>
-              {CATEGORIES.map((c) => (
+              {categoryOptions.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>

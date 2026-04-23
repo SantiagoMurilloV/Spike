@@ -168,8 +168,6 @@ export function AdminTournamentDetail() {
   // tournament. Team management lives entirely inside the tournament now
   // — there is no separate /admin/teams page.
   const [showNewTeamModal, setShowNewTeamModal] = useState(false);
-  /** Opens the tournament edit modal from the Ajustes Generales tab. */
-  const [editTournamentModalOpen, setEditTournamentModalOpen] = useState(false);
   /** Team currently being edited (opens the same TeamFormModal). */
   const [editingTeam, setEditingTeam] = useState<Team | undefined>();
 
@@ -288,6 +286,36 @@ export function AdminTournamentDetail() {
       return true;
     });
   }, [matches, phaseFilter, groupFilter, statusFilter]);
+
+  /**
+   * Split the filtered match list into "en vivo" vs everything else
+   * grouped by category (extracted from m.phase — the phase field
+   * stores things like "Grupos | Sub-14 Femenino"; we take what's
+   * after the first '|' as the category name). This drives the
+   * Partidos tab's live-first layout.
+   */
+  const matchesSplit = useMemo(() => {
+    const live: Match[] = [];
+    const byCategory = new Map<string, Match[]>();
+    for (const m of filteredMatches) {
+      if (m.status === 'live') {
+        live.push(m);
+        continue;
+      }
+      const category = m.phase.includes('|')
+        ? m.phase.split('|').slice(1).join('|').trim()
+        : m.phase;
+      const bucket = byCategory.get(category) ?? [];
+      bucket.push(m);
+      byCategory.set(category, bucket);
+    }
+    return {
+      live,
+      categories: Array.from(byCategory.entries()).sort(([a], [b]) =>
+        a.localeCompare(b),
+      ),
+    };
+  }, [filteredMatches]);
 
   // Group matches by phase+group for Cruces tab
   const matchesByPhaseGroup = useMemo(() => {
@@ -692,6 +720,204 @@ export function AdminTournamentDetail() {
     return { team1: team1Won, team2: team2Won };
   };
 
+  /**
+   * Renders a single match card. Kept as a closure inside the component
+   * so it has access to the edit state (editingMatchId, editSets, etc.)
+   * without a deep prop drill. Called from both the live-matches
+   * section and the by-category accordions.
+   *
+   * Bug-fix: during editing the big sets-won number stays pinned to
+   * the persisted `m.score` rather than recomputing from `editSets`.
+   * The old version showed `calcMatchScore(editSets)`, which meant a
+   * match whose set_scores rows were empty (but whose match.score had
+   * a 2-0 fallback) would "reset" to 0-0 the moment the admin opened
+   * the editor. The preview of the new sets-won total is shown as a
+   * smaller helper line below the set inputs.
+   */
+  const renderMatchCard = (m: Match) => {
+    const isEditing = editingMatchId === m.id;
+    const editedScore = isEditing ? calcMatchScore(editSets) : null;
+    return (
+      <div
+        key={m.id}
+        className={`p-4 bg-white border rounded-sm ${
+          m.status === 'live' ? 'border-spk-red border-2' : 'border-black/10'
+        }`}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Badge
+              variant={
+                m.status === 'live'
+                  ? 'destructive'
+                  : m.status === 'completed'
+                    ? 'secondary'
+                    : 'outline'
+              }
+            >
+              {STATUS_LABELS[m.status] || m.status}
+            </Badge>
+            <span className="text-xs text-black/50">
+              {m.phase}
+              {m.group ? ` • ${m.group}` : ''}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-black/50">
+            {m.court && (
+              <span className="flex items-center gap-1">
+                <MapPin className="w-3 h-3" />
+                {m.court}
+              </span>
+            )}
+            <span>{m.time}</span>
+          </div>
+        </div>
+
+        {/* Teams + Score — big number is always the persisted sets-won.
+            During editing we DON'T recompute from editSets (that was
+            the "reset" bug); we show the in-progress calculated result
+            as a subtle helper line under the inputs instead. */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div
+              className="w-10 h-10 rounded-sm flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+              style={{ backgroundColor: m.team1.colors.primary }}
+            >
+              {m.team1.initials}
+            </div>
+            <span className="font-medium truncate">{m.team1.name}</span>
+          </div>
+
+          <div className="px-4 text-center flex-shrink-0">
+            {m.score ? (
+              <span
+                className="text-2xl font-bold"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+              >
+                {m.score.team1} — {m.score.team2}
+              </span>
+            ) : (
+              <span
+                className="text-xl text-black/20 font-bold"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+              >
+                VS
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
+            <span className="font-medium truncate text-right">{m.team2.name}</span>
+            <div
+              className="w-10 h-10 rounded-sm flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+              style={{ backgroundColor: m.team2.colors.primary }}
+            >
+              {m.team2.initials}
+            </div>
+          </div>
+        </div>
+
+        {/* Edit controls */}
+        {isEditing ? (
+          <div className="mt-3 pt-3 border-t border-black/10 space-y-3">
+            <div className="space-y-2">
+              <div className="text-[11px] uppercase text-black/50 tracking-wider font-semibold"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.12em' }}>
+                Puntos por set
+              </div>
+              {editSets.map((set, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="text-xs text-black/50 w-12 flex-shrink-0">
+                    Set {idx + 1}:
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={set.team1}
+                    onChange={(e) =>
+                      updateSetScore(idx, 'team1', parseInt(e.target.value) || 0)
+                    }
+                    className="w-14 px-2 py-1 border border-black/20 rounded text-center text-sm font-bold"
+                  />
+                  <span className="text-black/30 text-sm">—</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={set.team2}
+                    onChange={(e) =>
+                      updateSetScore(idx, 'team2', parseInt(e.target.value) || 0)
+                    }
+                    className="w-14 px-2 py-1 border border-black/20 rounded text-center text-sm font-bold"
+                  />
+                  {editSets.length > 1 && (
+                    <button
+                      onClick={() => removeSet(idx)}
+                      className="p-1 text-red-400 hover:text-red-600 transition-colors"
+                      title="Eliminar set"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {editSets.length < 5 && (
+                <button
+                  onClick={addSet}
+                  className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
+                >
+                  <Plus className="w-3 h-3" />
+                  Agregar Set
+                </button>
+              )}
+              {editedScore && (
+                <div className="text-[11px] text-black/50 pt-1">
+                  Al guardar: sets ganados{' '}
+                  <span className="font-bold text-black/70 tabular-nums">
+                    {editedScore.team1}–{editedScore.team2}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Select value={editStatus} onValueChange={setEditStatus}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="upcoming">Próximo</SelectItem>
+                  <SelectItem value="live">En Vivo</SelectItem>
+                  <SelectItem value="completed">Finalizado</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                onClick={() => saveScore(m.id)}
+                disabled={savingScore}
+                className="bg-spk-win hover:bg-spk-win/90"
+              >
+                {savingScore && <Loader2 className="w-3 h-3 animate-spin" />}
+                Guardar
+              </Button>
+              <Button size="sm" variant="outline" onClick={cancelEditScore}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-end mt-2">
+            <button
+              onClick={() => startEditScore(m)}
+              className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
+            >
+              <Edit className="w-3 h-3" />
+              Editar marcador
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const saveScore = async (matchId: string) => {
     setSavingScore(true);
     try {
@@ -835,106 +1061,16 @@ export function AdminTournamentDetail() {
 
         {/* ── Info Tab ──────────────────────────────────────────── */}
         <TabsContent value="info">
-          <SpkPanel
-            headerAction={
-              <button
-                type="button"
-                onClick={() => setEditTournamentModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-spk-blue text-white hover:bg-spk-blue/90 rounded-sm text-sm font-bold transition-colors"
-              >
-                <Edit className="w-4 h-4" aria-hidden="true" />
-                <span
-                  style={{
-                    fontFamily: 'Barlow Condensed, sans-serif',
-                    letterSpacing: '0.06em',
-                  }}
-                  className="uppercase"
-                >
-                  Editar torneo
-                </span>
-              </button>
-            }
-          >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm text-black/60">Nombre</label>
-                    <p className="font-medium">{tournament.name}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm text-black/60">Formato</label>
-                    <p className="font-medium">
-                      {FORMAT_LABELS[tournament.format] || tournament.format}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-sm text-black/60">Deporte</label>
-                    <p className="font-medium">{tournament.sport}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm text-black/60">Club</label>
-                    <p className="font-medium">{tournament.club}</p>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm text-black/60">Fechas</label>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-black/40" />
-                      <p className="font-medium">
-                        {formatDate(tournament.startDate)} — {formatDate(tournament.endDate)}
-                      </p>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-sm text-black/60">Estado</label>
-                    <div className="mt-1">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium border ${STATUS_COLORS[tournament.status] || STATUS_COLORS.completed}`}
-                      >
-                        {STATUS_LABELS[tournament.status] || tournament.status}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-sm text-black/60">Canchas y Ubicaciones</label>
-                    {tournament.courts.length > 0 ? (
-                      <div className="flex flex-col gap-1.5 mt-1">
-                        {tournament.courts.map((court) => {
-                          const loc = tournament.courtLocations?.[court];
-                          return (
-                            <div key={court} className="flex items-start gap-2 text-sm">
-                              <MapPin className="w-4 h-4 text-spk-blue mt-0.5 flex-shrink-0" />
-                              <div>
-                                <span className="font-medium">{court}</span>
-                                {loc && (
-                                  <span className="text-black/60 ml-2">· {loc}</span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <span className="text-black/40 text-sm">Sin canchas asignadas</span>
-                    )}
-                  </div>
-                  <div>
-                    <label className="text-sm text-black/60">Equipos Inscritos</label>
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-black/40" />
-                      <p className="font-medium">{enrolledTeams.length}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              {tournament.description && (
-                <div className="mt-6 pt-4 border-t border-black/10">
-                  <label className="text-sm text-black/60">Descripción</label>
-                  <p className="mt-1">{tournament.description}</p>
-                </div>
-              )}
-          </SpkPanel>
+          {/* Fully editable form, same inputs as the modal, pre-filled
+              with the tournament's current values. Admin edits in place
+              and hits Guardar; inline variant skips the modal chrome. */}
+          <TournamentFormModal
+            variant="inline"
+            isOpen
+            onClose={() => {}}
+            onSubmit={handleTournamentEditSubmit}
+            tournament={tournament}
+          />
         </TabsContent>
 
         {/* ── Equipos Tab ──────────────────────────────────────── */}
@@ -1004,12 +1140,13 @@ export function AdminTournamentDetail() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {teamsByCategory.map(([category, teams], idx) => (
+                  {teamsByCategory.map(([category, teams]) => (
                     <CategorySection
                       key={category}
                       title={category}
                       count={teams.length}
                       subtitle={`${teams.length} ${teams.length === 1 ? 'equipo' : 'equipos'}`}
+                      defaultOpen
                     >
                       {/* Each enrolled team is itself a collapsible row so
                           admins can see/edit its roster without leaving
@@ -1046,6 +1183,7 @@ export function AdminTournamentDetail() {
             }}
             onSubmit={handleTeamFormSubmit}
             team={editingTeam}
+            allowedCategories={tournament.categories}
           />
         </TabsContent>
 
@@ -1614,7 +1752,8 @@ export function AdminTournamentDetail() {
                 </Select>
               </div>
 
-              {/* Match list */}
+              {/* Match list — live matches first under a subtle header,
+                  then the rest grouped by category as expandable sections. */}
               {filteredMatches.length === 0 ? (
                 <div className="text-center py-12">
                   <Trophy className="w-12 h-12 text-black/20 mx-auto mb-3" />
@@ -1625,202 +1764,52 @@ export function AdminTournamentDetail() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {filteredMatches.map((m) => (
-                    <div
-                      key={m.id}
-                      className={`p-4 bg-white border rounded-sm ${
-                        m.status === 'live'
-                          ? 'border-spk-red border-2'
-                          : 'border-black/10'
-                      }`}
+                <div className="space-y-6">
+                  {/* Live matches — always expanded, subtle red dot header. */}
+                  {matchesSplit.live.length > 0 && (
+                    <section>
+                      <h3
+                        className="flex items-center gap-2 text-xs font-semibold uppercase text-spk-red mb-3"
+                        style={{
+                          fontFamily: 'Barlow Condensed, sans-serif',
+                          letterSpacing: '0.14em',
+                        }}
+                      >
+                        <span className="relative inline-flex w-2 h-2">
+                          <span className="absolute inline-flex w-full h-full rounded-full bg-spk-red opacity-75 animate-ping" />
+                          <span className="relative inline-flex w-2 h-2 rounded-full bg-spk-red" />
+                        </span>
+                        En vivo
+                        <span className="text-black/40 font-medium tabular-nums">
+                          ({matchesSplit.live.length})
+                        </span>
+                      </h3>
+                      <div className="space-y-2">
+                        {matchesSplit.live.map((m) => renderMatchCard(m))}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Everything else, grouped by category. Each accordion
+                      opens by default so the admin sees all upcoming and
+                      completed matches at once. */}
+                  {matchesSplit.categories.map(([category, catMatches]) => (
+                    <CategorySection
+                      key={category || '_uncat'}
+                      title={category || 'Sin categoría'}
+                      count={catMatches.length}
+                      defaultOpen
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant={
-                              m.status === 'live'
-                                ? 'destructive'
-                                : m.status === 'completed'
-                                  ? 'secondary'
-                                  : 'outline'
-                            }
-                          >
-                            {STATUS_LABELS[m.status] || m.status}
-                          </Badge>
-                          <span className="text-xs text-black/50">
-                            {m.phase}
-                            {m.group ? ` • ${m.group}` : ''}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-black/50">
-                          {m.court && (
-                            <span className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              {m.court}
-                            </span>
-                          )}
-                          <span>{m.time}</span>
-                        </div>
+                      <div className="space-y-2">
+                        {catMatches.map((m) => renderMatchCard(m))}
                       </div>
-
-                      {/* Teams + Score */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div
-                            className="w-10 h-10 rounded-sm flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                            style={{ backgroundColor: m.team1.colors.primary }}
-                          >
-                            {m.team1.initials}
-                          </div>
-                          <span className="font-medium truncate">{m.team1.name}</span>
-                        </div>
-
-                        {editingMatchId === m.id ? (
-                          <div className="px-4 flex-shrink-0 text-center">
-                            <span
-                              className="text-2xl font-bold"
-                              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                            >
-                              {calcMatchScore(editSets).team1} — {calcMatchScore(editSets).team2}
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="px-4 text-center flex-shrink-0">
-                            {m.score ? (
-                              <span
-                                className="text-2xl font-bold"
-                                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                              >
-                                {m.score.team1} — {m.score.team2}
-                              </span>
-                            ) : (
-                              <span
-                                className="text-xl text-black/20 font-bold"
-                                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
-                              >
-                                VS
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
-                          <span className="font-medium truncate text-right">
-                            {m.team2.name}
-                          </span>
-                          <div
-                            className="w-10 h-10 rounded-sm flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                            style={{ backgroundColor: m.team2.colors.primary }}
-                          >
-                            {m.team2.initials}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Edit controls */}
-                      {editingMatchId === m.id ? (
-                        <div className="mt-3 pt-3 border-t border-black/10 space-y-3">
-                          {/* Sets editor */}
-                          <div className="space-y-2">
-                            {editSets.map((set, idx) => (
-                              <div key={idx} className="flex items-center gap-2">
-                                <span className="text-xs text-black/50 w-12 flex-shrink-0">
-                                  Set {idx + 1}:
-                                </span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={set.team1}
-                                  onChange={(e) =>
-                                    updateSetScore(idx, 'team1', parseInt(e.target.value) || 0)
-                                  }
-                                  className="w-14 px-2 py-1 border border-black/20 rounded text-center text-sm font-bold"
-                                />
-                                <span className="text-black/30 text-sm">—</span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={set.team2}
-                                  onChange={(e) =>
-                                    updateSetScore(idx, 'team2', parseInt(e.target.value) || 0)
-                                  }
-                                  className="w-14 px-2 py-1 border border-black/20 rounded text-center text-sm font-bold"
-                                />
-                                {editSets.length > 1 && (
-                                  <button
-                                    onClick={() => removeSet(idx)}
-                                    className="p-1 text-red-400 hover:text-red-600 transition-colors"
-                                    title="Eliminar set"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                            {editSets.length < 5 && (
-                              <button
-                                onClick={addSet}
-                                className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
-                              >
-                                <Plus className="w-3 h-3" />
-                                Agregar Set
-                              </button>
-                            )}
-                          </div>
-                          {/* Status + save/cancel */}
-                          <div className="flex items-center justify-center gap-3">
-                            <Select value={editStatus} onValueChange={setEditStatus}>
-                              <SelectTrigger className="w-[140px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="upcoming">Próximo</SelectItem>
-                                <SelectItem value="live">En Vivo</SelectItem>
-                                <SelectItem value="completed">Finalizado</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              size="sm"
-                              onClick={() => saveScore(m.id)}
-                              disabled={savingScore}
-                              className="bg-spk-win hover:bg-spk-win/90"
-                            >
-                              {savingScore && <Loader2 className="w-3 h-3 animate-spin" />}
-                              Guardar
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={cancelEditScore}>
-                              Cancelar
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex justify-end mt-2">
-                          <button
-                            onClick={() => startEditScore(m)}
-                            className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
-                          >
-                            <Edit className="w-3 h-3" />
-                            Editar marcador
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    </CategorySection>
                   ))}
                 </div>
               )}
           </SpkPanel>
         </TabsContent>
       </Tabs>
-
-      {/* Tournament edit modal — lives here (outside Tabs) so it stays
-          mounted even if the user changes sections mid-edit. */}
-      <TournamentFormModal
-        isOpen={editTournamentModalOpen}
-        onClose={() => setEditTournamentModalOpen(false)}
-        onSubmit={handleTournamentEditSubmit}
-        tournament={tournament}
-      />
     </div>
   );
 }
