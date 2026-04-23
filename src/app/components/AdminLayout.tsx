@@ -6,7 +6,6 @@ import {
   LogOut,
   Menu,
   X,
-  Calendar,
   UserCog,
   ChevronDown,
   ChevronRight,
@@ -135,9 +134,11 @@ export function AdminLayout() {
   const currentTab = new URLSearchParams(location.search).get('tab') ?? 'info';
 
   // Top-level entries other than Torneos (which is special — nested).
+  // "Partidos" was removed from the top level: it's duplicated inside
+  // every tournament's sub-nav and the global /admin/matches page is
+  // rarely useful once you're working inside a single torneo.
   const flatItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
-    { icon: Calendar, label: 'Partidos', path: '/admin/matches' },
     { icon: UserCog, label: 'Jueces', path: '/admin/judges' },
     { icon: Settings, label: 'Configuración', path: '/admin/settings' },
   ];

@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import {
-  ArrowLeft,
   Loader2,
   Users,
   Calendar,
@@ -1022,33 +1021,39 @@ export function AdminTournamentDetail() {
 
   // ── Render ─────────────────────────────────────────────────────
 
+  // Section title changes per active tab. Sidebar already shows the
+  // tournament name + which section is active, so the in-page heading
+  // is kept subtle — it's a wayfinding reminder, not a page title.
+  const sectionTitle =
+    activeTab === 'teams'
+      ? 'Inscripción equipos y plantel'
+      : activeTab === 'fixtures'
+        ? 'Cruces'
+        : activeTab === 'matches'
+          ? 'Partidos'
+          : 'Ajustes generales';
+
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => navigate('/admin/tournaments')}
-          className="p-2 hover:bg-black/5 rounded-sm transition-colors"
+      {/* Header — subtle wayfinding: section name + "Copa X" underline,
+          no giant page title, no back arrow (sidebar handles navigation). */}
+      <div>
+        <h1
+          className="text-lg sm:text-xl font-bold uppercase tracking-wider text-black/80"
+          style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
         >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div className="flex-1">
-          <h1
-            className="text-2xl sm:text-3xl font-bold"
-            style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+          {sectionTitle}
+        </h1>
+        <div className="flex items-center gap-2 mt-0.5 text-xs text-black/50">
+          <span className="font-medium">Copa {tournament.name}</span>
+          <span className="text-black/20">·</span>
+          <span
+            className={`px-2 py-0.5 rounded-full border text-[10px] font-medium ${STATUS_COLORS[tournament.status] || STATUS_COLORS.completed}`}
           >
-            {tournament.name.toUpperCase()}
-          </h1>
-          <div className="flex items-center gap-3 mt-1">
-            <span
-              className={`px-3 py-0.5 rounded-full text-xs font-medium border ${STATUS_COLORS[tournament.status] || STATUS_COLORS.completed}`}
-            >
-              {STATUS_LABELS[tournament.status] || tournament.status}
-            </span>
-            <span className="text-sm text-black/60">
-              {FORMAT_LABELS[tournament.format] || tournament.format}
-            </span>
-          </div>
+            {STATUS_LABELS[tournament.status] || tournament.status}
+          </span>
+          <span className="text-black/20">·</span>
+          <span>{FORMAT_LABELS[tournament.format] || tournament.format}</span>
         </div>
       </div>
 
