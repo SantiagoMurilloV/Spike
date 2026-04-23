@@ -1,0 +1,169 @@
+import type { MatchStatus } from '../../types';
+
+/**
+ * DTOs that match the backend's request/response contracts. Kept
+ * together so every resource-module imports from the same place, and
+ * anybody adding a field can see the sibling types side by side.
+ */
+
+export interface CreateTournamentDto {
+  name: string;
+  sport: string;
+  club: string;
+  startDate: string;
+  endDate: string;
+  description?: string;
+  coverImage?: string;
+  logo?: string;
+  status: 'upcoming' | 'ongoing' | 'completed';
+  teamsCount: number;
+  format: 'groups' | 'knockout' | 'groups+knockout' | 'league';
+  courts: string[];
+  /** Mapa opcional { nombreCancha: ubicación }. */
+  courtLocations?: Record<string, string>;
+  /** Divisions accepted by the tournament; empty = no filter. */
+  categories?: string[];
+  /** ISO yyyy-mm-dd; captain credentials stop working after this day. */
+  enrollmentDeadline?: string | null;
+  /** Recommended roster cap (default 12). */
+  playersPerTeam?: number;
+}
+
+export type UpdateTournamentDto = Partial<CreateTournamentDto>;
+
+export interface CreateTeamDto {
+  name: string;
+  initials: string;
+  logo?: string;
+  primaryColor: string;
+  secondaryColor: string;
+  city?: string;
+  department?: string;
+  category?: string;
+}
+
+export type UpdateTeamDto = Partial<CreateTeamDto>;
+
+export interface CreatePlayerDto {
+  firstName: string;
+  lastName: string;
+  birthYear?: number;
+  documentType?: string;
+  documentNumber?: string;
+  category?: string;
+  position?: string;
+  photo?: string;
+  documentFile?: string;
+  shirtNumber?: number;
+}
+
+export type UpdatePlayerDto = Partial<CreatePlayerDto>;
+
+export interface CreateMatchDto {
+  tournamentId: string;
+  team1Id: string;
+  team2Id: string;
+  date: string;
+  time: string;
+  court: string;
+  referee?: string;
+  phase: string;
+  groupName?: string;
+}
+
+export type UpdateMatchDto = Partial<CreateMatchDto> & {
+  status?: MatchStatus;
+  scoreTeam1?: number;
+  scoreTeam2?: number;
+  duration?: number;
+};
+
+export interface ScoreUpdate {
+  status?: 'live' | 'completed';
+  scoreTeam1?: number;
+  scoreTeam2?: number;
+  sets?: Array<{ setNumber: number; team1Points: number; team2Points: number }>;
+  duration?: number;
+}
+
+export interface SystemSettings {
+  id?: string;
+  systemName: string;
+  clubName?: string;
+  location?: string;
+  language: string;
+  contactEmail?: string;
+  website?: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: {
+    id: string;
+    username: string;
+    role: string;
+    /** Team id when role is team_captain. */
+    teamId?: string;
+  };
+}
+
+export interface Judge {
+  id: string;
+  username: string;
+  role: string;
+  displayName?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// ── Platform (super_admin) ────────────────────────────────────────
+
+export interface PlatformStats {
+  tournaments: number;
+  teams: number;
+  players: number;
+  users: {
+    super_admin: number;
+    admin: number;
+    judge: number;
+    total: number;
+  };
+  presence: {
+    activeUsers: number;
+    activeVisitors: number;
+  };
+  /** True when PLATFORM_RECOVERY_KEY is configured on the backend. */
+  passwordRecoveryEnabled: boolean;
+}
+
+export interface PlatformUser {
+  id: string;
+  username: string;
+  role: string;
+  displayName?: string;
+  tournamentQuota: number;
+  createdBy?: string | null;
+  ownedTournamentsCount: number;
+  /** Free-text note, only visible to super_admin. Memory aid only. */
+  adminNote?: string | null;
+  createdAt?: string;
+}
+
+export interface CreatePlatformUserDto {
+  username: string;
+  password: string;
+  role: 'super_admin' | 'admin' | 'judge';
+  displayName?: string;
+  tournamentQuota?: number;
+  createdBy?: string | null;
+  adminNote?: string | null;
+}
+
+export interface UpdatePlatformUserDto {
+  role?: 'super_admin' | 'admin' | 'judge';
+  tournamentQuota?: number;
+  displayName?: string;
+  username?: string;
+  password?: string;
+  adminNote?: string | null;
+}

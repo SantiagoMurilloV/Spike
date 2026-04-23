@@ -1,0 +1,35 @@
+import { request } from './client';
+import type { Judge } from './dtos';
+
+/**
+ * Judges CRUD. Lives under /users/judges because judges are just
+ * `users` rows with role='judge' on the server; we keep the frontend
+ * surface narrow by not exposing the generic users endpoint.
+ */
+export const judgesApi = {
+  async listJudges(): Promise<Judge[]> {
+    return request<Judge[]>('/users/judges');
+  },
+
+  async createJudge(data: {
+    username: string;
+    password: string;
+    displayName?: string;
+  }): Promise<Judge> {
+    return request<Judge>('/users/judges', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteJudge(id: string): Promise<void> {
+    await request<void>(`/users/judges/${id}`, { method: 'DELETE' });
+  },
+
+  async resetJudgePassword(id: string, password: string): Promise<void> {
+    await request<void>(`/users/judges/${id}/password`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
+  },
+};
