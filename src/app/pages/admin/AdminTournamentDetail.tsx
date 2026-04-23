@@ -18,12 +18,13 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { api } from '../../services/api';
-import type { ScoreUpdate, CreateTeamDto } from '../../services/api';
+import type { ScoreUpdate, CreateTeamDto, UpdateTournamentDto } from '../../services/api';
 import { Tournament, Team, Match, BracketMatch, FixtureResult, StandingsRow } from '../../types';
 import { TeamAvatar } from '../../components/TeamAvatar';
 import { GroupMatrix } from '../../components/GroupMatrix';
 import { CategorySection } from '../../components/admin/CategorySection';
 import { TeamFormModal } from '../../components/admin/TeamFormModal';
+import { TournamentFormModal } from '../../components/admin/TournamentFormModal';
 import { TeamRosterCard } from '../../components/admin/TeamRosterCard';
 import { useData } from '../../context/DataContext';
 import type { UpdateTeamDto } from '../../services/api';
@@ -82,32 +83,27 @@ function formatDate(d: Date) {
 }
 
 /**
- * SpkPanel — system-branded container replacing shadcn's generic <Card>.
- * Uses the same shell as AdminTeams / AdminMatches (white body + black
- * header with Barlow Condensed title) so the tournament-detail page
- * visually matches the rest of the admin surface.
+ * SpkPanel — subtle section container. The old version had a black
+ * header bar that duplicated what the sidebar nav already conveys, so
+ * we stripped it. Now it's just a lightweight wrapper with breathing
+ * room and an optional action slot. `title` is kept in the signature
+ * but unused — passing it is a no-op, kept so call sites remain valid
+ * while we migrate them.
  */
 function SpkPanel({
-  title,
   children,
   headerAction,
 }: {
-  title: string;
+  title?: string;
   children: React.ReactNode;
   headerAction?: React.ReactNode;
 }) {
   return (
-    <div className="bg-white border-2 border-black/10 rounded-sm overflow-hidden">
-      <div className="bg-black text-white px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-        <h2
-          className="text-base sm:text-lg font-bold tracking-wider uppercase"
-          style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.06em' }}
-        >
-          {title}
-        </h2>
-        {headerAction}
-      </div>
-      <div className="p-4 sm:p-6">{children}</div>
+    <div>
+      {headerAction && (
+        <div className="flex items-center justify-end mb-3">{headerAction}</div>
+      )}
+      <div>{children}</div>
     </div>
   );
 }
@@ -138,7 +134,7 @@ export function AdminTournamentDetail() {
   // Used by the "Crear equipo nuevo" flow inside the Equipos tab — we go
   // through the shared DataContext action so the global teams list stays
   // in sync with the one we just created for this tournament.
-  const { addTeam, updateTeam } = useData();
+  const { addTeam, updateTeam, updateTournament } = useData();
 
   // Data state
   const [tournament, setTournament] = useState<Tournament | null>(null);
@@ -172,6 +168,8 @@ export function AdminTournamentDetail() {
   // tournament. Team management lives entirely inside the tournament now
   // — there is no separate /admin/teams page.
   const [showNewTeamModal, setShowNewTeamModal] = useState(false);
+  /** Opens the tournament edit modal from the Ajustes Generales tab. */
+  const [editTournamentModalOpen, setEditTournamentModalOpen] = useState(false);
   /** Team currently being edited (opens the same TeamFormModal). */
   const [editingTeam, setEditingTeam] = useState<Team | undefined>();
 
@@ -377,6 +375,36 @@ export function AdminTournamentDetail() {
    * depending on whether `editingTeam` is set. Centralised here so the
    * same modal renders once and handles both flows.
    */
+  /**
+   * Submit handler for the Tournament edit modal shown from the Ajustes
+   * Generales tab. Shape-matches the one in AdminTournaments so both
+   * entry points write identical DTOs.
+   */
+  const handleTournamentEditSubmit = async (updated: Tournament) => {
+    if (!tournament) return;
+    const dto: UpdateTournamentDto = {
+      name: updated.name,
+      sport: updated.sport,
+      club: updated.club,
+      startDate: updated.startDate.toISOString().split('T')[0],
+      endDate: updated.endDate.toISOString().split('T')[0],
+      description: updated.description,
+      coverImage: updated.coverImage,
+      logo: updated.logo,
+      status: updated.status,
+      teamsCount: updated.teamsCount,
+      format: updated.format,
+      courts: updated.courts,
+      courtLocations: updated.courtLocations,
+      categories: updated.categories,
+    };
+    const fresh = await updateTournament(tournament.id, dto);
+    // Also refresh the locally-held tournament so the page repaints
+    // without a full reload.
+    setTournament(fresh);
+    toast.success('Torneo actualizado');
+  };
+
   const handleTeamFormSubmit = async (team: Team) => {
     if (editingTeam) {
       const dto: UpdateTeamDto = {
@@ -807,7 +835,26 @@ export function AdminTournamentDetail() {
 
         {/* ── Info Tab ──────────────────────────────────────────── */}
         <TabsContent value="info">
-          <SpkPanel title="Información del Torneo">
+          <SpkPanel
+            headerAction={
+              <button
+                type="button"
+                onClick={() => setEditTournamentModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-spk-blue text-white hover:bg-spk-blue/90 rounded-sm text-sm font-bold transition-colors"
+              >
+                <Edit className="w-4 h-4" aria-hidden="true" />
+                <span
+                  style={{
+                    fontFamily: 'Barlow Condensed, sans-serif',
+                    letterSpacing: '0.06em',
+                  }}
+                  className="uppercase"
+                >
+                  Editar torneo
+                </span>
+              </button>
+            }
+          >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
@@ -1765,6 +1812,15 @@ export function AdminTournamentDetail() {
           </SpkPanel>
         </TabsContent>
       </Tabs>
+
+      {/* Tournament edit modal — lives here (outside Tabs) so it stays
+          mounted even if the user changes sections mid-edit. */}
+      <TournamentFormModal
+        isOpen={editTournamentModalOpen}
+        onClose={() => setEditTournamentModalOpen(false)}
+        onSubmit={handleTournamentEditSubmit}
+        tournament={tournament}
+      />
     </div>
   );
 }

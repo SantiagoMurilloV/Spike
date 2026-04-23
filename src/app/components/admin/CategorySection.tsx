@@ -30,48 +30,46 @@ export function CategorySection({
   const contentId = `cat-body-${title.replace(/\s+/g, '-')}`;
 
   return (
-    <div className="bg-white border-2 border-black/10 rounded-sm overflow-hidden">
+    <div className="border-b border-black/10 last:border-b-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls={contentId}
-        className="w-full flex items-center justify-between gap-3 px-4 sm:px-5 py-3 text-left bg-black text-white hover:bg-black/90 transition-colors"
+        className="w-full flex items-center justify-between gap-3 px-1 py-3 text-left text-black/70 hover:text-black transition-colors"
       >
         <div className="flex items-center gap-3 min-w-0">
+          <motion.span
+            animate={{ rotate: open ? 0 : -90 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            className="inline-flex text-black/40"
+            aria-hidden="true"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </motion.span>
           <span
-            className="text-base sm:text-lg font-bold uppercase truncate"
-            style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.06em' }}
+            className="text-sm font-semibold uppercase truncate"
+            style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.1em' }}
           >
             {title}
           </span>
           {count !== undefined && (
             <span
-              className="inline-flex items-center justify-center min-w-[26px] h-[22px] px-2 rounded-full bg-spk-red text-white text-[11px] font-bold tabular-nums"
+              className="text-[11px] text-black/45 tabular-nums font-medium"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
-              {count}
+              ({count})
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
-          {subtitle && (
-            <span
-              className="hidden sm:inline text-[11px] text-white/60 uppercase tracking-wider"
-              style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.12em' }}
-            >
-              {subtitle}
-            </span>
-          )}
-          <motion.span
-            animate={{ rotate: open ? 180 : 0 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="inline-flex"
-            aria-hidden="true"
+        {subtitle && (
+          <span
+            className="hidden sm:inline text-[11px] text-black/40 uppercase tracking-wider flex-shrink-0"
+            style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.12em' }}
           >
-            <ChevronDown className="w-5 h-5" />
-          </motion.span>
-        </div>
+            {subtitle}
+          </span>
+        )}
       </button>
 
       <AnimatePresence initial={false}>
@@ -82,10 +80,10 @@ export function CategorySection({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
             className="overflow-hidden"
           >
-            <div className="p-4 sm:p-5">{children}</div>
+            <div className="pt-1 pb-5 px-1">{children}</div>
           </motion.div>
         )}
       </AnimatePresence>
