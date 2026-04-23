@@ -28,6 +28,10 @@ export interface CreateTournamentDto {
   courtLocations?: Record<string, string>;
   /** Divisions accepted by the tournament; empty = no filter. */
   categories?: string[];
+  /** ISO yyyy-mm-dd; captain credentials stop working after this day. */
+  enrollmentDeadline?: string | null;
+  /** Recommended roster cap (default 12). */
+  playersPerTeam?: number;
 }
 
 export type UpdateTournamentDto = Partial<CreateTournamentDto>;
@@ -194,6 +198,8 @@ interface BackendTournament {
   courtLocations?: Record<string, string>;
   categories?: string[];
   ownerId?: string;
+  enrollmentDeadline?: string;
+  playersPerTeam?: number;
 }
 
 interface BackendEnrolledTeam {
@@ -401,6 +407,8 @@ function toFrontendTournament(t: BackendTournament): Tournament {
     courtLocations: t.courtLocations ?? {},
     categories: t.categories ?? [],
     ownerId: t.ownerId,
+    enrollmentDeadline: t.enrollmentDeadline,
+    playersPerTeam: t.playersPerTeam,
   };
 }
 

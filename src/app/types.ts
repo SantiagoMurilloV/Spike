@@ -100,6 +100,10 @@ export interface Tournament {
   /** UUID of the admin (tenant) that owns this tournament. Null for legacy
    *  or platform-owned tournaments. */
   ownerId?: string;
+  /** ISO yyyy-mm-dd date; captain credentials stop working after this day. */
+  enrollmentDeadline?: string;
+  /** Recommended roster cap per team. Default 12. */
+  playersPerTeam?: number;
 }
 
 export interface BracketMatch {

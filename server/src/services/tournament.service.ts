@@ -21,6 +21,19 @@ export type ListScope =
   | { scope: 'all' }
   | { scope: 'owner'; ownerId: string };
 
+/**
+ * Postgres DATE columns come back from `pg` either as a Date instance
+ * or a YYYY-MM-DD string depending on the driver version. Normalise to
+ * a plain ISO date (no time component) so the frontend can bind it
+ * straight into an `<input type="date">`.
+ */
+function normalizeDate(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (typeof value === 'string') return value.slice(0, 10);
+  return undefined;
+}
+
 function mapRow(row: Record<string, unknown>): Tournament {
   // court_locations may come as object (jsonb parsed by pg) or null/undefined
   const rawLocations = row.court_locations as Record<string, string> | null | undefined;
@@ -41,6 +54,8 @@ function mapRow(row: Record<string, unknown>): Tournament {
     courtLocations: rawLocations && typeof rawLocations === 'object' ? rawLocations : {},
     categories: (row.categories as string[] | null | undefined) ?? [],
     ownerId: (row.owner_id as string | null) ?? undefined,
+    enrollmentDeadline: normalizeDate(row.enrollment_deadline),
+    playersPerTeam: (row.players_per_team as number | null) ?? undefined,
     createdAt: row.created_at as string | undefined,
     updatedAt: row.updated_at as string | undefined,
   };
@@ -187,8 +202,8 @@ export class TournamentService {
     await this.assertQuota(ownerId);
     const pool = getPool();
     const result = await pool.query(
-      `INSERT INTO tournaments (name, sport, club, start_date, end_date, description, cover_image, logo, status, teams_count, format, courts, court_locations, categories, owner_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      `INSERT INTO tournaments (name, sport, club, start_date, end_date, description, cover_image, logo, status, teams_count, format, courts, court_locations, categories, owner_id, enrollment_deadline, players_per_team)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        RETURNING *`,
       [
         data.name,
@@ -206,6 +221,8 @@ export class TournamentService {
         JSON.stringify(data.courtLocations || {}),
         data.categories ?? [],
         ownerId,
+        data.enrollmentDeadline || null,
+        data.playersPerTeam ?? 12,
       ],
     );
     return mapRow(result.rows[0]);
@@ -242,6 +259,8 @@ export class TournamentService {
       courts: 'courts',
       courtLocations: 'court_locations',
       categories: 'categories',
+      enrollmentDeadline: 'enrollment_deadline',
+      playersPerTeam: 'players_per_team',
     };
 
     for (const [key, column] of Object.entries(columnMap)) {

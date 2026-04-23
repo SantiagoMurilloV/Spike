@@ -430,6 +430,8 @@ export function AdminTournamentDetail() {
       courts: updated.courts,
       courtLocations: updated.courtLocations,
       categories: updated.categories,
+      enrollmentDeadline: updated.enrollmentDeadline ?? null,
+      playersPerTeam: updated.playersPerTeam,
     };
     const fresh = await updateTournament(tournament.id, dto);
     // Also refresh the locally-held tournament so the page repaints

@@ -27,6 +27,19 @@ export interface Tournament {
    * without assigning an owner. Drives admin-dashboard scoping.
    */
   ownerId?: string;
+  /**
+   * Deadline for team captains to keep their roster editable (ISO
+   * date). When set, passes it to the future team-panel login flow
+   * — after this date the captain's credentials won't be usable.
+   * NULL means no deadline (captains can always edit).
+   */
+  enrollmentDeadline?: string;
+  /**
+   * Recommended roster cap per team (defaults to 12). Only used by the
+   * captain panel to show "N / max" — it's advisory, no enforcement
+   * at create time so a team can exceed if the admin allows.
+   */
+  playersPerTeam?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -139,6 +152,10 @@ export interface CreateTournamentDto {
    * omitted disables the enrolment category filter.
    */
   categories?: string[];
+  /** ISO date; captain credentials stop working after this day. */
+  enrollmentDeadline?: string | null;
+  /** Recommended roster cap (default 12). */
+  playersPerTeam?: number;
 }
 
 export type UpdateTournamentDto = Partial<CreateTournamentDto>;

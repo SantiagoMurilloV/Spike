@@ -121,6 +121,8 @@ export function TournamentFormModal({
     format: 'groups+knockout' as 'groups' | 'knockout' | 'groups+knockout' | 'league',
     courts: [...DEFAULT_COURTS] as CourtEntry[],
     categories: [] as string[],
+    enrollmentDeadline: '' as string,
+    playersPerTeam: 12,
   });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
@@ -167,6 +169,8 @@ export function TournamentFormModal({
         format: tournament.format,
         courts,
         categories: tournament.categories ? [...tournament.categories] : [],
+        enrollmentDeadline: tournament.enrollmentDeadline ?? '',
+        playersPerTeam: tournament.playersPerTeam ?? 12,
       });
       setCoverFile(null);
       setCoverPreview(tournament.coverImage ?? null);
@@ -260,6 +264,8 @@ export function TournamentFormModal({
       courtLocations,
       coverImage: coverImageUrl,
       categories: formData.categories,
+      enrollmentDeadline: formData.enrollmentDeadline || undefined,
+      playersPerTeam: formData.playersPerTeam,
     };
 
     try {
@@ -281,6 +287,8 @@ export function TournamentFormModal({
           format: 'groups+knockout',
           courts: [...DEFAULT_COURTS],
           categories: [],
+          enrollmentDeadline: '',
+          playersPerTeam: 12,
         });
       }
     } catch (err) {
@@ -521,6 +529,60 @@ export function TournamentFormModal({
                 className={inputClass('teamsCount')}
               />
               {errors.teamsCount && <p className="mt-1 text-sm text-red-500">{errors.teamsCount}</p>}
+            </div>
+          </div>
+
+          {/* Inscription deadline + players per team. Both optional — the
+              deadline gates the captain credentials in a later phase, and
+              playersPerTeam is an advisory cap the captain panel uses to
+              show "N / max". */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label
+                className="block text-sm font-bold mb-2"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+              >
+                Fecha límite de inscripción
+              </label>
+              <input
+                type="date"
+                value={formData.enrollmentDeadline}
+                onChange={(e) =>
+                  setFormData({ ...formData, enrollmentDeadline: e.target.value })
+                }
+                className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
+              />
+              <p className="mt-1 text-xs text-black/50">
+                Opcional. Después de esta fecha los capitanes no pueden
+                editar su plantel.
+              </p>
+            </div>
+            <div>
+              <label
+                className="block text-sm font-bold mb-2"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+              >
+                Jugador@s por equipo
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="30"
+                value={formData.playersPerTeam}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    playersPerTeam: Math.max(
+                      1,
+                      parseInt(e.target.value, 10) || 0,
+                    ),
+                  })
+                }
+                className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
+              />
+              <p className="mt-1 text-xs text-black/50">
+                Cupo recomendado del plantel. Default: 12.
+              </p>
             </div>
           </div>
 
