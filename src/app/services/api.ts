@@ -544,6 +544,9 @@ export const api = {
    */
   async getAdminDashboardStats(): Promise<{
     liveMatches: number;
+    tournaments: number;
+    teams: number;
+    players: number;
     activeJudges: number;
     activeVisitors: number;
   }> {

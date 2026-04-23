@@ -39,21 +39,34 @@ export async function dashboardStats(
     const adminId = req.user!.userId;
     const pool = getPool();
 
-    // One round-trip for the two DB-backed numbers:
-    //  (a) live match count in the admin's tournaments
-    //  (b) list of judge ids created by this admin (we intersect it with
-    //      the presence map in-process; avoids piping the presence Set
-    //      into SQL).
+    // Single round-trip for all DB-backed numbers. Subselects keep it
+    // readable; the COUNT DISTINCT on teams and players is the scoping
+    // trick — teams live globally but we only count the ones enrolled
+    // in THIS admin's tournaments, and similarly for their rosters.
     const result = await pool.query(
       `SELECT
         (SELECT COUNT(*)::int FROM matches m
          JOIN tournaments t ON m.tournament_id = t.id
          WHERE t.owner_id = $1 AND m.status = 'live') AS live_matches,
+        (SELECT COUNT(*)::int FROM tournaments WHERE owner_id = $1) AS tournaments,
+        (SELECT COUNT(DISTINCT tt.team_id)::int FROM tournament_teams tt
+         JOIN tournaments t ON tt.tournament_id = t.id
+         WHERE t.owner_id = $1) AS teams,
+        (SELECT COUNT(DISTINCT p.id)::int FROM players p
+         JOIN tournament_teams tt ON p.team_id = tt.team_id
+         JOIN tournaments t ON tt.tournament_id = t.id
+         WHERE t.owner_id = $1) AS players,
         COALESCE(ARRAY_AGG(id) FILTER (WHERE role = 'judge' AND created_by = $1), '{}') AS judge_ids
        FROM users`,
       [adminId],
     );
-    const row = result.rows[0] as { live_matches: number; judge_ids: string[] };
+    const row = result.rows[0] as {
+      live_matches: number;
+      tournaments: number;
+      teams: number;
+      players: number;
+      judge_ids: string[];
+    };
 
     const activeUserIds = getActiveUserIds();
     const activeJudges = (row.judge_ids ?? []).filter((id) => activeUserIds.has(id))
@@ -61,6 +74,9 @@ export async function dashboardStats(
 
     res.json({
       liveMatches: row.live_matches,
+      tournaments: row.tournaments,
+      teams: row.teams,
+      players: row.players,
       activeJudges,
       activeVisitors: getActiveVisitorsCount(),
     });

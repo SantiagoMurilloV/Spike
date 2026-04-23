@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import { UserCheck, Eye } from 'lucide-react';
+import { UserCheck, Eye, Trophy, Users, UserCog } from 'lucide-react';
 import { motion } from 'motion/react';
 import { MatchCard } from '../../components/MatchCard';
 import { useData } from '../../context/DataContext';
@@ -29,6 +29,9 @@ export function AdminDashboard() {
 
   const [stats, setStats] = useState<{
     liveMatches: number;
+    tournaments: number;
+    teams: number;
+    players: number;
     activeJudges: number;
     activeVisitors: number;
   } | null>(null);
@@ -71,7 +74,7 @@ export function AdminDashboard() {
         </p>
       </div>
 
-      {/* Two presence cards — judges + visitors */}
+      {/* Two presence cards — judges + visitors (live, pulsing dot). */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <LiveCard
           label="Jueces activos"
@@ -86,6 +89,30 @@ export function AdminDashboard() {
           hint="Personas navegando el sitio público ahora mismo"
           Icon={Eye}
           accent="bg-spk-blue/10 text-spk-blue"
+        />
+      </div>
+
+      {/* Platform totals scoped to this admin — tournaments they own,
+          teams enrolled in those tournaments, and rosters. Same card
+          style as the super-admin console so the look is consistent. */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <StatCard
+          label="Torneos"
+          value={stats?.tournaments ?? 0}
+          Icon={Trophy}
+          accent="bg-spk-gold/10 text-spk-gold"
+        />
+        <StatCard
+          label="Equipos"
+          value={stats?.teams ?? 0}
+          Icon={Users}
+          accent="bg-spk-blue/10 text-spk-blue"
+        />
+        <StatCard
+          label="Jugadoras"
+          value={stats?.players ?? 0}
+          Icon={UserCog}
+          accent="bg-spk-win/10 text-spk-win"
         />
       </div>
 
@@ -174,3 +201,39 @@ function LiveCard({
   );
 }
 
+// ── Static stat card ──────────────────────────────────────────────
+
+function StatCard({
+  label,
+  value,
+  Icon,
+  accent,
+}: {
+  label: string;
+  value: number;
+  Icon: React.ComponentType<{ className?: string }>;
+  accent: string;
+}) {
+  return (
+    <div className="bg-white border-2 border-black/10 rounded-sm p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs uppercase tracking-wider text-black/50 truncate">
+            {label}
+          </div>
+          <div
+            className="text-3xl sm:text-4xl font-bold mt-1 tabular-nums"
+            style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+          >
+            {value}
+          </div>
+        </div>
+        <div
+          className={`w-10 h-10 rounded-sm flex items-center justify-center flex-shrink-0 ${accent}`}
+        >
+          <Icon className="w-5 h-5" aria-hidden="true" />
+        </div>
+      </div>
+    </div>
+  );
+}
