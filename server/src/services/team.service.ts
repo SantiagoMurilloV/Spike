@@ -1,3 +1,4 @@
+import bcrypt from 'bcrypt';
 import { getPool } from '../config/database';
 import {
   Team,
@@ -5,9 +6,20 @@ import {
   UpdateTeamDto,
   ValidationResult,
   Match,
+  TeamCredentialsReceipt,
 } from '../types';
 import { NotFoundError, AppError } from '../middleware/errorHandler';
 import { validate, validateHexColor } from '../middleware/validation';
+import { BCRYPT_ROUNDS } from './password';
+import { encryptPassword } from './passwordRecovery';
+import { generatePassword, generateCaptainUsername } from '../lib/passwordGen';
+
+function normalizeIsoDate(value: unknown): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'string') return value;
+  return undefined;
+}
 
 function mapRow(row: Record<string, unknown>): Team {
   return {
@@ -20,6 +32,8 @@ function mapRow(row: Record<string, unknown>): Team {
     city: row.city as string | undefined,
     department: row.department as string | undefined,
     category: row.category as string | undefined,
+    captainUsername: (row.captain_username as string | null) ?? undefined,
+    credentialsGeneratedAt: normalizeIsoDate(row.credentials_generated_at),
     createdAt: row.created_at as string | undefined,
     updatedAt: row.updated_at as string | undefined,
   };
@@ -156,6 +170,72 @@ export class TeamService {
     //   matches, standings, tournament_teams → CASCADE
     //   bracket_matches team*_id / winner_id → SET NULL
     await pool.query('DELETE FROM teams WHERE id = $1', [id]);
+  }
+
+  /**
+   * Generate (or regenerate) a captain's login credentials for the team.
+   *
+   * Returns the plaintext password exactly once — the caller shows it in
+   * a show-once modal and then it's gone. The stored artifacts are:
+   *   · captain_username           (plaintext, UNIQUE)
+   *   · captain_password_hash      (bcrypt, 12 rounds)
+   *   · captain_password_recovery  (AES-256-GCM ciphertext, null if
+   *                                 PLATFORM_RECOVERY_KEY is unset)
+   *   · credentials_generated_at   (NOW())
+   *
+   * Regeneration overwrites the previous set — any existing captain session
+   * tied to the old password becomes unusable on next bcrypt compare. The
+   * captain_username is also regenerated so an old leaked handle is also
+   * retired; callers who want a stable username can switch to a "reset
+   * password only" variant later.
+   *
+   * Collision handling: captain_username has UNIQUE constraint. We retry
+   * up to 5 times before giving up — at 9000 suffixes per initials prefix
+   * that's a >1-in-10^15 chance of hitting the cap.
+   */
+  async generateCaptainCredentials(teamId: string): Promise<TeamCredentialsReceipt> {
+    const team = await this.getById(teamId);
+    const pool = getPool();
+
+    const password = generatePassword();
+    const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    const recovery = encryptPassword(password);
+
+    const MAX_RETRIES = 5;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      const username = generateCaptainUsername(team.initials);
+      try {
+        const result = await pool.query(
+          `UPDATE teams
+           SET captain_username = $1,
+               captain_password_hash = $2,
+               captain_password_recovery = $3,
+               credentials_generated_at = NOW(),
+               updated_at = NOW()
+           WHERE id = $4
+           RETURNING credentials_generated_at`,
+          [username, hash, recovery, teamId]
+        );
+        const generatedAt = normalizeIsoDate(result.rows[0].credentials_generated_at)
+          ?? new Date().toISOString();
+        return {
+          teamId,
+          username,
+          password,
+          generatedAt,
+        };
+      } catch (err) {
+        // 23505 = unique_violation. Anything else bubbles up.
+        const code = (err as { code?: string })?.code;
+        if (code !== '23505') throw err;
+        // Collision on captain_username — retry with a fresh suffix.
+      }
+    }
+
+    throw new AppError(
+      500,
+      'No se pudo generar un usuario único para el capitán. Probá de nuevo.'
+    );
   }
 
   async getMatches(teamId: string): Promise<Match[]> {

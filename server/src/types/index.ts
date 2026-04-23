@@ -54,8 +54,24 @@ export interface Team {
   city?: string;
   department?: string;
   category?: string;
+  /** Captain handle (lowercase, unique). Populated after "Generar credenciales". */
+  captainUsername?: string;
+  /** ISO timestamp when credentials were generated/regenerated. */
+  credentialsGeneratedAt?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+/**
+ * Transient payload returned ONLY from POST /teams/:teamId/credentials.
+ * Plaintext password is never stored or re-fetched — after the call it
+ * lives only in the bcrypt hash (and optionally the AES recovery blob).
+ */
+export interface TeamCredentialsReceipt {
+  teamId: string;
+  username: string;
+  password: string;
+  generatedAt: string;
 }
 
 export interface Match {

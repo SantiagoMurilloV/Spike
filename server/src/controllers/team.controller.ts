@@ -63,3 +63,26 @@ export async function getMatches(req: Request, res: Response, next: NextFunction
     next(error);
   }
 }
+
+/**
+ * POST /api/teams/:teamId/credentials
+ *
+ * Generates (or regenerates) login credentials for the team's captain.
+ * Response body is the plaintext receipt — the FE shows it once in the
+ * show-once modal and then drops it. Requires an admin (or super_admin)
+ * JWT; enforced by requireRole at the router level.
+ */
+export async function generateCredentials(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const teamId = req.params.teamId as string;
+    validateUUID(teamId, 'ID de equipo');
+    const receipt = await teamService.generateCaptainCredentials(teamId);
+    res.status(201).json(receipt);
+  } catch (error) {
+    next(error);
+  }
+}

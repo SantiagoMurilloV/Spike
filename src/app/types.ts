@@ -10,6 +10,22 @@ export interface Team {
   city?: string;
   department?: string;
   category?: string;
+  /** Captain login handle once credentials have been generated. */
+  captainUsername?: string;
+  /** ISO timestamp of the last credentials (re)generation. */
+  credentialsGeneratedAt?: string;
+}
+
+/**
+ * Returned only from POST /teams/:id/credentials. Plaintext password is
+ * shown ONCE in the show-once modal and discarded — we never persist it
+ * client-side.
+ */
+export interface TeamCredentialsReceipt {
+  teamId: string;
+  username: string;
+  password: string;
+  generatedAt: string;
 }
 
 /**

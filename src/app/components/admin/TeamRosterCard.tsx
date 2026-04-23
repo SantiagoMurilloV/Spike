@@ -8,6 +8,7 @@ import {
   User,
   FileText,
   Users,
+  KeyRound,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -16,6 +17,7 @@ import { api } from '../../services/api';
 import { TeamAvatar } from '../TeamAvatar';
 import { PlayerFormModal } from './PlayerFormModal';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { TeamCredentialsModal } from './TeamCredentialsModal';
 
 interface TeamRosterCardProps {
   team: Team;
@@ -63,6 +65,17 @@ export function TeamRosterCard({
   const [pendingDeletePlayerId, setPendingDeletePlayerId] = useState<string | null>(null);
   const [deletingPlayerId, setDeletingPlayerId] = useState<string | null>(null);
 
+  // Captain credentials — show-once receipt + regenerate confirm.
+  const [credentialsReceipt, setCredentialsReceipt] = useState<
+    { username: string; password: string } | null
+  >(null);
+  const [generatingCreds, setGeneratingCreds] = useState(false);
+  const [pendingRegenerate, setPendingRegenerate] = useState(false);
+  /** Local override so the UI shows "regenerar" immediately after the first
+   *  generation, without waiting for the parent to refetch the team. */
+  const [justGeneratedLocal, setJustGeneratedLocal] = useState(false);
+  const hasCredentials = Boolean(team.captainUsername) || justGeneratedLocal;
+
   const loadRoster = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -108,6 +121,51 @@ export function TeamRosterCard({
       return next;
     });
     toast.success(editingPlayer ? 'Jugador@ actualizad@' : 'Jugador@ agregad@');
+  };
+
+  /**
+   * Generate (or regenerate) the captain credentials. Throws on failure so
+   * ConfirmDialog can keep itself open when called from the regenerate
+   * flow; the direct-click path wraps this in try/catch.
+   */
+  const doGenerateCredentials = async () => {
+    setGeneratingCreds(true);
+    try {
+      const receipt = await api.generateTeamCredentials(team.id);
+      setCredentialsReceipt({
+        username: receipt.username,
+        password: receipt.password,
+      });
+      setJustGeneratedLocal(true);
+      toast.success(
+        hasCredentials ? 'Credenciales regeneradas' : 'Credenciales generadas'
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Error al generar credenciales'
+      );
+      throw err;
+    } finally {
+      setGeneratingCreds(false);
+    }
+  };
+
+  const handleClickGenerate = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (hasCredentials) {
+      setPendingRegenerate(true);
+      return;
+    }
+    try {
+      await doGenerateCredentials();
+    } catch {
+      // toast already shown
+    }
+  };
+
+  const confirmRegenerate = async () => {
+    await doGenerateCredentials();
+    setPendingRegenerate(false);
   };
 
   const confirmDeletePlayer = async () => {
@@ -182,6 +240,32 @@ export function TeamRosterCard({
           className="flex items-center gap-1 flex-shrink-0"
           onClick={(e) => e.stopPropagation()}
         >
+          <button
+            type="button"
+            onClick={handleClickGenerate}
+            disabled={generatingCreds}
+            aria-label={
+              hasCredentials
+                ? `Regenerar credenciales para ${team.name}`
+                : `Generar credenciales para ${team.name}`
+            }
+            title={
+              hasCredentials
+                ? 'Regenerar credenciales del capitán'
+                : 'Generar credenciales del capitán'
+            }
+            className={`p-2 rounded-sm transition-colors disabled:opacity-50 ${
+              hasCredentials
+                ? 'bg-spk-gold/20 text-spk-gold hover:bg-spk-gold/30'
+                : 'bg-black/5 text-black/60 hover:bg-black/10'
+            }`}
+          >
+            {generatingCreds ? (
+              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <KeyRound className="w-4 h-4" aria-hidden="true" />
+            )}
+          </button>
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onEditTeam(team); }}
@@ -382,6 +466,24 @@ export function TeamRosterCard({
         confirmLabel="Eliminar"
         loading={deletingPlayerId !== null}
         onConfirm={confirmDeletePlayer}
+      />
+
+      <ConfirmDialog
+        open={pendingRegenerate}
+        onOpenChange={(openDialog) => {
+          if (!openDialog && !generatingCreds) setPendingRegenerate(false);
+        }}
+        title="Regenerar credenciales"
+        description="Se van a generar un usuario y contraseña nuevos para el capitán. Las credenciales anteriores dejarán de funcionar de inmediato. ¿Continuar?"
+        confirmLabel="Regenerar"
+        loading={generatingCreds}
+        onConfirm={confirmRegenerate}
+      />
+
+      <TeamCredentialsModal
+        teamName={team.name}
+        receipt={credentialsReceipt}
+        onClose={() => setCredentialsReceipt(null)}
       />
     </div>
   );

@@ -6,6 +6,7 @@ import {
   update,
   remove,
   getMatches,
+  generateCredentials,
 } from '../controllers/team.controller';
 import {
   listByTeam as listPlayers,
@@ -14,6 +15,7 @@ import {
   update as updatePlayer,
   remove as removePlayer,
 } from '../controllers/player.controller';
+import { requireRole } from '../middleware/auth';
 
 const router = Router();
 
@@ -26,6 +28,14 @@ router.delete('/:id', remove);
 
 // Team sub-resources
 router.get('/:id/matches', getMatches);
+
+// Captain credentials — admins (and super_admins) can (re)generate a team
+// captain's login. Returns the plaintext password exactly once.
+router.post(
+  '/:teamId/credentials',
+  requireRole('admin', 'super_admin'),
+  generateCredentials
+);
 
 // Roster — nested under /teams/:teamId/players
 // GET is public (read-only); POST/PUT/DELETE go through authMiddleware.

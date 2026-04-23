@@ -7,6 +7,7 @@ import type {
   MatchStatus,
   FixtureResult,
   Player,
+  TeamCredentialsReceipt,
 } from '../types';
 
 // ── DTOs (match what the backend expects) ──────────────────────────
@@ -179,6 +180,8 @@ interface BackendTeam {
   city?: string;
   department?: string;
   category?: string;
+  captainUsername?: string | null;
+  credentialsGeneratedAt?: string | null;
 }
 
 interface BackendTournament {
@@ -386,6 +389,8 @@ function toFrontendTeam(t: BackendTeam): Team {
     city: t.city,
     department: t.department,
     category: t.category,
+    captainUsername: t.captainUsername ?? undefined,
+    credentialsGeneratedAt: t.credentialsGeneratedAt ?? undefined,
   };
 }
 
@@ -767,6 +772,18 @@ export const api = {
   async getTeamMatches(id: string): Promise<Match[]> {
     const data = await request<BackendMatch[]>(`/teams/${id}/matches`);
     return data.map(toFrontendMatch);
+  },
+
+  /**
+   * Generate (or regenerate) captain login credentials for a team. The
+   * plaintext password is returned ONCE — caller shows it in the show-once
+   * modal and drops it on close. Backend persists bcrypt hash + optional
+   * AES-256-GCM recovery blob.
+   */
+  async generateTeamCredentials(teamId: string): Promise<TeamCredentialsReceipt> {
+    return request<TeamCredentialsReceipt>(`/teams/${teamId}/credentials`, {
+      method: 'POST',
+    });
   },
 
   // ── Players (roster) ───────────────────────────────────────────
