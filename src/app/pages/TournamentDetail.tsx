@@ -100,7 +100,6 @@ export function TournamentDetail() {
   }
 
   const liveMatches = matches.filter((m) => m.status === 'live');
-  const groupMatches = matches.filter((m) => m.group);
 
   const tabs: TabDescriptor[] = [
     {
@@ -137,9 +136,7 @@ export function TournamentDetail() {
         )}
         {activeTab === 'grupos' && <GruposTab matches={matches} standings={standings} />}
         {activeTab === 'matches' && <MatchesTab matches={matches} />}
-        {activeTab === 'bracket' && (
-          <BracketTab bracketMatches={bracket} groupMatches={groupMatches} />
-        )}
+        {activeTab === 'bracket' && <BracketTab bracketMatches={bracket} />}
         {activeTab === 'info' && (
           <InfoTab
             tournament={tournament}

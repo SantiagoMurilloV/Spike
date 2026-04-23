@@ -15,6 +15,7 @@ import { api, ApiError } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { PlayerFormModal } from '../../components/admin/PlayerFormModal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { getErrorMessage } from '../../lib/errors';
 
 /**
  * TeamPanel — the captain's home. Shows the team identity plus the full
@@ -79,7 +80,7 @@ export function TeamPanel() {
         logout('Sesión expirada. Iniciá sesión de nuevo.');
         return;
       }
-      setError(err instanceof Error ? err.message : 'Error al cargar el panel');
+      setError(getErrorMessage(err, 'Error al cargar el panel'));
     } finally {
       setLoading(false);
     }
@@ -125,7 +126,7 @@ export function TeamPanel() {
       toast.success('Jugador@ eliminad@');
       setPendingDeleteId(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al eliminar');
+      toast.error(getErrorMessage(err, 'Error al eliminar'));
       throw err;
     } finally {
       setDeletingId(null);

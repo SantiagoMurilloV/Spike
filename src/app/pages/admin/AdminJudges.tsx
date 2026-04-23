@@ -3,6 +3,7 @@ import { Plus, Trash2, Loader2, UserCog, Key } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, type Judge } from '../../services/api';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { getErrorMessage } from '../../lib/errors';
 
 /**
  * AdminJudges — admin-only CRUD for "juez" accounts. Judges log in with the
@@ -34,7 +35,7 @@ export function AdminJudges() {
       const list = await api.listJudges();
       setJudges(list);
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : 'Error al cargar jueces');
+      setLoadError(getErrorMessage(err, 'Error al cargar jueces'));
     } finally {
       setLoading(false);
     }
@@ -64,7 +65,7 @@ export function AdminJudges() {
       resetForm();
       refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al crear juez');
+      toast.error(getErrorMessage(err, 'Error al crear juez'));
     } finally {
       setCreating(false);
     }
@@ -80,7 +81,7 @@ export function AdminJudges() {
       setPendingDeleteId(null);
       setJudges((prev) => prev.filter((j) => j.id !== id));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al eliminar juez');
+      toast.error(getErrorMessage(err, 'Error al eliminar juez'));
       throw err;
     } finally {
       setDeletingId(null);
@@ -97,7 +98,7 @@ export function AdminJudges() {
       setResetTargetId(null);
       setResetPassword('');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo cambiar la contraseña');
+      toast.error(getErrorMessage(err, 'No se pudo cambiar la contraseña'));
     } finally {
       setResetting(false);
     }

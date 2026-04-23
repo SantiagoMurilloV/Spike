@@ -51,3 +51,18 @@ export function roleLabel(role: string | undefined | null): string {
   if (role && role in ROLE_LABEL) return ROLE_LABEL[role as AppRole];
   return role ?? '';
 }
+
+/**
+ * Role predicates — use these instead of `role === 'admin'` literals
+ * so adding a new role in the ROLES tuple doesn't silently bypass
+ * call-site checks. Each accepts `unknown` so they compose with any
+ * input shape (AuthUser.role, JWT payload, form value, etc.).
+ */
+export function isRole(role: unknown, target: AppRole): boolean {
+  return role === target;
+}
+
+export const isSuperAdmin = (role: unknown): boolean => isRole(role, 'super_admin');
+export const isAdmin = (role: unknown): boolean => isRole(role, 'admin');
+export const isJudge = (role: unknown): boolean => isRole(role, 'judge');
+export const isTeamCaptain = (role: unknown): boolean => isRole(role, 'team_captain');

@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { api, type SystemSettings } from '../../services/api';
 import { useData } from '../../context/DataContext';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { getErrorMessage } from '../../lib/errors';
 
 export function AdminSettings() {
   const [showPassword, setShowPassword] = useState(false);
@@ -31,7 +32,7 @@ export function AdminSettings() {
         const data = await api.getSettings();
         setSettings(data);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Error al cargar configuración');
+        toast.error(getErrorMessage(err, 'Error al cargar configuración'));
       } finally {
         setLoadingSettings(false);
       }
@@ -53,7 +54,7 @@ export function AdminSettings() {
       setSettings(updated);
       toast.success('Configuración guardada correctamente');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al guardar configuración');
+      toast.error(getErrorMessage(err, 'Error al guardar configuración'));
     } finally {
       setSaving(false);
     }
@@ -81,7 +82,7 @@ export function AdminSettings() {
       setNewPassword('');
       toast.success('Contraseña actualizada correctamente');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al cambiar contraseña');
+      toast.error(getErrorMessage(err, 'Error al cambiar contraseña'));
     } finally {
       setSavingPassword(false);
     }
@@ -319,7 +320,7 @@ export function AdminSettings() {
             setResetConfirmOpen(false);
           } catch (err) {
             toast.error(
-              err instanceof Error ? err.message : 'Error al reiniciar los datos',
+              getErrorMessage(err, 'Error al reiniciar los datos'),
             );
             throw err;
           } finally {

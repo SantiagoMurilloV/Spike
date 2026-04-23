@@ -11,6 +11,7 @@ import {
   type FieldErrors,
   type TournamentFormState,
 } from './types';
+import { getErrorMessage } from '../../../lib/errors';
 
 const MAX_COVER_BYTES = 10 * 1024 * 1024;
 
@@ -199,7 +200,7 @@ export function useTournamentForm({
         if (err instanceof ApiError && err.status === 400) {
           setErrors({ server: err.message });
         } else {
-          toast.error(err instanceof Error ? err.message : 'Error de red al guardar torneo', {
+          toast.error(getErrorMessage(err, 'Error de red al guardar torneo'), {
             action: { label: 'Reintentar', onClick: () => handleSubmit(e) },
           });
         }

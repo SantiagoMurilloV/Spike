@@ -9,6 +9,7 @@ import {
   type PlatformUser,
 } from '../../services/api';
 import { generatePassword } from '../../lib/passwordGen';
+import { isAdmin, isJudge } from '../../lib/roles';
 
 interface CreateUserModalProps {
   isOpen: boolean;
@@ -71,8 +72,8 @@ export function CreateUserModal({ isOpen, onClose, onCreated, admins }: CreateUs
         role: form.role,
         displayName: form.displayName?.trim() || undefined,
         tournamentQuota:
-          form.role === 'admin' ? Number(form.tournamentQuota ?? 1) : undefined,
-        createdBy: form.role === 'judge' ? form.createdBy ?? null : null,
+          isAdmin(form.role) ? Number(form.tournamentQuota ?? 1) : undefined,
+        createdBy: isJudge(form.role) ? form.createdBy ?? null : null,
         adminNote: form.adminNote?.trim() || null,
       };
       await api.createPlatformUser(dto);
@@ -195,7 +196,7 @@ export function CreateUserModal({ isOpen, onClose, onCreated, admins }: CreateUs
             </select>
           </Field>
 
-          {form.role === 'admin' && (
+          {isAdmin(form.role) && (
             <Field label="Cupo de torneos">
               <input
                 type="number"
@@ -209,7 +210,7 @@ export function CreateUserModal({ isOpen, onClose, onCreated, admins }: CreateUs
             </Field>
           )}
 
-          {form.role === 'judge' && (
+          {isJudge(form.role) && (
             <Field label="Admin dueño del juez">
               <select
                 value={form.createdBy ?? ''}

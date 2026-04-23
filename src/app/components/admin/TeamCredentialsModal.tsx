@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Copy, Check, AlertTriangle, KeyRound, RefreshCw } from 'lucide-react';
 import { motion } from 'motion/react';
+
+const COPY_FLASH_MS = 2000;
 
 type CredentialField = 'user' | 'pass' | 'both';
 
@@ -54,11 +56,28 @@ export function TeamCredentialsModal({
   onRegenerate,
 }: TeamCredentialsModalProps) {
   const [copiedField, setCopiedField] = useState<CredentialField | null>(null);
+  // Hold the timeout so we can clear it on unmount / receipt change —
+  // otherwise a late firing would call setState on an unmounted modal.
+  const copyFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearCopyFlash = () => {
+    if (copyFlashTimer.current) {
+      clearTimeout(copyFlashTimer.current);
+      copyFlashTimer.current = null;
+    }
+  };
 
   // Reset the copy-confirmation state whenever a fresh receipt opens.
   useEffect(() => {
-    if (receipt !== null) setCopiedField(null);
+    if (receipt !== null) {
+      setCopiedField(null);
+      clearCopyFlash();
+    }
   }, [receipt]);
+
+  // Final cleanup on unmount — strictly belt-and-suspenders, the
+  // receipt-change effect above covers the common case (modal closes).
+  useEffect(() => () => clearCopyFlash(), []);
 
   if (receipt === null) return null;
 
@@ -69,7 +88,8 @@ export function TeamCredentialsModal({
     try {
       await navigator.clipboard.writeText(value);
       setCopiedField(field);
-      setTimeout(() => setCopiedField(null), 2000);
+      clearCopyFlash();
+      copyFlashTimer.current = setTimeout(() => setCopiedField(null), COPY_FLASH_MS);
     } catch {
       // Clipboard blocked — the field is `select-all` so triple-click + C works.
     }

@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { ApiError } from '../../services/api';
 import { useData } from '../../context/DataContext';
+import { getErrorMessage } from '../../lib/errors';
 
 interface MatchFormModalProps {
   isOpen: boolean;
@@ -189,7 +190,7 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
       if (err instanceof ApiError && err.status === 400) {
         setErrors({ server: err.message });
       } else {
-        toast.error(err instanceof Error ? err.message : 'Error de red al guardar partido', {
+        toast.error(getErrorMessage(err, 'Error de red al guardar partido'), {
           action: {
             label: 'Reintentar',
             onClick: () => handleSubmit(e),

@@ -16,7 +16,8 @@ import { CreateUserModal } from '../../components/super-admin/CreateUserModal';
 import { EditUserModal } from '../../components/super-admin/EditUserModal';
 import { NewPasswordModal } from '../../components/super-admin/NewPasswordModal';
 import { useAuth } from '../../context/AuthContext';
-import { roleLabel } from '../../lib/roles';
+import { isAdmin, roleLabel } from '../../lib/roles';
+import { getErrorMessage } from '../../lib/errors';
 
 /**
  * Super-admin user management page. Lives on `/super-admin/users` to keep
@@ -53,7 +54,7 @@ export function SuperAdminUsers() {
       const u = await api.listPlatformUsers();
       setUsers(u);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar usuarios');
+      setError(getErrorMessage(err, 'Error al cargar usuarios'));
     } finally {
       setLoading(false);
     }
@@ -73,7 +74,7 @@ export function SuperAdminUsers() {
       setPendingDeleteId(null);
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al eliminar');
+      toast.error(getErrorMessage(err, 'Error al eliminar'));
       throw err;
     } finally {
       setDeleting(null);
@@ -98,13 +99,13 @@ export function SuperAdminUsers() {
       });
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al guardar');
+      toast.error(getErrorMessage(err, 'Error al guardar'));
     } finally {
       setQuotaSaving(null);
     }
   };
 
-  const admins = users.filter((u) => u.role === 'admin');
+  const admins = users.filter((u) => isAdmin(u.role));
 
   if (loading && users.length === 0) {
     return (
@@ -198,7 +199,7 @@ export function SuperAdminUsers() {
                       <RoleBadge role={u.role} />
                     </Td>
                     <Td>
-                      {u.role === 'admin' ? (
+                      {isAdmin(u.role) ? (
                         editingQuota ? (
                           <div className="flex items-center gap-1">
                             <input

@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useIdleTimeout, useActivePresence } from '../hooks/useIdleTimeout';
 import { IdleWarningDialog } from './admin/IdleWarningDialog';
+import { isAdmin } from '../lib/roles';
 
 // Idle auto-logout — admin only. Judges deliberately stay on the
 // scoring console for long stretches between rallies and must never
@@ -117,7 +118,7 @@ export function AdminLayout() {
   }, [handleLogout]);
 
   const { reset: resetIdle } = useIdleTimeout({
-    enabled: user?.role === 'admin',
+    enabled: isAdmin(user?.role),
     timeoutMs: IDLE_TIMEOUT_MS,
     warnMs: IDLE_WARN_MS,
     onWarn: handleIdleWarn,

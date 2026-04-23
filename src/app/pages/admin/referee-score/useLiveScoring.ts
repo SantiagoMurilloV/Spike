@@ -10,6 +10,7 @@ import {
   setTargetFor,
 } from './scoring';
 import type { ServingSide, SyncState } from './types';
+import { getErrorMessage } from '../../../lib/errors';
 
 interface Snapshot {
   scoreH: number;
@@ -70,7 +71,7 @@ export function useLiveScoring(matchId: string | undefined) {
         hydrated.current = true;
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'Error al cargar el partido');
+        setError(getErrorMessage(err, 'Error al cargar el partido'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -151,7 +152,7 @@ export function useLiveScoring(matchId: string | undefined) {
         setSync('saved');
       } catch (err) {
         setSync('error');
-        toast.error(err instanceof Error ? err.message : 'Error al sincronizar');
+        toast.error(getErrorMessage(err, 'Error al sincronizar'));
       }
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => {
@@ -249,7 +250,7 @@ export function useLiveScoring(matchId: string | undefined) {
         toast.success('Partido finalizado');
         onSuccess(match.tournamentId);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Error al finalizar');
+        toast.error(getErrorMessage(err, 'Error al finalizar'));
       }
     },
     [match, scoreH, scoreA, sets, seconds],

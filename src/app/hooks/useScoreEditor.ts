@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { calcSetsWon, MAX_SETS, type SetPoints } from '../lib/scoring';
+import { getErrorMessage } from '../lib/errors';
 
 /**
  * Payload passed to the caller-provided `save` function once the admin
@@ -105,7 +106,7 @@ export function useScoreEditor<T>({
         setEditingId(null);
         toast.success(successCopy);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : errorCopy);
+        toast.error(getErrorMessage(err, errorCopy));
       } finally {
         setSaving(false);
       }

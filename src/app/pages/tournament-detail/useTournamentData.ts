@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import type { Tournament, Match, StandingsRow, BracketMatch, Team } from '../../types';
+import { getErrorMessage } from '../../lib/errors';
 
 export interface TournamentData {
   tournament: Tournament | null;
@@ -60,7 +61,7 @@ export function useTournamentData(id: string | undefined) {
         enrolledTeams: enrolledRes.status === 'fulfilled' ? enrolledRes.value : [],
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar el torneo');
+      setError(getErrorMessage(err, 'Error al cargar el torneo'));
     } finally {
       setLoading(false);
     }

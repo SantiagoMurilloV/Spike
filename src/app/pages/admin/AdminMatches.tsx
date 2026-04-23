@@ -8,6 +8,7 @@ import { MatchFormModal } from '../../components/admin/MatchFormModal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Match } from '../../types';
 import type { CreateMatchDto, UpdateMatchDto } from '../../services/api';
+import { getErrorMessage } from '../../lib/errors';
 
 export function AdminMatches() {
   const navigate = useNavigate();
@@ -61,7 +62,7 @@ export function AdminMatches() {
       toast.success('Partido eliminado correctamente');
       setPendingDeleteId(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al eliminar partido');
+      toast.error(getErrorMessage(err, 'Error al eliminar partido'));
       throw err; // keep dialog open so the user can retry
     } finally {
       setDeletingId(null);

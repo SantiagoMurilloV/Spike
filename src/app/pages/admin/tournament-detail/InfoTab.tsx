@@ -14,6 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../../../components/ui/alert-dialog';
+import { getErrorMessage } from '../../../lib/errors';
 
 interface InfoTabProps {
   tournament: Tournament;
@@ -49,7 +50,7 @@ export function InfoTab({ tournament, onSubmit, onFinalize, onFinalized }: InfoT
       toast.success('Torneo finalizado');
       setShowFinalizeDialog(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al finalizar el torneo');
+      toast.error(getErrorMessage(err, 'Error al finalizar el torneo'));
     } finally {
       setFinalizing(false);
     }

@@ -19,6 +19,7 @@ import { PlayerFormModal } from './PlayerFormModal';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { TeamCredentialsModal } from './TeamCredentialsModal';
 import { useTeamCaptainCredentials } from '../../hooks/useTeamCaptainCredentials';
+import { getErrorMessage } from '../../lib/errors';
 
 interface TeamRosterCardProps {
   team: Team;
@@ -77,7 +78,7 @@ export function TeamRosterCard({
       setPlayers(rows);
       setFetched(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar plantel');
+      setError(getErrorMessage(err, 'Error al cargar plantel'));
     } finally {
       setLoading(false);
     }
@@ -144,7 +145,7 @@ export function TeamRosterCard({
       toast.success('Jugador@ eliminad@');
       setPendingDeletePlayerId(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al eliminar');
+      toast.error(getErrorMessage(err, 'Error al eliminar'));
       throw err;
     } finally {
       setDeletingPlayerId(null);

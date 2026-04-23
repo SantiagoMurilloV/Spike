@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import type { Team } from '../types';
 import { api, ApiError } from '../services/api';
+import { getErrorMessage } from '../lib/errors';
 
 export interface DisplayReceipt {
   username: string;
@@ -50,7 +51,7 @@ export function useTeamCaptainCredentials(team: Team) {
         toast.error('Este equipo no tiene credenciales. Generalas primero.');
         return;
       }
-      toast.error(err instanceof Error ? err.message : 'Error al obtener credenciales');
+      toast.error(getErrorMessage(err, 'Error al obtener credenciales'));
     } finally {
       setBusy(false);
     }
@@ -71,7 +72,7 @@ export function useTeamCaptainCredentials(team: Team) {
         hasCredentials ? 'Credenciales regeneradas' : 'Credenciales generadas'
       );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al generar credenciales');
+      toast.error(getErrorMessage(err, 'Error al generar credenciales'));
       throw err;
     } finally {
       setBusy(false);

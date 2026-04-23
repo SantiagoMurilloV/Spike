@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import type { Player } from '../../types';
 import { ApiError, api, type CreatePlayerDto, type UpdatePlayerDto } from '../../services/api';
 import { CATEGORIES, withCurrentCategories } from '../../lib/categories';
+import { getErrorMessage } from '../../lib/errors';
 
 interface PlayerFormModalProps {
   isOpen: boolean;
@@ -222,7 +223,7 @@ export function PlayerFormModal({ isOpen, onClose, onSaved, teamId, player }: Pl
       if (err instanceof ApiError && err.status === 400) {
         setErrors({ server: err.message });
       } else {
-        toast.error(err instanceof Error ? err.message : 'Error al guardar jugador@');
+        toast.error(getErrorMessage(err, 'Error al guardar jugador@'));
       }
     } finally {
       setSubmitting(false);

@@ -34,6 +34,7 @@ import { humanizePhase } from '../../../lib/phase';
 import type { useScoreEditor } from '../../../hooks/useScoreEditor';
 import { GroupMatricesByCategory, EnfrentamientoRow } from './fixtures/GroupsView';
 import { BracketByCategory } from './fixtures/BracketView';
+import { getErrorMessage } from '../../../lib/errors';
 
 type BracketEditor = ReturnType<typeof useScoreEditor<BracketMatch>>;
 
@@ -165,7 +166,7 @@ export function FixturesTab({
       await refreshAfterGenerate(result);
       toast.success('Cruces generados');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al generar cruces');
+      toast.error(getErrorMessage(err, 'Error al generar cruces'));
     } finally {
       setGenerating(false);
     }
@@ -216,7 +217,7 @@ export function FixturesTab({
       setShowManualGroups(false);
       toast.success('Cruces generados');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al generar cruces');
+      toast.error(getErrorMessage(err, 'Error al generar cruces'));
     } finally {
       setGenerating(false);
     }
@@ -232,7 +233,7 @@ export function FixturesTab({
       setShowManualBracket(false);
       toast.success('Bracket generado');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al generar bracket');
+      toast.error(getErrorMessage(err, 'Error al generar bracket'));
     } finally {
       setGenerating(false);
     }
@@ -258,7 +259,7 @@ export function FixturesTab({
       setPendingGroups({});
       toast.success('Grupos y Bracket generados correctamente');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al generar formato completo');
+      toast.error(getErrorMessage(err, 'Error al generar formato completo'));
     } finally {
       setGenerating(false);
     }
@@ -274,7 +275,7 @@ export function FixturesTab({
       setShowBracketCrossings(false);
       toast.success(`Bracket generado con ${bracket.length} partidos`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al generar bracket');
+      toast.error(getErrorMessage(err, 'Error al generar bracket'));
     } finally {
       setGenerating(false);
     }

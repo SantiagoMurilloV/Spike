@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Tournament } from '../../types';
 import { api, type CreateTournamentDto, type UpdateTournamentDto } from '../../services/api';
 import { tournamentStatusColor, tournamentStatusLabel } from '../../lib/status';
+import { getErrorMessage } from '../../lib/errors';
 
 export function AdminTournaments() {
   const navigate = useNavigate();
@@ -68,7 +69,7 @@ export function AdminTournaments() {
       toast.success('Torneo eliminado correctamente');
       setPendingDeleteId(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al eliminar torneo');
+      toast.error(getErrorMessage(err, 'Error al eliminar torneo'));
       throw err; // keep dialog open so the user can retry
     } finally {
       setDeletingId(null);

@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import type { Match } from '../types';
 import { MatchCardSkeleton } from '../components/SkeletonLoaders';
+import { getErrorMessage } from '../lib/errors';
 export function MatchDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -25,7 +26,7 @@ export function MatchDetail() {
       setMatch(data);
     } catch (err) {
       if (!options.silent) {
-        setError(err instanceof Error ? err.message : 'Error al cargar el partido');
+        setError(getErrorMessage(err, 'Error al cargar el partido'));
       }
     } finally {
       if (!options.silent) setLoading(false);

@@ -9,6 +9,7 @@ import spkLogo from '../../imports/spk-cup-logo-v4-1.svg';
 import { api } from '../services/api';
 import type { Team, Match } from '../types';
 import { MatchCardSkeleton } from '../components/SkeletonLoaders';
+import { getErrorMessage } from '../lib/errors';
 
 export function TeamDetail() {
   const { id } = useParams();
@@ -43,7 +44,7 @@ export function TeamDetail() {
       setTeam(teamData);
       setTeamMatches(matchesData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar el equipo');
+      setError(getErrorMessage(err, 'Error al cargar el equipo'));
     } finally {
       setLoading(false);
     }

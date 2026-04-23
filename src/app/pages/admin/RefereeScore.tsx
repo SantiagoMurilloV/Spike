@@ -2,6 +2,7 @@ import { useNavigate, useParams } from 'react-router';
 import { ArrowLeft, ArrowRight, Clock, RefreshCw, Trophy, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { LiveBadge } from '../../components/LiveBadge';
+import { isJudge } from '../../lib/roles';
 import { useLiveScoring } from './referee-score/useLiveScoring';
 import { TeamScorePanel } from './referee-score/TeamScorePanel';
 import { SetStrip } from './referee-score/SetStrip';
@@ -22,7 +23,7 @@ export function RefereeScore() {
   const { user } = useAuth();
   // Judges land back at their dashboard; admins return to the
   // tournament detail they came from.
-  const postFinalizeTarget = user?.role === 'judge' ? '/judge' : null;
+  const postFinalizeTarget = isJudge(user?.role) ? '/judge' : null;
 
   const live = useLiveScoring(matchId);
 

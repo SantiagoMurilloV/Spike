@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { ApiError, api } from '../../services/api';
 import { CATEGORIES, withCurrentCategories } from '../../lib/categories';
+import { getErrorMessage } from '../../lib/errors';
 
 interface TeamFormModalProps {
   isOpen: boolean;
@@ -208,7 +209,7 @@ export function TeamFormModal({
       if (err instanceof ApiError && err.status === 400) {
         setErrors({ server: err.message });
       } else {
-        toast.error(err instanceof Error ? err.message : 'Error de red al guardar equipo', {
+        toast.error(getErrorMessage(err, 'Error de red al guardar equipo'), {
           action: {
             label: 'Reintentar',
             onClick: () => handleSubmit(e),

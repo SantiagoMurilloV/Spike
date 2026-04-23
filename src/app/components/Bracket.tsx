@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import type { BracketMatch, Match } from '../types';
+import type { BracketMatch } from '../types';
 import { useIsMobile } from './ui/use-mobile';
 import { DIMENSIONS } from './bracket/dims';
 import { fireChampionConfetti, parseRound } from './bracket/helpers';
@@ -10,11 +10,6 @@ export { formatBracketPlaceholder } from './bracket/helpers';
 
 interface BracketProps {
   matches: BracketMatch[];
-  /**
-   * Deprecated — the bracket no longer renders group matches as a column.
-   * Kept for backwards compatibility so callers don't break.
-   */
-  groupMatches?: Match[];
 }
 
 /**

@@ -19,6 +19,7 @@ import {
   type UpdateMatchDto,
 } from '../services/api';
 import { useMatchNotifications } from '../hooks/useMatchNotifications';
+import { getErrorMessage } from '../lib/errors';
 
 interface LoadingState {
   tournaments: boolean;
@@ -140,7 +141,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setTeams(data);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'Error al cargar equipos';
+        getErrorMessage(err, 'Error al cargar equipos');
       setError((prev) => ({ ...prev, teams: message }));
     } finally {
       setLoading((prev) => ({ ...prev, teams: false }));
@@ -157,7 +158,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setTournaments(data);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'Error al cargar torneos';
+        getErrorMessage(err, 'Error al cargar torneos');
       setError((prev) => ({ ...prev, tournaments: message }));
     } finally {
       setLoading((prev) => ({ ...prev, tournaments: false }));
@@ -174,7 +175,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setMatches(data);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'Error al cargar partidos';
+        getErrorMessage(err, 'Error al cargar partidos');
       setError((prev) => ({ ...prev, matches: message }));
     } finally {
       setLoading((prev) => ({ ...prev, matches: false }));

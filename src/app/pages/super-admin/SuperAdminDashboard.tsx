@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Trophy, Users, UserCog, Shield, Activity, Eye, Loader2, KeyRound } from 'lucide-react';
 import { motion } from 'motion/react';
 import { api, type PlatformStats } from '../../services/api';
+import { getErrorMessage } from '../../lib/errors';
 
 /**
  * Super-admin dashboard — stats-at-a-glance only. User management has
@@ -22,7 +23,7 @@ export function SuperAdminDashboard() {
       setStats(s);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar');
+      setError(getErrorMessage(err, 'Error al cargar'));
     }
   }, []);
 

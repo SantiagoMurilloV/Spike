@@ -24,6 +24,7 @@ import { InfoTab } from './tournament-detail/InfoTab';
 import { TeamsTab } from './tournament-detail/TeamsTab';
 import { FixturesTab } from './tournament-detail/FixturesTab';
 import { MatchesTab } from './tournament-detail/MatchesTab';
+import { getErrorMessage } from '../../lib/errors';
 
 const FORMAT_LABELS: Record<string, string> = {
   groups: 'Fase de Grupos',
@@ -144,7 +145,7 @@ export function AdminTournamentDetail() {
       setBracketMatches(bracket);
       setStandings(standingsData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar datos del torneo');
+      setError(getErrorMessage(err, 'Error al cargar datos del torneo'));
     } finally {
       setLoading(false);
     }
@@ -207,7 +208,7 @@ export function AdminTournamentDetail() {
       setEnrolledTeams(updated);
       toast.success('Equipo inscrito correctamente');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al inscribir equipo');
+      toast.error(getErrorMessage(err, 'Error al inscribir equipo'));
     } finally {
       setEnrolling(false);
     }
@@ -221,7 +222,7 @@ export function AdminTournamentDetail() {
       setEnrolledTeams((prev) => prev.filter((t) => t.id !== teamId));
       toast.success('Equipo desinscrito correctamente');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al desinscribir equipo');
+      toast.error(getErrorMessage(err, 'Error al desinscribir equipo'));
     } finally {
       setUnenrollingId(null);
     }
@@ -292,7 +293,7 @@ export function AdminTournamentDetail() {
       setGeneratedAt(null);
       toast.success('Cruces eliminados correctamente');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Error al limpiar cruces');
+      toast.error(getErrorMessage(err, 'Error al limpiar cruces'));
     } finally {
       setClearing(false);
     }
@@ -310,7 +311,7 @@ export function AdminTournamentDetail() {
       setBracketMatches(bracket);
       toast.success('Tabla y bracket actualizados');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo recalcular la tabla');
+      toast.error(getErrorMessage(err, 'No se pudo recalcular la tabla'));
     } finally {
       setRecalculating(false);
     }
