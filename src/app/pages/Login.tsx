@@ -6,18 +6,7 @@ import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { ApiError } from '../services/api';
-
-/**
- * Map a user role to the landing page for that role. Each role gets its
- * own chrome: super_admin → platform console, admin → tournament admin,
- * judge → live scoring. Unknown roles fall back to /admin.
- */
-function homeForRole(role: string | undefined): string {
-  if (role === 'super_admin') return '/super-admin';
-  if (role === 'judge') return '/judge';
-  if (role === 'team_captain') return '/team-panel';
-  return '/admin';
-}
+import { homeForRole } from '../lib/roles';
 
 export function Login() {
   const navigate = useNavigate();

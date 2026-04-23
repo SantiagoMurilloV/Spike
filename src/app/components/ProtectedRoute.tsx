@@ -1,8 +1,7 @@
 import { Navigate } from 'react-router';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
-type AppRole = 'super_admin' | 'admin' | 'judge' | 'team_captain';
+import { type AppRole, homeForRole } from '../lib/roles';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -37,19 +36,9 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   }
 
   if (allowedRoles && user && !allowedRoles.includes(user.role as AppRole)) {
-    // Wrong role → send them to their own home rather than showing a
-    // "not found" page.
-    const fallback =
-      user.role === 'super_admin'
-        ? '/super-admin'
-        : user.role === 'admin'
-          ? '/admin'
-          : user.role === 'judge'
-            ? '/judge'
-            : user.role === 'team_captain'
-              ? '/team-panel'
-              : '/login';
-    return <Navigate to={fallback} replace />;
+    // Wrong role → bounce to the user's own home so they don't see
+    // someone else's chrome or a bare 403.
+    return <Navigate to={homeForRole(user.role)} replace />;
   }
 
   return <>{children}</>;

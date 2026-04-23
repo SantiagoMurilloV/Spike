@@ -16,6 +16,7 @@ import { CreateUserModal } from '../../components/super-admin/CreateUserModal';
 import { EditUserModal } from '../../components/super-admin/EditUserModal';
 import { NewPasswordModal } from '../../components/super-admin/NewPasswordModal';
 import { useAuth } from '../../context/AuthContext';
+import { roleLabel } from '../../lib/roles';
 
 /**
  * Super-admin user management page. Lives on `/super-admin/users` to keep
@@ -372,15 +373,16 @@ function Td({ children, className = '' }: { children: React.ReactNode; className
   return <td className={`px-4 py-3 align-middle ${className}`}>{children}</td>;
 }
 
+const ROLE_BADGE_STYLE: Record<string, string> = {
+  super_admin: 'bg-spk-red text-white',
+  admin: 'bg-spk-blue/10 text-spk-blue border border-spk-blue/30',
+  judge: 'bg-black/5 text-black/70 border border-black/10',
+  team_captain: 'bg-spk-gold/15 text-spk-gold border border-spk-gold/30',
+};
+
 function RoleBadge({ role }: { role: string }) {
-  const style =
-    role === 'super_admin'
-      ? 'bg-spk-red text-white'
-      : role === 'admin'
-        ? 'bg-spk-blue/10 text-spk-blue border border-spk-blue/30'
-        : 'bg-black/5 text-black/70 border border-black/10';
-  const label =
-    role === 'super_admin' ? 'Super Admin' : role === 'admin' ? 'Admin' : 'Juez';
+  const style = ROLE_BADGE_STYLE[role] ?? ROLE_BADGE_STYLE.judge;
+  const label = roleLabel(role);
   return (
     <span
       className={`inline-flex items-center px-2.5 py-1 rounded-sm text-[11px] font-bold uppercase ${style}`}

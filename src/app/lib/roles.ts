@@ -1,0 +1,53 @@
+/**
+ * Single source of truth for the app's user roles. Mirrors the backend
+ * type in `server/src/types/index.ts::AppRole`. A JWT's `role` field will
+ * be one of these values.
+ *
+ * Kept as a `const` tuple so we can derive `AppRole` from the runtime
+ * list — adding a new role means touching ONE line and the union + the
+ * home-route map + ProtectedRoute's permit list stay honest.
+ */
+export const ROLES = ['super_admin', 'admin', 'judge', 'team_captain'] as const;
+
+export type AppRole = (typeof ROLES)[number];
+
+/**
+ * Landing path for each role. Used both on a successful login (to push
+ * the user straight into their chrome) and inside ProtectedRoute when
+ * someone with the wrong role hits a route that isn't theirs (so they
+ * bounce to their own panel instead of a raw 403).
+ *
+ * `null` for roles we don't want to redirect (none today — kept as a
+ * type hatch for future read-only roles).
+ */
+export const ROLE_HOME: Record<AppRole, string> = {
+  super_admin: '/super-admin',
+  admin: '/admin',
+  judge: '/judge',
+  team_captain: '/team-panel',
+};
+
+/**
+ * Resolve the landing path for a role. Falls back to `/admin` (the old
+ * default) if the role string isn't one we recognise — matches the
+ * historical behavior for forward compatibility with old tokens.
+ */
+export function homeForRole(role: string | undefined | null): string {
+  if (role && role in ROLE_HOME) {
+    return ROLE_HOME[role as AppRole];
+  }
+  return '/admin';
+}
+
+/** Human-readable label for a role, used in lists/badges. */
+export const ROLE_LABEL: Record<AppRole, string> = {
+  super_admin: 'Super Admin',
+  admin: 'Admin',
+  judge: 'Juez',
+  team_captain: 'Capitán',
+};
+
+export function roleLabel(role: string | undefined | null): string {
+  if (role && role in ROLE_LABEL) return ROLE_LABEL[role as AppRole];
+  return role ?? '';
+}
