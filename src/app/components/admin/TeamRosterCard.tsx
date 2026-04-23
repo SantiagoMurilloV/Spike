@@ -107,7 +107,7 @@ export function TeamRosterCard({
       next[idx] = saved;
       return next;
     });
-    toast.success(editingPlayer ? 'Jugadora actualizada' : 'Jugadora agregada');
+    toast.success(editingPlayer ? 'Jugador@ actualizad@' : 'Jugador@ agregad@');
   };
 
   const confirmDeletePlayer = async () => {
@@ -117,7 +117,7 @@ export function TeamRosterCard({
     try {
       await api.deletePlayer(team.id, id);
       setPlayers((prev) => prev.filter((p) => p.id !== id));
-      toast.success('Jugadora eliminada');
+      toast.success('Jugador@ eliminad@');
       setPendingDeletePlayerId(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al eliminar');
@@ -171,7 +171,7 @@ export function TeamRosterCard({
         {fetched && (
           <span
             className="hidden sm:inline-flex items-center gap-1 text-xs text-black/60"
-            title={`${players.length} jugadoras`}
+            title={`${players.length} jugador@s`}
           >
             <Users className="w-3.5 h-3.5" aria-hidden="true" />
             <span className="font-bold tabular-nums">{players.length}</span>
@@ -241,7 +241,7 @@ export function TeamRosterCard({
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.05em' }} className="uppercase font-bold">
-                    Agregar jugadora
+                    Agregar jugador@
                   </span>
                 </button>
               </div>
@@ -263,7 +263,7 @@ export function TeamRosterCard({
                 </div>
               ) : players.length === 0 ? (
                 <div className="py-8 text-center text-sm text-black/60">
-                  Aún no hay jugadoras registradas. Empieza agregando una.
+                  Aún no hay jugador@s registrad@s. Empezá agregando.
                 </div>
               ) : (
                 <ul className="space-y-2">
@@ -377,8 +377,8 @@ export function TeamRosterCard({
         onOpenChange={(openDialog) => {
           if (!openDialog) setPendingDeletePlayerId(null);
         }}
-        title="Eliminar jugadora"
-        description="¿Estás seguro de que quieres eliminar a esta jugadora? Esta acción no se puede deshacer."
+        title="Eliminar jugador@"
+        description="¿Estás seguro de que querés eliminar a este/a jugador/a? Esta acción no se puede deshacer."
         confirmLabel="Eliminar"
         loading={deletingPlayerId !== null}
         onConfirm={confirmDeletePlayer}

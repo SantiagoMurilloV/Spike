@@ -218,7 +218,7 @@ export function PlayerFormModal({ isOpen, onClose, onSaved, teamId, player }: Pl
       if (err instanceof ApiError && err.status === 400) {
         setErrors({ server: err.message });
       } else {
-        toast.error(err instanceof Error ? err.message : 'Error al guardar jugadora');
+        toast.error(err instanceof Error ? err.message : 'Error al guardar jugador@');
       }
     } finally {
       setSubmitting(false);
@@ -245,7 +245,7 @@ export function PlayerFormModal({ isOpen, onClose, onSaved, teamId, player }: Pl
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-black/10 px-4 sm:px-6 py-4 flex items-center justify-between rounded-t-xl">
           <h2 className="text-lg sm:text-xl font-bold" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-            {player ? 'EDITAR JUGADORA' : 'AGREGAR JUGADORA'}
+            {player ? 'EDITAR JUGADOR@' : 'AGREGAR JUGADOR@'}
           </h2>
           <button
             type="button"
@@ -271,7 +271,7 @@ export function PlayerFormModal({ isOpen, onClose, onSaved, teamId, player }: Pl
               {photoPreview ? (
                 <img
                   src={photoPreview}
-                  alt="Foto jugadora"
+                  alt="Foto jugador@"
                   className="w-24 h-24 rounded-sm object-cover border-4 border-black/10"
                 />
               ) : (
@@ -480,7 +480,7 @@ export function PlayerFormModal({ isOpen, onClose, onSaved, teamId, player }: Pl
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {player ? 'Guardar Cambios' : 'Agregar Jugadora'}
+              {player ? 'Guardar Cambios' : 'Agregar Jugador@'}
             </button>
           </div>
         </form>

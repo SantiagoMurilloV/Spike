@@ -94,7 +94,7 @@ export class PlayerService {
   async getById(id: string): Promise<Player> {
     const pool = getPool();
     const result = await pool.query('SELECT * FROM players WHERE id = $1', [id]);
-    if (result.rows.length === 0) throw new NotFoundError('Jugadora');
+    if (result.rows.length === 0) throw new NotFoundError('Jugador@');
     return mapRow(result.rows[0]);
   }
 
@@ -172,7 +172,7 @@ export class PlayerService {
   async delete(id: string): Promise<void> {
     const pool = getPool();
     const result = await pool.query('DELETE FROM players WHERE id = $1 RETURNING id', [id]);
-    if (result.rows.length === 0) throw new NotFoundError('Jugadora');
+    if (result.rows.length === 0) throw new NotFoundError('Jugador@');
   }
 }
 

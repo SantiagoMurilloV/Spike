@@ -68,12 +68,22 @@ app.use(cors(corsOptions));
 // other fields).
 app.use(express.json({ limit: '20mb' }));
 
-// Presence tracking — counts anonymous visitors (fingerprint by
-// IP+UA) on every request, and authed users once the auth middleware
-// resolves req.user. Feeds the super-admin dashboard's "activos" counters.
+// Presence tracking (anonymous visitors). Counts ONLY truly public
+// traffic — requests that arrive without an Authorization header AND
+// don't look like a bot. Authed users are tracked separately via
+// touchUser() after authMiddleware resolves req.user, so an admin
+// polling the API every 25 s doesn't double-count as a "visitor".
+const BOT_UA_RE =
+  /bot|crawler|spider|slurp|uptimerobot|pingdom|headlesschrome|node-fetch|curl|wget|axios|python-requests|healthcheck|ahrefs|semrush|facebookexternalhit/i;
 app.use((req, _res, next) => {
-  // Skip health checks so Railway uptime pings don't inflate the count.
-  if (req.path !== '/api/health') touchVisitor(req);
+  if (req.path === '/api/health') return next();
+  // Drop anything that carries a bearer token — that's either an admin,
+  // a judge or the super_admin, all handled by touchUser() below.
+  if (req.headers.authorization?.startsWith('Bearer ')) return next();
+  // Skip obvious bots and uptime monitors so they don't pad the number.
+  const ua = (req.headers['user-agent'] ?? '').toString();
+  if (BOT_UA_RE.test(ua)) return next();
+  touchVisitor(req);
   next();
 });
 

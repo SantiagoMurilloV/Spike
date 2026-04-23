@@ -23,7 +23,7 @@ export async function listByTeam(req: Request, res: Response, next: NextFunction
 export async function getById(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const id = req.params.playerId as string;
-    validateUUID(id, 'ID de jugadora');
+    validateUUID(id, 'ID de jugador@');
     const player = await playerService.getById(id);
     res.json(player);
   } catch (error) {
@@ -45,7 +45,7 @@ export async function create(req: Request, res: Response, next: NextFunction): P
 export async function update(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const id = req.params.playerId as string;
-    validateUUID(id, 'ID de jugadora');
+    validateUUID(id, 'ID de jugador@');
     const player = await playerService.update(id, req.body);
     res.json(player);
   } catch (error) {
@@ -56,9 +56,9 @@ export async function update(req: Request, res: Response, next: NextFunction): P
 export async function remove(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const id = req.params.playerId as string;
-    validateUUID(id, 'ID de jugadora');
+    validateUUID(id, 'ID de jugador@');
     await playerService.delete(id);
-    res.json({ message: 'Jugadora eliminada exitosamente' });
+    res.json({ message: 'Jugador@ eliminad@ exitosamente' });
   } catch (error) {
     next(error);
   }

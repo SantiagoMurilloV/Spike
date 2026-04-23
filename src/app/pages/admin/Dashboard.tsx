@@ -109,7 +109,7 @@ export function AdminDashboard() {
           accent="bg-spk-blue/10 text-spk-blue"
         />
         <StatCard
-          label="Jugadoras"
+          label="Jugador@s"
           value={stats?.players ?? 0}
           Icon={UserCog}
           accent="bg-spk-win/10 text-spk-win"
