@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { X, Loader2, GitMerge } from 'lucide-react';
+import { X, Loader2, GitMerge, Award, Medal } from 'lucide-react';
 import { Button } from '../../ui/button';
 import {
   Select,
@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../ui/select';
-import { categoryOfGroupName, groupLetter } from '../../../lib/phase';
+import { categoryOfGroupName, groupLetter, type BracketTier } from '../../../lib/phase';
 import { nextPow2 } from './shared';
 
 export interface BracketCrossingsModalProps {
@@ -18,6 +18,14 @@ export interface BracketCrossingsModalProps {
   onClose: () => void;
   onGenerate: (seeds: Array<{ position: number; label: string }>) => void;
   generating: boolean;
+  /**
+   * When set, the modal is opened as part of the Oro/Plata division
+   * flow. The header + confirm button switch to the tier-specific copy
+   * so the admin knows which bracket they're currently defining. The
+   * actual tier goes to the backend from the parent's onGenerate
+   * handler — this prop is purely presentational.
+   */
+  tier?: BracketTier | null;
 }
 
 /**
@@ -36,7 +44,27 @@ export function BracketCrossingsModal({
   onClose,
   onGenerate,
   generating,
+  tier = null,
 }: BracketCrossingsModalProps) {
+  const headline =
+    tier === 'gold'
+      ? 'DEFINIR BRACKET ORO'
+      : tier === 'silver'
+        ? 'DEFINIR BRACKET PLATA'
+        : 'DEFINIR ELIMINACIÓN DIRECTA';
+  const HeadlineIcon = tier === 'gold' ? Award : tier === 'silver' ? Medal : GitMerge;
+  const headlineColor =
+    tier === 'gold'
+      ? 'text-amber-500'
+      : tier === 'silver'
+        ? 'text-slate-400'
+        : 'text-spk-blue';
+  const confirmLabel =
+    tier === 'gold'
+      ? 'Generar Bracket Oro'
+      : tier === 'silver'
+        ? 'Generar Bracket Plata'
+        : 'Confirmar y Generar';
   const [classifiersPerGroup, setClassifiersPerGroup] = useState(2);
 
   const hasMultipleCategories = useMemo(() => {
@@ -122,12 +150,12 @@ export function BracketCrossingsModal({
       >
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-black/10">
           <div className="flex items-center gap-3">
-            <GitMerge className="w-5 h-5 text-spk-blue flex-shrink-0" />
+            <HeadlineIcon className={`w-5 h-5 ${headlineColor} flex-shrink-0`} />
             <h2
               className="text-lg sm:text-xl font-bold"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
-              DEFINIR ELIMINACIÓN DIRECTA
+              {headline}
             </h2>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-black/5 rounded flex-shrink-0">
@@ -206,7 +234,7 @@ export function BracketCrossingsModal({
               className="bg-spk-blue hover:bg-spk-blue/90 flex-1 sm:flex-none"
             >
               {generating && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Confirmar y Generar
+              {confirmLabel}
             </Button>
           </div>
         </div>

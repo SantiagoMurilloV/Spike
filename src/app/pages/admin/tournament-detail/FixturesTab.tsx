@@ -23,11 +23,14 @@ import {
 } from '../../../components/ui/alert-dialog';
 import {
   CategoryPickerDialog,
+  BracketModePickerDialog,
   ManualGroupsModal,
   ManualBracketModal,
   BracketCrossingsModal,
   type ScheduleConfig,
+  type BracketMode,
 } from '../../../components/admin/ManualFixtureModal';
+import type { BracketTier } from '../../../lib/phase';
 import { CategorySection } from '../../../components/admin/CategorySection';
 import { humanizePhase } from '../../../lib/phase';
 import type { useScoreEditor } from '../../../hooks/useScoreEditor';
@@ -90,10 +93,18 @@ export function FixturesTab({
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
   const [showManualGroups, setShowManualGroups] = useState(false);
   const [showManualBracket, setShowManualBracket] = useState(false);
+  const [showBracketMode, setShowBracketMode] = useState(false);
   const [showBracketCrossings, setShowBracketCrossings] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [pendingGroups, setPendingGroups] = useState<Record<string, string[]>>({});
   const [pendingSchedule, setPendingSchedule] = useState<ScheduleConfig | undefined>();
+  // Tier for the currently-open BracketCrossingsModal: `'gold'` during
+  // the first step of the division flow, `'silver'` during the second,
+  // `null` for the legacy single-bracket flow.
+  const [currentTier, setCurrentTier] = useState<BracketTier | null>(null);
+  // Mode the admin picked for this category — drives whether
+  // completing the Oro modal opens another one for Plata.
+  const [bracketMode, setBracketMode] = useState<BracketMode | null>(null);
   // True while any generate-round-trip is in flight — drives disable
   // state on every "Generar" button so the admin can't double-submit.
   const [generating, setGenerating] = useState(false);
@@ -147,19 +158,32 @@ export function FixturesTab({
     if (resolved !== null) openManualModal();
   };
 
-  /** "Definir Eliminación Directa" button — post-groups bracket flow. */
+  /** "Definir Eliminación Directa" button — post-groups bracket flow.
+   *  Always goes through the mode picker (single vs Oro+Plata) once a
+   *  category is resolved. Single-category + one-group tournaments
+   *  still need the mode step so the admin consciously opts in or out
+   *  of the division. */
   const startPostGroupsCrossings = () => {
     const resolved = flow.openPostGroupsFlow();
-    if (resolved !== null) setShowBracketCrossings(true);
+    if (resolved !== null) setShowBracketMode(true);
   };
 
   const handlePickCategory = (category: string) => {
     const target = flow.pick(category);
     if (target === 'post-groups') {
-      setShowBracketCrossings(true);
+      setShowBracketMode(true);
     } else {
       openManualModal();
     }
+  };
+
+  /** Transition from the mode picker to the crossings modal, tagging
+   *  the first step of the division flow as the Oro bracket. */
+  const handlePickBracketMode = (mode: BracketMode) => {
+    setBracketMode(mode);
+    setShowBracketMode(false);
+    setCurrentTier(mode === 'division' ? 'gold' : null);
+    setShowBracketCrossings(true);
   };
 
   const handleManualGroupsGenerate = async (
@@ -241,10 +265,29 @@ export function FixturesTab({
   ) => {
     setGenerating(true);
     try {
-      const bracket = await api.generateBracketCrossings(id, seeds);
+      const bracket = await api.generateBracketCrossings(id, seeds, {
+        categoryFilter: flow.pickedCategory ?? undefined,
+        bracketTier: currentTier ?? undefined,
+      });
       onBracketUpdated(bracket);
+      // Division flow: after finishing Oro, re-open the modal for Plata.
+      // After Plata (or the single-bracket flow), close and reset.
+      if (bracketMode === 'division' && currentTier === 'gold') {
+        toast.success('Bracket Oro generado. Ahora definí el bracket Plata.');
+        setCurrentTier('silver');
+        // Keep the modal open — swapping `tier` re-renders the header/
+        // button but `useEffect` inside the modal resets the matchups
+        // when `matchCount` changes.
+        return;
+      }
       setShowBracketCrossings(false);
-      toast.success(`Bracket generado con ${bracket.length} partidos`);
+      setCurrentTier(null);
+      setBracketMode(null);
+      toast.success(
+        currentTier === 'silver'
+          ? `Bracket Plata generado con ${bracket.filter((b) => b.round.includes('|silver|')).length} partidos`
+          : `Bracket generado con ${bracket.length} partidos`,
+      );
     } catch (err) {
       toast.error(getErrorMessage(err, 'Error al generar bracket'));
     } finally {
@@ -386,7 +429,8 @@ export function FixturesTab({
             <AlertDialogAction
               onClick={() => {
                 setShowRegenerateDialog(false);
-                startCategoryFlow();
+                const resolved = flow.openInitialFlow();
+                if (resolved !== null) openManualModal();
               }}
               className="bg-spk-red hover:bg-spk-red-dark"
             >
@@ -440,6 +484,16 @@ export function FixturesTab({
         generating={generating}
       />
 
+      <BracketModePickerDialog
+        open={showBracketMode}
+        category={flow.pickedCategory}
+        onClose={() => {
+          setShowBracketMode(false);
+          flow.reset();
+        }}
+        onPick={handlePickBracketMode}
+      />
+
       <BracketCrossingsModal
         open={showBracketCrossings}
         groupNames={
@@ -450,6 +504,8 @@ export function FixturesTab({
         onClose={() => {
           setShowBracketCrossings(false);
           setPendingGroups({});
+          setCurrentTier(null);
+          setBracketMode(null);
         }}
         onGenerate={
           Object.keys(pendingGroups).length > 0
@@ -457,6 +513,7 @@ export function FixturesTab({
             : handlePostGroupsBracketCrossings
         }
         generating={generating}
+        tier={currentTier}
       />
     </>
   );

@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
+import { Award, Medal } from 'lucide-react';
 import type { BracketMatch } from '../../types';
+import type { BracketTier } from '../../lib/phase';
 import { FONT, type BracketDims } from './dims';
 import { BracketMatchBox } from './BracketMatchBox';
 import { ThirdPlaceCard } from './ThirdPlaceCard';
@@ -13,15 +15,24 @@ import {
  * Single-category bracket. Renders the knockout rounds as SVG columns
  * with Bezier connectors, plus an optional 3rd-place card at the
  * bottom when the tournament includes one.
+ *
+ * Category-level header (the big red-underlined `<h2>`) is owned by
+ * the wrapper (`Bracket.tsx` for public, `BracketView` for admin) so
+ * multi-tier divisions (Oro + Plata within one category) share a
+ * single heading above the two sub-brackets.
  */
 export function CategoryBracket({
   category,
   bracketMatches,
   dims,
+  tier = null,
 }: {
   category: string;
   bracketMatches: BracketMatch[];
   dims: BracketDims;
+  /** When set, a smaller "Oro"/"Plata" sub-header appears above the
+   *  bracket SVG with a medal icon in the tier's color. */
+  tier?: BracketTier | null;
 }) {
   const { MATCH_W, MATCH_H, COL_GAP, ROW_GAP, HEADER_H } = dims;
   const ROUND_W = MATCH_W + COL_GAP;
@@ -48,19 +59,22 @@ export function CategoryBracket({
   const totalH = HEADER_H + contentH + 24;
   const totalW = bracketRounds.length * ROUND_W + 40;
 
+  const tierLabel =
+    tier === 'gold' ? 'División Oro' : tier === 'silver' ? 'División Plata' : null;
+  const TierIcon = tier === 'gold' ? Award : tier === 'silver' ? Medal : null;
+  const tierColor =
+    tier === 'gold' ? 'text-amber-500' : tier === 'silver' ? 'text-slate-400' : '';
+
   return (
     <div>
-      {category && (
-        <h2
-          className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-5 pb-2 sm:pb-3 uppercase"
-          style={{
-            ...FONT,
-            letterSpacing: '-0.02em',
-            borderBottom: '3px solid var(--brand-red)',
-          }}
+      {tierLabel && TierIcon && (
+        <h3
+          className={`flex items-center gap-2 text-lg sm:text-xl font-bold mb-3 uppercase ${tierColor}`}
+          style={{ ...FONT, letterSpacing: '0.04em' }}
         >
-          {category}
-        </h2>
+          <TierIcon className="w-5 h-5" />
+          {tierLabel}
+        </h3>
       )}
 
       <div

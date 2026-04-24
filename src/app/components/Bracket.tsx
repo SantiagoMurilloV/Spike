@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { BracketMatch } from '../types';
+import type { BracketTier } from '../lib/phase';
 import { useIsMobile } from './ui/use-mobile';
-import { DIMENSIONS } from './bracket/dims';
+import { DIMENSIONS, FONT } from './bracket/dims';
 import { fireChampionConfetti, parseRound } from './bracket/helpers';
 import { CategoryBracket } from './bracket/CategoryBracket';
 
@@ -13,38 +14,62 @@ interface BracketProps {
 }
 
 /**
- * Top-level bracket renderer. Splits the matches by category and
- * delegates each to CategoryBracket. Also watches for new champions
- * and fires the confetti burst (deduped per final id).
+ * Top-level bracket renderer. Splits matches first by category (big
+ * red-underlined header) and then by tier (Oro / Plata sub-headers,
+ * when present). A category with no tiered matches renders as a single
+ * CategoryBracket; a category with both Oro and Plata matches renders
+ * two side-by-side under the same category header.
+ *
+ * Also watches for new champions and fires the confetti burst (deduped
+ * per final id).
  */
 export function Bracket({ matches }: BracketProps) {
   const isMobile = useIsMobile();
   const dims = isMobile ? DIMENSIONS.mobile : DIMENSIONS.desktop;
 
+  // First split: one entry per category, with matches partitioned by
+  // tier. Order of tiers inside each category is stable (gold → silver
+  // → null) so the UI is predictable across renders.
   const categories = useMemo(() => {
-    const map = new Map<string, BracketMatch[]>();
+    type TierBucket = { tier: BracketTier | null; matches: BracketMatch[] };
+    const map = new Map<string, Map<BracketTier | null, BracketMatch[]>>();
     for (const m of matches) {
-      const { category } = parseRound(m.round);
-      if (!map.has(category)) map.set(category, []);
-      map.get(category)!.push(m);
+      const { category, tier } = parseRound(m.round);
+      if (!map.has(category)) map.set(category, new Map());
+      const tierMap = map.get(category)!;
+      if (!tierMap.has(tier)) tierMap.set(tier, []);
+      tierMap.get(tier)!.push(m);
     }
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+    const tierOrder: Array<BracketTier | null> = ['gold', 'silver', null];
+    return [...map.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([category, tierMap]): [string, TierBucket[]] => {
+        const buckets: TierBucket[] = [];
+        for (const t of tierOrder) {
+          const ms = tierMap.get(t);
+          if (ms && ms.length > 0) buckets.push({ tier: t, matches: ms });
+        }
+        return [category, buckets];
+      });
   }, [matches]);
 
-  // Fire confetti the first time a final is won — deduped per champion id.
+  // Fire confetti the first time a final is won — deduped per champion
+  // id. Works across tiers: Oro final and Plata final each trigger once.
   const celebratedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    for (const [, catMatches] of categories) {
-      const final = catMatches.find(
-        (m) => parseRound(m.round).name.toLowerCase() === 'final',
-      );
-      if (
-        final?.status === 'completed' &&
-        final.winner &&
-        !celebratedRef.current.has(final.id)
-      ) {
-        celebratedRef.current.add(final.id);
-        fireChampionConfetti();
+    for (const [, buckets] of categories) {
+      for (const b of buckets) {
+        const final = b.matches.find(
+          (m) => parseRound(m.round).name.toLowerCase() === 'final',
+        );
+        if (
+          final?.status === 'completed' &&
+          final.winner &&
+          !celebratedRef.current.has(final.id)
+        ) {
+          celebratedRef.current.add(final.id);
+          fireChampionConfetti();
+        }
       }
     }
   }, [categories]);
@@ -53,13 +78,32 @@ export function Bracket({ matches }: BracketProps) {
 
   return (
     <div className="space-y-10 sm:space-y-16">
-      {categories.map(([category, catMatches]) => (
-        <CategoryBracket
-          key={category || '_'}
-          category={category}
-          bracketMatches={catMatches}
-          dims={dims}
-        />
+      {categories.map(([category, buckets]) => (
+        <section key={category || '_'} className="space-y-6">
+          {category && (
+            <h2
+              className="text-2xl sm:text-3xl font-bold pb-2 sm:pb-3 uppercase"
+              style={{
+                ...FONT,
+                letterSpacing: '-0.02em',
+                borderBottom: '3px solid var(--brand-red)',
+              }}
+            >
+              {category}
+            </h2>
+          )}
+          <div className="space-y-8">
+            {buckets.map((b) => (
+              <CategoryBracket
+                key={`${category}-${b.tier ?? 'single'}`}
+                category={category}
+                bracketMatches={b.matches}
+                dims={dims}
+                tier={buckets.length > 1 ? b.tier : null}
+              />
+            ))}
+          </div>
+        </section>
       ))}
     </div>
   );

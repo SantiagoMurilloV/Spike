@@ -6,6 +6,7 @@
  */
 
 export { CategoryPickerDialog } from './fixture-modals/CategoryPickerDialog';
+export { BracketModePickerDialog } from './fixture-modals/BracketModePickerDialog';
 export { FixtureModeDialog } from './fixture-modals/FixtureModeDialog';
 export { AutomaticScheduleModal } from './fixture-modals/AutomaticScheduleModal';
 export { ManualGroupsModal } from './fixture-modals/ManualGroupsModal';
@@ -15,3 +16,4 @@ export { BracketCrossingsModal } from './fixture-modals/BracketCrossingsModal';
 export type { ScheduleConfig } from './fixture-modals/shared';
 export type { ManualBracketPositionsProps } from './fixture-modals/ManualBracketPositionsModal';
 export type { BracketCrossingsModalProps } from './fixture-modals/BracketCrossingsModal';
+export type { BracketMode } from './fixture-modals/BracketModePickerDialog';

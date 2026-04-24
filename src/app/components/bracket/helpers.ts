@@ -2,7 +2,12 @@
 // @ts-ignore — canvas-confetti ships no types
 import confetti from 'canvas-confetti';
 import { BRAND_COLORS } from './dims';
-import { categoryOfBracketRound, bracketRoundName } from '../../lib/phase';
+import {
+  categoryOfBracketRound,
+  bracketRoundName,
+  tierOfBracketRound,
+  type BracketTier,
+} from '../../lib/phase';
 
 /**
  * Celebratory confetti when a tournament final is won. Respects
@@ -21,11 +26,21 @@ export function fireChampionConfetti(): void {
 }
 
 /**
- * Split a bracket round string into category + round name. Thin
+ * Split a bracket round string into category + tier + round name. Thin
  * wrapper over lib/phase helpers so call sites here read naturally.
+ * `tier` is only populated for Oro/Plata division brackets — ordinary
+ * single brackets return `null`.
  */
-export function parseRound(round: string): { category: string; name: string } {
-  return { category: categoryOfBracketRound(round), name: bracketRoundName(round) };
+export function parseRound(round: string): {
+  category: string;
+  name: string;
+  tier: BracketTier | null;
+} {
+  return {
+    category: categoryOfBracketRound(round),
+    name: bracketRoundName(round),
+    tier: tierOfBracketRound(round),
+  };
 }
 
 /**

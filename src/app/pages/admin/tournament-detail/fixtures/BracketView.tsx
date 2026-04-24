@@ -1,17 +1,68 @@
-import { Edit } from 'lucide-react';
+import { Edit, Award, Medal } from 'lucide-react';
 import { BracketMatch } from '../../../../types';
 import { Badge } from '../../../../components/ui/badge';
 import { CategorySection } from '../../../../components/admin/CategorySection';
 import { ScoreSetsEditor } from '../../../../components/admin/ScoreSetsEditor';
-import { categoryOfBracketRound, bracketRoundName } from '../../../../lib/phase';
+import {
+  categoryOfBracketRound,
+  bracketRoundName,
+  tierOfBracketRound,
+  type BracketTier,
+} from '../../../../lib/phase';
 import type { useScoreEditor } from '../../../../hooks/useScoreEditor';
 
 type BracketEditor = ReturnType<typeof useScoreEditor<BracketMatch>>;
+
+interface TierBucket {
+  tier: BracketTier | null;
+  matches: BracketMatch[];
+}
+
+/**
+ * Group a category's bracket rows by tier. Keeps the tier order
+ * stable (gold → silver → null) so the UI doesn't shuffle between
+ * renders when new matches stream in.
+ */
+function groupByTier(rows: BracketMatch[]): TierBucket[] {
+  const map = new Map<BracketTier | null, BracketMatch[]>();
+  for (const r of rows) {
+    const tier = tierOfBracketRound(r.round);
+    if (!map.has(tier)) map.set(tier, []);
+    map.get(tier)!.push(r);
+  }
+  const tierOrder: Array<BracketTier | null> = ['gold', 'silver', null];
+  const buckets: TierBucket[] = [];
+  for (const t of tierOrder) {
+    const ms = map.get(t);
+    if (ms && ms.length > 0) buckets.push({ tier: t, matches: ms });
+  }
+  return buckets;
+}
+
+function tierHeading(tier: BracketTier) {
+  return tier === 'gold' ? 'División Oro' : 'División Plata';
+}
+
+function TierHeader({ tier }: { tier: BracketTier }) {
+  const Icon = tier === 'gold' ? Award : Medal;
+  const color = tier === 'gold' ? 'text-amber-500' : 'text-slate-400';
+  return (
+    <h4
+      className={`flex items-center gap-2 text-sm font-bold uppercase mb-2 ${color}`}
+      style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
+    >
+      <Icon className="w-4 h-4" />
+      {tierHeading(tier)}
+    </h4>
+  );
+}
 
 /**
  * Bracket-match list organized by category — collapses to accordions
  * when there's more than one category, else renders inline. Each row
  * has an inline score editor tied to the shared `BracketEditor` hook.
+ * Within a category, rows are further split by tier (Oro / Plata)
+ * when the tournament uses the division format.
  */
 export function BracketByCategory({
   bracketMatches,
@@ -38,6 +89,23 @@ export function BracketByCategory({
     </div>
   );
 
+  const renderCategoryBody = (rows: BracketMatch[]) => {
+    const buckets = groupByTier(rows);
+    if (buckets.length === 1 && buckets[0].tier === null) {
+      return renderRows(buckets[0].matches);
+    }
+    return (
+      <div className="space-y-4">
+        {buckets.map((b) => (
+          <div key={b.tier ?? '_none'}>
+            {b.tier && <TierHeader tier={b.tier} />}
+            {renderRows(b.matches)}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   if (!hasMultipleCategories) {
     return (
       <div>
@@ -47,7 +115,7 @@ export function BracketByCategory({
         >
           Bracket de Eliminación
         </h3>
-        {renderRows(categories[0]?.[1] ?? [])}
+        {renderCategoryBody(categories[0]?.[1] ?? [])}
       </div>
     );
   }
@@ -61,7 +129,7 @@ export function BracketByCategory({
           count={rows.length}
           subtitle={`${rows.length} ${rows.length === 1 ? 'partido' : 'partidos'}`}
         >
-          {renderRows(rows)}
+          {renderCategoryBody(rows)}
         </CategorySection>
       ))}
     </div>
