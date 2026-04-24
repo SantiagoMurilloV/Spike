@@ -94,6 +94,7 @@ export function AdminTournaments() {
         categories: tournament.categories,
         enrollmentDeadline: tournament.enrollmentDeadline ?? null,
         playersPerTeam: tournament.playersPerTeam,
+        bracketMode: tournament.bracketMode,
       };
       await updateTournament(editingTournament.id, dto);
       toast.success('Torneo actualizado correctamente');
@@ -115,6 +116,7 @@ export function AdminTournaments() {
         categories: tournament.categories,
         enrollmentDeadline: tournament.enrollmentDeadline ?? null,
         playersPerTeam: tournament.playersPerTeam,
+        bracketMode: tournament.bracketMode,
       };
       await addTournament(dto);
       toast.success('Torneo creado correctamente');

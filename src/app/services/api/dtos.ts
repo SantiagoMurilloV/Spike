@@ -27,6 +27,10 @@ export interface CreateTournamentDto {
   enrollmentDeadline?: string | null;
   /** Recommended roster cap (default 12). */
   playersPerTeam?: number;
+  /** Bracket strategy — 'manual' = drag-pairs flow, 'divisions' = auto
+   *  VNL Oro/Plata driven by the standings table. Defaults to 'manual'
+   *  on the server. */
+  bracketMode?: 'manual' | 'divisions';
 }
 
 export type UpdateTournamentDto = Partial<CreateTournamentDto>;

@@ -78,6 +78,7 @@ export function toFrontendTournament(t: BackendTournament): Tournament {
     ownerId: t.ownerId,
     enrollmentDeadline: t.enrollmentDeadline,
     playersPerTeam: t.playersPerTeam,
+    bracketMode: t.bracketMode ?? 'manual',
   };
 }
 

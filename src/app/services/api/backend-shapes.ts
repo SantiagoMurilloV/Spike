@@ -39,6 +39,8 @@ export interface BackendTournament {
   ownerId?: string;
   enrollmentDeadline?: string;
   playersPerTeam?: number;
+  /** 'manual' | 'divisions'. See Tournament.bracketMode. */
+  bracketMode?: 'manual' | 'divisions';
 }
 
 export interface BackendEnrolledTeam {
