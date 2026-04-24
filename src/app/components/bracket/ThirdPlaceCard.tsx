@@ -8,8 +8,18 @@ import { formatBracketPlaceholder } from './helpers';
  * HTML version of a bracket match, used for the 3rd-place play-off
  * card. Rendered below the main SVG with a bigger, Tailwind-friendly
  * layout since it's a single match and doesn't need the SVG precision.
+ *
+ * `compact` switches to a tighter version intended to live aligned
+ * right below the final column inside the bracket card — smaller
+ * padding, smaller fonts, thinner color rail.
  */
-export function ThirdPlaceCard({ match }: { match: BracketMatch }) {
+export function ThirdPlaceCard({
+  match,
+  compact = false,
+}: {
+  match: BracketMatch;
+  compact?: boolean;
+}) {
   const hasWinner = match.winner !== undefined;
   const t1Won = hasWinner && match.winner?.id === match.team1?.id;
   const t2Won = hasWinner && match.winner?.id === match.team2?.id;
@@ -19,8 +29,15 @@ export function ThirdPlaceCard({ match }: { match: BracketMatch }) {
 
   if (!match.team1 && !match.team2 && !placeholder1 && !placeholder2) {
     return (
-      <div className="bg-black/5 border-2 border-dashed border-black/15 rounded-sm text-center py-6">
-        <span className="text-sm text-black/30 font-bold uppercase" style={FONT}>
+      <div
+        className={`bg-black/5 border-2 border-dashed border-black/15 rounded-sm text-center ${
+          compact ? 'py-3' : 'py-6'
+        }`}
+      >
+        <span
+          className={`${compact ? 'text-xs' : 'text-sm'} text-black/30 font-bold uppercase`}
+          style={FONT}
+        >
           Por definir
         </span>
       </div>
@@ -30,7 +47,10 @@ export function ThirdPlaceCard({ match }: { match: BracketMatch }) {
   return (
     <div
       className="bg-white rounded-sm overflow-hidden"
-      style={{ border: '2px solid rgba(0,0,0,0.10)', boxShadow: 'var(--shadow-card)' }}
+      style={{
+        border: compact ? '1px solid rgba(0,0,0,0.10)' : '2px solid rgba(0,0,0,0.10)',
+        boxShadow: 'var(--shadow-card)',
+      }}
     >
       <TeamRow
         team={match.team1}
@@ -38,6 +58,7 @@ export function ThirdPlaceCard({ match }: { match: BracketMatch }) {
         isWinner={t1Won}
         isLoser={match.status === 'completed' && hasWinner && !t1Won}
         placeholder={placeholder1}
+        compact={compact}
       />
       <div className="border-t border-black/10" />
       <TeamRow
@@ -46,6 +67,7 @@ export function ThirdPlaceCard({ match }: { match: BracketMatch }) {
         isWinner={t2Won}
         isLoser={match.status === 'completed' && hasWinner && !t2Won}
         placeholder={placeholder2}
+        compact={compact}
       />
     </div>
   );
@@ -57,18 +79,20 @@ function TeamRow({
   isWinner,
   isLoser,
   placeholder,
+  compact,
 }: {
   team?: BracketMatch['team1'];
   score?: number;
   isWinner: boolean;
   isLoser: boolean;
   placeholder?: string;
+  compact?: boolean;
 }) {
   if (!team) {
     return (
-      <div className="px-4 py-3 bg-black/5">
+      <div className={`${compact ? 'px-3 py-2' : 'px-4 py-3'} bg-black/5`}>
         <span
-          className="text-sm text-black/40 font-bold uppercase"
+          className={`${compact ? 'text-xs' : 'text-sm'} text-black/40 font-bold uppercase`}
           style={{ ...FONT, letterSpacing: '0.04em' }}
         >
           {placeholder || 'Por definir'}
@@ -79,19 +103,19 @@ function TeamRow({
 
   return (
     <div
-      className={`relative flex items-center justify-between px-4 py-3 ${
-        isWinner ? 'bg-spk-red/5' : ''
-      }`}
+      className={`relative flex items-center justify-between ${
+        compact ? 'px-3 py-2' : 'px-4 py-3'
+      } ${isWinner ? 'bg-spk-red/5' : ''}`}
     >
       <div
-        className="absolute left-0 top-0 bottom-0 w-[5px]"
+        className={`absolute left-0 top-0 bottom-0 ${compact ? 'w-[4px]' : 'w-[5px]'}`}
         style={{ backgroundColor: team.colors.primary }}
         aria-hidden="true"
       />
-      <div className="flex items-center gap-3 flex-1 min-w-0 pl-2">
+      <div className={`flex items-center ${compact ? 'gap-2' : 'gap-3'} flex-1 min-w-0 pl-2`}>
         <TeamAvatar team={team} size="sm" />
         <span
-          className={`text-base font-bold uppercase truncate ${
+          className={`${compact ? 'text-sm' : 'text-base'} font-bold uppercase truncate ${
             isLoser ? 'text-black/45' : isWinner ? 'text-black' : 'text-black/80'
           }`}
           style={{ ...FONT, letterSpacing: '-0.01em' }}
@@ -102,7 +126,7 @@ function TeamRow({
       <div className="flex items-center gap-2 flex-shrink-0">
         {score !== undefined && (
           <span
-            className={`text-xl font-bold tabular-nums ${
+            className={`${compact ? 'text-base' : 'text-xl'} font-bold tabular-nums ${
               isWinner ? 'text-spk-red' : isLoser ? 'text-black/35' : 'text-black/80'
             }`}
             style={{ ...FONT, letterSpacing: '-0.02em' }}
@@ -110,7 +134,12 @@ function TeamRow({
             {score}
           </span>
         )}
-        {isWinner && <Trophy className="w-4 h-4 text-spk-gold" aria-hidden="true" />}
+        {isWinner && (
+          <Trophy
+            className={`${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} text-spk-gold`}
+            aria-hidden="true"
+          />
+        )}
       </div>
     </div>
   );

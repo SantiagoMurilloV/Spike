@@ -84,56 +84,69 @@ export function CategoryBracket({
           border: '1px solid rgba(0,0,0,0.06)',
         }}
       >
-        <svg
-          width={totalW}
-          height={totalH}
-          className="block"
-          style={{ minWidth: totalW }}
-          role="img"
-          aria-label={category ? `Bracket de ${category}` : 'Bracket del torneo'}
-        >
-          {/* Connectors — drawn BEFORE boxes so they sit behind */}
-          {bracketRounds.map((round, rIdx) => {
-            if (rIdx >= bracketRounds.length - 1) return null;
-            return (
-              <RoundConnectors
-                key={`connectors-${round.round}`}
-                roundIdx={rIdx}
+        <div style={{ minWidth: totalW, width: totalW }}>
+          <svg
+            width={totalW}
+            height={totalH}
+            className="block"
+            role="img"
+            aria-label={category ? `Bracket de ${category}` : 'Bracket del torneo'}
+          >
+            {/* Connectors — drawn BEFORE boxes so they sit behind */}
+            {bracketRounds.map((round, rIdx) => {
+              if (rIdx >= bracketRounds.length - 1) return null;
+              return (
+                <RoundConnectors
+                  key={`connectors-${round.round}`}
+                  roundIdx={rIdx}
+                  round={round}
+                  nextRound={bracketRounds[rIdx + 1]}
+                  contentH={contentH}
+                  dims={dims}
+                  roundW={ROUND_W}
+                />
+              );
+            })}
+
+            {/* Match boxes */}
+            {bracketRounds.map((round, rIdx) => (
+              <RoundColumn
+                key={round.round}
                 round={round}
-                nextRound={bracketRounds[rIdx + 1]}
+                roundIdx={rIdx}
+                totalRounds={bracketRounds.length}
                 contentH={contentH}
                 dims={dims}
                 roundW={ROUND_W}
               />
-            );
-          })}
+            ))}
+          </svg>
 
-          {/* Match boxes */}
-          {bracketRounds.map((round, rIdx) => (
-            <RoundColumn
-              key={round.round}
-              round={round}
-              roundIdx={rIdx}
-              totalRounds={bracketRounds.length}
-              contentH={contentH}
-              dims={dims}
-              roundW={ROUND_W}
-            />
-          ))}
-        </svg>
-      </div>
-
-      {thirdPlace && (
-        <div className="mt-6 max-w-md">
-          <h3
-            className="text-sm font-bold mb-3 uppercase text-black/60"
-            style={{ ...FONT, letterSpacing: '0.14em' }}
-          >
-            3er Puesto
-          </h3>
-          <ThirdPlaceCard match={thirdPlace} />
+          {/* 3rd-place mini bracket — aligned under the final column so
+              it reads as a small satellite of the finals row instead of
+              drifting far below to the left. Uses the compact variant of
+              ThirdPlaceCard to fit neatly in one match-width slot. */}
+          {thirdPlace && (
+            <div
+              style={{
+                paddingLeft: (bracketRounds.length - 1) * ROUND_W + 20,
+                paddingRight: 20,
+                marginTop: -4,
+              }}
+            >
+              <div style={{ width: MATCH_W }}>
+                <div
+                  className="text-[10px] font-bold uppercase text-black/45 mb-1.5 text-center"
+                  style={{ ...FONT, letterSpacing: '0.18em' }}
+                >
+                  3er Puesto
+                </div>
+                <ThirdPlaceCard match={thirdPlace} compact />
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
