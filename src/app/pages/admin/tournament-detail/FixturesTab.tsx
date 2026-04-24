@@ -31,10 +31,8 @@ import {
   type BracketMode,
 } from '../../../components/admin/ManualFixtureModal';
 import type { BracketTier } from '../../../lib/phase';
-import { CategorySection } from '../../../components/admin/CategorySection';
-import { humanizePhase } from '../../../lib/phase';
 import type { useScoreEditor } from '../../../hooks/useScoreEditor';
-import { GroupMatricesByCategory, EnfrentamientoRow } from './fixtures/GroupsView';
+import { GroupMatricesByCategory } from './fixtures/GroupsView';
 import { BracketByCategory } from './fixtures/BracketView';
 import { useCategoryFlow } from './fixtures/useCategoryFlow';
 import { useFixturesDerived } from './fixtures/useFixturesDerived';
@@ -96,8 +94,6 @@ export function FixturesTab({
   const [showBracketMode, setShowBracketMode] = useState(false);
   const [showBracketCrossings, setShowBracketCrossings] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
-  const [pendingGroups, setPendingGroups] = useState<Record<string, string[]>>({});
-  const [pendingSchedule, setPendingSchedule] = useState<ScheduleConfig | undefined>();
   // Tier for the currently-open BracketCrossingsModal: `'gold'` during
   // the first step of the division flow, `'silver'` during the second,
   // `null` for the legacy single-bracket flow.
@@ -114,8 +110,10 @@ export function FixturesTab({
   const flow = useCategoryFlow({ tournament, enrolledTeams, matches });
 
   // Derived collections consumed by the render block.
-  const { groupNames, matchesByGroup, standingsByGroup, matchesByPhaseGroup } =
-    useFixturesDerived({ matches, standings });
+  const { groupNames, matchesByGroup, standingsByGroup } = useFixturesDerived({
+    matches,
+    standings,
+  });
 
   // ── Handlers ────────────────────────────────────────────────────
 
@@ -186,17 +184,16 @@ export function FixturesTab({
     setShowBracketCrossings(true);
   };
 
+  /**
+   * Persist the groups the admin drew for the picked category. The
+   * backend auto-creates an empty bracket shape for `groups+knockout`
+   * but WITHOUT placeholders — the admin defines crossings later via
+   * "Definir Eliminación Directa", which is a separate conscious step.
+   */
   const handleManualGroupsGenerate = async (
     groups: Record<string, string[]>,
     schedule: ScheduleConfig,
   ) => {
-    if (tournament.format === 'groups+knockout') {
-      setPendingGroups(groups);
-      setPendingSchedule(schedule);
-      setShowManualGroups(false);
-      setShowBracketCrossings(true);
-      return;
-    }
     setGenerating(true);
     try {
       const result = await api.generateManualFixtures(id, {
@@ -206,9 +203,9 @@ export function FixturesTab({
       });
       await refreshAfterGenerate(result);
       setShowManualGroups(false);
-      toast.success('Cruces generados');
+      toast.success('Grupos generados');
     } catch (err) {
-      toast.error(getErrorMessage(err, 'Error al generar cruces'));
+      toast.error(getErrorMessage(err, 'Error al generar grupos'));
     } finally {
       setGenerating(false);
     }
@@ -228,33 +225,6 @@ export function FixturesTab({
       toast.success('Bracket generado');
     } catch (err) {
       toast.error(getErrorMessage(err, 'Error al generar bracket'));
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const handleInitialBracketCrossings = async (
-    seeds: Array<{ position: number; label: string }>,
-  ) => {
-    setGenerating(true);
-    try {
-      const bracketSeeds = seeds.map((s) => ({
-        position: s.position,
-        teamId: null as string | null,
-        label: s.label,
-      }));
-      const result = await api.generateManualFixtures(id, {
-        groups: pendingGroups,
-        schedule: pendingSchedule,
-        bracketSeeds,
-        categoryFilter: flow.pickedCategory ?? undefined,
-      });
-      await refreshAfterGenerate(result);
-      setShowBracketCrossings(false);
-      setPendingGroups({});
-      toast.success('Grupos y Bracket generados correctamente');
-    } catch (err) {
-      toast.error(getErrorMessage(err, 'Error al generar formato completo'));
     } finally {
       setGenerating(false);
     }
@@ -376,52 +346,50 @@ export function FixturesTab({
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content — two top-level sections mirror the public layout:
+          "Grupos" lists the round-robin matrices per category, "Brackets"
+          lists the knockout per category (with Oro/Plata when present).
+          Enfrentamientos individuales viven en la tab Partidos. */}
       {matches.length === 0 && bracketMatches.length === 0 ? (
         <div className="text-center py-12">
           <Trophy className="w-12 h-12 text-black/20 mx-auto mb-3" />
           <p className="text-black/60">No hay cruces generados</p>
           <p className="text-sm text-black/40 mt-1">
-            Inscribe equipos y presiona "Generar Cruces"
+            Inscribe equipos y presioná "Creación de Grupos"
           </p>
         </div>
       ) : (
-        <div className="space-y-6">
-          <GroupMatricesByCategory
-            groupNames={groupNames}
-            matchesByGroup={matchesByGroup}
-            standingsByGroup={standingsByGroup}
-          />
-
-          {matchesByPhaseGroup.map(([label, groupMatches]) => (
-            <CategorySection
-              key={label}
-              title={`Enfrentamientos — ${humanizePhase(label)}`}
-              count={groupMatches.length}
-              subtitle={`${groupMatches.length} ${groupMatches.length === 1 ? 'partido' : 'partidos'}`}
-            >
-              <div className="space-y-2">
-                {groupMatches.map((m) => (
-                  <EnfrentamientoRow key={m.id} match={m} />
-                ))}
-              </div>
-            </CategorySection>
-          ))}
+        <div className="space-y-10">
+          {groupNames.length > 0 && (
+            <section>
+              <SectionHeader title="Grupos" />
+              <GroupMatricesByCategory
+                groupNames={groupNames}
+                matchesByGroup={matchesByGroup}
+                standingsByGroup={standingsByGroup}
+              />
+            </section>
+          )}
 
           {bracketMatches.length > 0 && (
-            <BracketByCategory bracketMatches={bracketMatches} editor={bracketEditor} />
+            <section>
+              <SectionHeader title="Brackets" />
+              <BracketByCategory bracketMatches={bracketMatches} editor={bracketEditor} />
+            </section>
           )}
         </div>
       )}
 
-      {/* Regenerate confirmation */}
+      {/* Regenerate confirmation — deja claro que el próximo paso
+          pregunta la categoría y el alcance se limita a ella. */}
       <AlertDialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Regenerar cruces?</AlertDialogTitle>
+            <AlertDialogTitle>¿Regenerar grupos?</AlertDialogTitle>
             <AlertDialogDescription>
-              Ya existen cruces generados para este torneo. Regenerar eliminará todos los cruces
-              anteriores y sus resultados. Esta acción no se puede deshacer.
+              A continuación elegís la categoría cuyos grupos querés regenerar. Se reemplazan los
+              grupos y resultados de esa categoría; las demás categorías y el bracket no se tocan.
+              Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -434,7 +402,7 @@ export function FixturesTab({
               }}
               className="bg-spk-red hover:bg-spk-red-dark"
             >
-              Regenerar Cruces
+              Elegir categoría
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -496,26 +464,37 @@ export function FixturesTab({
 
       <BracketCrossingsModal
         open={showBracketCrossings}
-        groupNames={
-          Object.keys(pendingGroups).length > 0
-            ? Object.keys(pendingGroups)
-            : flow.groupNamesForPickedCategory
-        }
+        groupNames={flow.groupNamesForPickedCategory}
         onClose={() => {
           setShowBracketCrossings(false);
-          setPendingGroups({});
           setCurrentTier(null);
           setBracketMode(null);
         }}
-        onGenerate={
-          Object.keys(pendingGroups).length > 0
-            ? handleInitialBracketCrossings
-            : handlePostGroupsBracketCrossings
-        }
+        onGenerate={handlePostGroupsBracketCrossings}
         generating={generating}
         tier={currentTier}
       />
     </>
+  );
+}
+
+/**
+ * Big red-underlined heading used for the two top sections ("Grupos"
+ * and "Brackets"). Matches the public-facing tournament page style so
+ * admin + spectator views read the same.
+ */
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <h2
+      className="text-2xl sm:text-3xl font-bold pb-2 sm:pb-3 uppercase mb-4 sm:mb-5"
+      style={{
+        fontFamily: 'Barlow Condensed, sans-serif',
+        letterSpacing: '-0.02em',
+        borderBottom: '3px solid var(--brand-red)',
+      }}
+    >
+      {title}
+    </h2>
   );
 }
 

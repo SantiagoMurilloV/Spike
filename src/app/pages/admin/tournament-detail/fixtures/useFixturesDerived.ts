@@ -4,7 +4,8 @@ import type { Match, StandingsRow } from '../../../../types';
 /**
  * Derived collections the Cruces tab renders. Kept outside the component
  * so FixturesTab stays under its line budget and the memos are
- * individually addressable for tests.
+ * individually addressable for tests. Only group-level collections live
+ * here — individual match lists belong to the Partidos tab.
  */
 export function useFixturesDerived({
   matches,
@@ -51,20 +52,5 @@ export function useFixturesDerived({
     return map;
   }, [matches, standings]);
 
-  /**
-   * Matches grouped by their `phase + group` label. The Cruces tab
-   * renders one CategorySection per entry. League matches fall under
-   * their phase alone (no group).
-   */
-  const matchesByPhaseGroup = useMemo(() => {
-    const grouped: Record<string, Match[]> = {};
-    for (const m of matches) {
-      const key = m.group ? `${m.phase} — ${m.group}` : m.phase;
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(m);
-    }
-    return Object.entries(grouped);
-  }, [matches]);
-
-  return { groupNames, matchesByGroup, standingsByGroup, matchesByPhaseGroup };
+  return { groupNames, matchesByGroup, standingsByGroup };
 }
