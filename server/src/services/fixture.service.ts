@@ -2,7 +2,12 @@ import { getPool } from '../config/database';
 import type { Match, BracketMatch, FixtureResult, Tournament, Team } from '../types';
 import { NotFoundError, ValidationError } from '../middleware/errorHandler';
 import { enrollmentService } from './enrollment.service';
-import type { MatchFixture, BracketFixture, ScheduleConfig } from './fixture/types';
+import type {
+  MatchFixture,
+  BracketFixture,
+  ScheduleConfig,
+  BracketTier,
+} from './fixture/types';
 import { MIN_TEAMS, MIN_TEAMS_MESSAGES } from './fixture/types';
 import {
   shuffleTeams,
@@ -21,6 +26,7 @@ import {
   persistBracket,
   clearTournamentFixtures,
   clearCategoryFixtures,
+  clearCategoryBracket,
 } from './fixture/persist';
 
 // Legacy named exports kept for any server-side caller that imports
@@ -35,7 +41,12 @@ export {
   getRoundName,
   generateBracketStructure,
 } from './fixture/algorithms';
-export type { MatchFixture, BracketFixture, ScheduleConfig } from './fixture/types';
+export type {
+  MatchFixture,
+  BracketFixture,
+  ScheduleConfig,
+  BracketTier,
+} from './fixture/types';
 
 /**
  * FixtureGenerator orchestrates fixture generation against the DB.
@@ -167,8 +178,18 @@ export class FixtureGenerator {
   async generateBracketCrossings(
     tournamentId: string,
     seeds: Array<{ position: number; label: string }>,
+    options: {
+      /** When present, rounds get prefixed with this category and the
+       *  DELETE is scoped so other categories' brackets survive. */
+      categoryFilter?: string;
+      /** When present, round strings carry the tier as the middle
+       *  segment ("Category|gold|final") and the DELETE is scoped
+       *  further so Oro regeneration doesn't wipe Plata (and vice-versa). */
+      bracketTier?: BracketTier;
+    } = {},
   ): Promise<BracketMatch[]> {
     const pool = getPool();
+    const { categoryFilter, bracketTier } = options;
 
     const tournamentResult = await pool.query(
       'SELECT * FROM tournaments WHERE id = $1',
@@ -176,25 +197,30 @@ export class FixtureGenerator {
     );
     if (tournamentResult.rows.length === 0) throw new NotFoundError('Torneo');
 
-    // Detect category prefix from existing group_name values so simple
-    // "1|A" seeds can be rewritten to full "1|Category|A" labels.
-    const groupNamesResult = await pool.query(
-      'SELECT DISTINCT group_name FROM matches WHERE tournament_id = $1 AND group_name IS NOT NULL',
-      [tournamentId],
-    );
-    const dbGroupNames: string[] = groupNamesResult.rows.map(
-      (r: Record<string, unknown>) => r.group_name as string,
-    );
-    const categories = new Set<string>();
-    for (const gn of dbGroupNames) {
-      const pipeIdx = gn.lastIndexOf('|');
-      if (pipeIdx > -1) categories.add(gn.substring(0, pipeIdx));
+    // Prefer the explicit category from the picker. Fallback to detection
+    // from existing group_name values so legacy callers (no picker) keep
+    // working — only safe when there's exactly one category.
+    let category: string | undefined = categoryFilter;
+    if (!category) {
+      const groupNamesResult = await pool.query(
+        'SELECT DISTINCT group_name FROM matches WHERE tournament_id = $1 AND group_name IS NOT NULL',
+        [tournamentId],
+      );
+      const dbGroupNames: string[] = groupNamesResult.rows.map(
+        (r: Record<string, unknown>) => r.group_name as string,
+      );
+      const categories = new Set<string>();
+      for (const gn of dbGroupNames) {
+        const pipeIdx = gn.lastIndexOf('|');
+        if (pipeIdx > -1) categories.add(gn.substring(0, pipeIdx));
+      }
+      category = categories.size === 1 ? [...categories][0] : undefined;
     }
-    const category = categories.size === 1 ? [...categories][0] : undefined;
 
     const bracketFixtures = buildBracketFromSeeds(
       seeds.map((s) => ({ position: s.position, teamId: null, label: s.label })),
       category,
+      bracketTier,
     );
 
     // Try to resolve placeholders from current standings.
@@ -217,10 +243,18 @@ export class FixtureGenerator {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query(
-        'DELETE FROM bracket_matches WHERE tournament_id = $1',
-        [tournamentId],
-      );
+      // Scoped DELETE priorities:
+      //   1. category + tier → only that tier's bracket rows
+      //   2. category alone  → every bracket row of the category
+      //   3. neither         → legacy full wipe (single-category torneo)
+      if (category) {
+        await clearCategoryBracket(client, tournamentId, category, bracketTier);
+      } else {
+        await client.query(
+          'DELETE FROM bracket_matches WHERE tournament_id = $1',
+          [tournamentId],
+        );
+      }
 
       const persisted: BracketMatch[] = [];
       for (const bf of bracketFixtures) {

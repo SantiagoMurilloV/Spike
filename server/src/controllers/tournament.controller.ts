@@ -276,11 +276,17 @@ export async function generateBracketCrossings(req: Request, res: Response, next
   try {
     const id = req.params.id as string;
     validateUUID(id, 'ID de torneo');
-    const { seeds } = req.body;
+    const { seeds, categoryFilter, bracketTier } = req.body;
     if (!seeds || !Array.isArray(seeds) || seeds.length === 0) {
       throw new ValidationError('Se requieren las posiciones del bracket (seeds)');
     }
-    const bracketMatches = await fixtureGenerator.generateBracketCrossings(id, seeds);
+    if (bracketTier && bracketTier !== 'gold' && bracketTier !== 'silver') {
+      throw new ValidationError('bracketTier debe ser "gold" o "silver"');
+    }
+    const bracketMatches = await fixtureGenerator.generateBracketCrossings(id, seeds, {
+      categoryFilter,
+      bracketTier,
+    });
     res.json({ bracketMatches, generatedAt: new Date().toISOString() });
   } catch (error) {
     next(error);

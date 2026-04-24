@@ -9,6 +9,14 @@ export interface MatchFixture {
   status: 'upcoming';
 }
 
+/**
+ * Bracket-division tier. `null` / `undefined` → ordinary single-bracket
+ * crossings. When the admin chooses "División Oro + Plata" two brackets
+ * are generated and each bracket_matches row encodes its tier in the
+ * `round` column as the middle pipe segment: "Category|gold|final".
+ */
+export type BracketTier = 'gold' | 'silver';
+
 /** Pre-persistence shape of a bracket-match slot. */
 export interface BracketFixture {
   round: number;

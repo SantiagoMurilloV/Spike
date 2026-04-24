@@ -42,16 +42,24 @@ export const bracketApi = {
   },
 
   /** Post-groups crossings — admin defines which group positions meet
-   *  in each first-round bracket slot. */
+   *  in each first-round bracket slot. When `categoryFilter` is set the
+   *  backend scopes the DELETE so sibling categories' brackets survive;
+   *  when `bracketTier` is set the DELETE narrows further to that tier
+   *  (Oro regen leaves Plata intact, and vice-versa). */
   async generateBracketCrossings(
     tournamentId: string,
     seeds: Array<{ position: number; label: string }>,
+    options: { categoryFilter?: string; bracketTier?: 'gold' | 'silver' } = {},
   ): Promise<BracketMatch[]> {
     const raw = await request<{ bracketMatches: BackendBracketMatch[]; generatedAt: string }>(
       `/tournaments/${tournamentId}/generate-bracket-crossings`,
       {
         method: 'POST',
-        body: JSON.stringify({ seeds }),
+        body: JSON.stringify({
+          seeds,
+          categoryFilter: options.categoryFilter,
+          bracketTier: options.bracketTier,
+        }),
       },
     );
     return raw.bracketMatches.map(toFrontendBracketMatch);

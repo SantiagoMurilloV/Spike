@@ -44,18 +44,69 @@ export function groupLetter(groupName: string): string {
   return afterFirstSegment(groupName);
 }
 
-// ── bracketMatch.round ("category|round") ─────────────────────────
+// ── bracketMatch.round ("category|round" or "category|tier|round") ─
 
-/** Category segment of a bracket round string. */
+/**
+ * Bracket-division tier. `null` → ordinary single-bracket. When the
+ * tournament uses the "División Oro + Plata" mode each bracket_matches
+ * row carries the tier in its `round` as a middle segment
+ * ("Category|gold|final").
+ */
+export type BracketTier = 'gold' | 'silver';
+
+const TIER_SEGMENTS: readonly BracketTier[] = ['gold', 'silver'];
+
+function isTier(segment: string | undefined): segment is BracketTier {
+  return segment === 'gold' || segment === 'silver';
+}
+void TIER_SEGMENTS;
+
+/** Category segment of a bracket round string — always the first piece. */
 export function categoryOfBracketRound(round: string): string {
   if (!round.includes(CATEGORY_SEP)) return '';
   return firstSegment(round);
 }
 
-/** Round name (semifinal, final, cuartos…) from a bracket round. */
+/**
+ * Tier of a bracket round string, or `null` when the round was written
+ * in the legacy 2-segment form. Pattern matched against the MIDDLE
+ * segment so "Category|gold|final" → "gold" but "Category|gold" (a
+ * malformed 2-segment with the tier as the round name) stays null.
+ */
+export function tierOfBracketRound(round: string): BracketTier | null {
+  const parts = round.split(CATEGORY_SEP);
+  if (parts.length < 3) return null;
+  return isTier(parts[1]) ? parts[1] : null;
+}
+
+/**
+ * Round name (semifinal, final, cuartos…) from a bracket round. Skips
+ * the tier segment when present so the downstream UI doesn't have to
+ * know whether the round was tiered.
+ */
 export function bracketRoundName(round: string): string {
   if (!round.includes(CATEGORY_SEP)) return round;
+  const parts = round.split(CATEGORY_SEP);
+  // With a tier segment: ["Category", "gold", "final"] → take from index 2.
+  if (parts.length >= 3 && isTier(parts[1])) {
+    return parts.slice(2).join(CATEGORY_SEP);
+  }
+  // Legacy 2-segment: ["Category", "final"] → everything after first pipe.
   return afterFirstSegment(round);
+}
+
+/**
+ * Build a bracket round string from its parts. Central so call sites
+ * don't reassemble the pipe format by hand.
+ */
+export function buildBracketRound(
+  category: string,
+  roundName: string,
+  tier?: BracketTier | null,
+): string {
+  const cat = category ? `${category}${CATEGORY_SEP}` : '';
+  if (tier) return `${cat}${tier}${CATEGORY_SEP}${roundName}`;
+  return `${cat}${roundName}`;
 }
 
 // ── Display ───────────────────────────────────────────────────────

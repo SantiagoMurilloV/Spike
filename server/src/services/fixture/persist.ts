@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg';
 import type { Match, BracketMatch } from '../../types';
-import type { MatchFixture, BracketFixture } from './types';
+import type { MatchFixture, BracketFixture, BracketTier } from './types';
 import { mapMatchRow, mapBracketRow } from './mappers';
 
 interface Slot {
@@ -107,6 +107,34 @@ export async function clearCategoryFixtures(
     'DELETE FROM matches WHERE tournament_id = $1 AND group_name LIKE $2',
     [tournamentId, prefix],
   );
+  await client.query(
+    'DELETE FROM bracket_matches WHERE tournament_id = $1 AND round LIKE $2',
+    [tournamentId, prefix],
+  );
+}
+
+/**
+ * Delete only the bracket rows for a single category. When `tier` is
+ * passed, scope further to that tier so regenerating Oro doesn't wipe
+ * Plata (the round column is "Category|gold|…" / "Category|silver|…").
+ * Passing no tier targets both legacy 2-segment rounds and any tier so
+ * callers that toggle between modes can clear cleanly.
+ */
+export async function clearCategoryBracket(
+  client: PoolClient,
+  tournamentId: string,
+  category: string,
+  tier?: BracketTier | null,
+): Promise<void> {
+  if (tier) {
+    const prefix = `${category}|${tier}|%`;
+    await client.query(
+      'DELETE FROM bracket_matches WHERE tournament_id = $1 AND round LIKE $2',
+      [tournamentId, prefix],
+    );
+    return;
+  }
+  const prefix = `${category}|%`;
   await client.query(
     'DELETE FROM bracket_matches WHERE tournament_id = $1 AND round LIKE $2',
     [tournamentId, prefix],

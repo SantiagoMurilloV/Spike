@@ -1,6 +1,6 @@
 import { randomInt } from 'crypto';
 import type { Team } from '../../types';
-import type { MatchFixture, BracketFixture } from './types';
+import type { MatchFixture, BracketFixture, BracketTier } from './types';
 
 // ── Shuffle ────────────────────────────────────────────────────────
 
@@ -103,8 +103,18 @@ export function getRoundName(totalRounds: number, roundIndex: number): string {
   return `ronda-${roundIndex + 1}`;
 }
 
-const prefixWith = (prefix: string | undefined) => (name: string) =>
-  prefix ? `${prefix}|${name}` : name;
+/**
+ * Build the "round" string used in bracket_matches rows. Format:
+ *   · no prefix → `"final"` (legacy single-category)
+ *   · prefix    → `"Category|final"`
+ *   · prefix + tier → `"Category|gold|final"` (Oro/Plata division)
+ */
+const prefixWith =
+  (prefix: string | undefined, tier?: BracketTier | null) => (name: string) => {
+    const cat = prefix ? `${prefix}|` : '';
+    if (tier) return `${cat}${tier}|${name}`;
+    return `${cat}${name}`;
+  };
 
 /**
  * Generate a first-round + empty subsequent rounds + 3rd-place match
@@ -218,6 +228,7 @@ export function generateEmptyBracket(
 export function buildBracketFromSeeds(
   seeds: Array<{ position: number; teamId: string | null; label?: string }>,
   categoryPrefix?: string,
+  bracketTier?: BracketTier | null,
 ): BracketFixture[] {
   const maxPos = Math.max(...seeds.map((s) => s.position), 1);
   const firstRoundMatches = Math.ceil(maxPos / 2);
@@ -227,7 +238,7 @@ export function buildBracketFromSeeds(
   const seedMap = new Map<number, { teamId: string | null; label?: string }>();
   for (const s of seeds) seedMap.set(s.position, { teamId: s.teamId, label: s.label });
 
-  const roundName = prefixWith(categoryPrefix);
+  const roundName = prefixWith(categoryPrefix, bracketTier);
   const fixtures: BracketFixture[] = [];
 
   const firstRoundMatchCount = bracketSize / 2;
@@ -259,7 +270,10 @@ export function buildBracketFromSeeds(
     matchesInRound = matchesInRound / 2;
   }
 
-  if (totalRounds >= 2) {
+  // 3rd-place match: always present for single-bracket & gold tier,
+  // omitted for silver tier (per product decision: silver has final only).
+  const includeThirdPlace = bracketTier !== 'silver';
+  if (totalRounds >= 2 && includeThirdPlace) {
     fixtures.push({
       round: totalRounds,
       position: 2,
