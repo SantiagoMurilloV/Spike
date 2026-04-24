@@ -376,7 +376,7 @@ export function FixturesTab({
           </p>
         </div>
       ) : (
-        <div className="space-y-10">
+        <div className="space-y-6">
           {groupNames.length > 0 && (
             <section>
               <SectionHeader title="Grupos" />
@@ -499,18 +499,17 @@ export function FixturesTab({
 }
 
 /**
- * Big red-underlined heading used for the two top sections ("Grupos"
- * and "Brackets"). Matches the public-facing tournament page style so
- * admin + spectator views read the same.
+ * Subtle section heading for "Grupos" and "Brackets". Kept low-weight
+ * so the real visual hierarchy belongs to the category accordions
+ * underneath — the section name is just a navigational marker.
  */
 function SectionHeader({ title }: { title: string }) {
   return (
     <h2
-      className="text-2xl sm:text-3xl font-bold pb-2 sm:pb-3 uppercase mb-4 sm:mb-5"
+      className="text-xs font-semibold uppercase text-black/50 mb-2 tracking-wider pb-1.5 border-b border-black/10"
       style={{
         fontFamily: 'Barlow Condensed, sans-serif',
-        letterSpacing: '-0.02em',
-        borderBottom: '3px solid var(--brand-red)',
+        letterSpacing: '0.12em',
       }}
     >
       {title}

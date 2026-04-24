@@ -1,4 +1,4 @@
-import { Edit, Award, Medal } from 'lucide-react';
+import { Edit } from 'lucide-react';
 import { BracketMatch } from '../../../../types';
 import { Badge } from '../../../../components/ui/badge';
 import { CategorySection } from '../../../../components/admin/CategorySection';
@@ -43,20 +43,6 @@ function tierHeading(tier: BracketTier) {
   return tier === 'gold' ? 'División Oro' : 'División Plata';
 }
 
-function TierHeader({ tier }: { tier: BracketTier }) {
-  const Icon = tier === 'gold' ? Award : Medal;
-  const color = tier === 'gold' ? 'text-amber-500' : 'text-slate-400';
-  return (
-    <h4
-      className={`flex items-center gap-2 text-sm font-bold uppercase mb-2 ${color}`}
-      style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.08em' }}
-    >
-      <Icon className="w-4 h-4" />
-      {tierHeading(tier)}
-    </h4>
-  );
-}
-
 /**
  * Bracket-match list organized by category — collapses to accordions
  * when there's more than one category, else renders inline. Each row
@@ -91,17 +77,29 @@ export function BracketByCategory({
 
   const renderCategoryBody = (rows: BracketMatch[]) => {
     const buckets = groupByTier(rows);
+    // Legacy single-bracket (null tier) renders inline without a
+    // sub-accordion — no need to force the admin to click twice.
     if (buckets.length === 1 && buckets[0].tier === null) {
       return renderRows(buckets[0].matches);
     }
+    // Oro/Plata: each tier gets its own collapsible so the admin can
+    // expand them independently, mirroring the category-level dropdowns.
     return (
-      <div className="space-y-4">
-        {buckets.map((b) => (
-          <div key={b.tier ?? '_none'}>
-            {b.tier && <TierHeader tier={b.tier} />}
-            {renderRows(b.matches)}
-          </div>
-        ))}
+      <div className="space-y-0">
+        {buckets.map((b) =>
+          b.tier ? (
+            <CategorySection
+              key={b.tier}
+              title={tierHeading(b.tier)}
+              count={b.matches.length}
+              defaultOpen
+            >
+              {renderRows(b.matches)}
+            </CategorySection>
+          ) : (
+            <div key="_none">{renderRows(b.matches)}</div>
+          ),
+        )}
       </div>
     );
   };

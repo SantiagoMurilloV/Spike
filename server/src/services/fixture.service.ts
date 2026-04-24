@@ -256,7 +256,6 @@ export class FixtureGenerator {
         );
       }
 
-      const persisted: BracketMatch[] = [];
       for (const bf of bracketFixtures) {
         const team1Id = bf.team1Placeholder
           ? resolveLabel(bf.team1Placeholder)
@@ -265,11 +264,10 @@ export class FixtureGenerator {
           ? resolveLabel(bf.team2Placeholder)
           : bf.team2Id || null;
 
-        const result = await client.query(
+        await client.query(
           `INSERT INTO bracket_matches
              (tournament_id, team1_id, team2_id, status, round, position, team1_placeholder, team2_placeholder)
-           VALUES ($1, $2, $3, 'upcoming', $4, $5, $6, $7)
-           RETURNING *`,
+           VALUES ($1, $2, $3, 'upcoming', $4, $5, $6, $7)`,
           [
             tournamentId,
             team1Id || null,
@@ -280,11 +278,20 @@ export class FixtureGenerator {
             bf.team2Placeholder || null,
           ],
         );
-        persisted.push(mapBracketRow(result.rows[0]));
       }
 
+      // Return the FULL bracket (not just the newly-inserted rows) so
+      // the client's `bracketMatches` slice stays coherent. Critical
+      // for the Oro/Plata flow: when this call is the Plata step, the
+      // previously-persisted Oro rows must also be returned — otherwise
+      // the UI replaces state with Plata-only and Oro visually
+      // disappears (even though the DB keeps it).
+      const fullBracketResult = await client.query(
+        'SELECT * FROM bracket_matches WHERE tournament_id = $1 ORDER BY round, position',
+        [tournamentId],
+      );
       await client.query('COMMIT');
-      return persisted;
+      return fullBracketResult.rows.map(mapBracketRow);
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
