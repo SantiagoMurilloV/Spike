@@ -175,8 +175,8 @@ export async function generateFixtures(req: Request, res: Response, next: NextFu
   try {
     const id = req.params.id as string;
     validateUUID(id, 'ID de torneo');
-    const { schedule } = req.body || {};
-    const result = await fixtureGenerator.generate(id, schedule);
+    const { schedule, categoryFilter } = req.body || {};
+    const result = await fixtureGenerator.generate(id, schedule, categoryFilter);
     res.json(result);
   } catch (error) {
     next(error);
@@ -187,8 +187,13 @@ export async function generateManualFixtures(req: Request, res: Response, next: 
   try {
     const id = req.params.id as string;
     validateUUID(id, 'ID de torneo');
-    const { groups, bracketSeeds, schedule } = req.body;
-    const result = await fixtureGenerator.generateManual(id, { groups, bracketSeeds, schedule });
+    const { groups, bracketSeeds, schedule, categoryFilter } = req.body;
+    const result = await fixtureGenerator.generateManual(id, {
+      groups,
+      bracketSeeds,
+      schedule,
+      categoryFilter,
+    });
     res.json(result);
   } catch (error) {
     next(error);

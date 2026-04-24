@@ -35,6 +35,13 @@ interface ManualFixtureOptions {
   groups?: Record<string, string[]>;
   bracketSeeds?: Array<{ position: number; teamId: string | null; label?: string }>;
   schedule?: ScheduleOptions;
+  /**
+   * Limits the generation to a single category of the tournament. Set
+   * when the admin picked a category from the picker dialog before
+   * opening the manual-groups / manual-bracket modal. When absent, the
+   * backend falls back to the legacy "all categories at once" path.
+   */
+  categoryFilter?: string;
 }
 
 /**
@@ -126,10 +133,11 @@ export const tournamentsApi = {
   async generateFixtures(
     tournamentId: string,
     schedule?: ScheduleOptions,
+    categoryFilter?: string,
   ): Promise<FixtureResult> {
     return request<FixtureResult>(`/tournaments/${tournamentId}/generate-fixtures`, {
       method: 'POST',
-      body: JSON.stringify({ schedule }),
+      body: JSON.stringify({ schedule, categoryFilter }),
     });
   },
 

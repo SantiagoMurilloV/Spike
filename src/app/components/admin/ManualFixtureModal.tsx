@@ -5,6 +5,7 @@
  * this path — the split is invisible to them.
  */
 
+export { CategoryPickerDialog } from './fixture-modals/CategoryPickerDialog';
 export { FixtureModeDialog } from './fixture-modals/FixtureModeDialog';
 export { AutomaticScheduleModal } from './fixture-modals/AutomaticScheduleModal';
 export { ManualGroupsModal } from './fixture-modals/ManualGroupsModal';

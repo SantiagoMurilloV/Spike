@@ -86,3 +86,29 @@ export async function clearTournamentFixtures(
   await client.query('DELETE FROM matches WHERE tournament_id = $1', [tournamentId]);
   await client.query('DELETE FROM bracket_matches WHERE tournament_id = $1', [tournamentId]);
 }
+
+/**
+ * Delete only the fixtures that belong to a specific category, leaving
+ * other categories untouched. The category is encoded as a prefix in:
+ *   · matches.group_name  → "Category|A" / "Category|liga"
+ *   · bracket_matches.round → "Category|semifinal"
+ *
+ * Both fields use `category|…` so a single `LIKE 'Category|%'` catches
+ * everything. A NULL / empty `group_name` means the match isn't
+ * category-scoped and must be left alone.
+ */
+export async function clearCategoryFixtures(
+  client: PoolClient,
+  tournamentId: string,
+  category: string,
+): Promise<void> {
+  const prefix = `${category}|%`;
+  await client.query(
+    'DELETE FROM matches WHERE tournament_id = $1 AND group_name LIKE $2',
+    [tournamentId, prefix],
+  );
+  await client.query(
+    'DELETE FROM bracket_matches WHERE tournament_id = $1 AND round LIKE $2',
+    [tournamentId, prefix],
+  );
+}

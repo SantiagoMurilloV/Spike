@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Shuffle, Trophy, Clock, RefreshCw, Trash2 } from 'lucide-react';
 import { api } from '../../../services/api';
@@ -22,8 +22,7 @@ import {
   AlertDialogTitle,
 } from '../../../components/ui/alert-dialog';
 import {
-  FixtureModeDialog,
-  AutomaticScheduleModal,
+  CategoryPickerDialog,
   ManualGroupsModal,
   ManualBracketModal,
   BracketCrossingsModal,
@@ -34,6 +33,8 @@ import { humanizePhase } from '../../../lib/phase';
 import type { useScoreEditor } from '../../../hooks/useScoreEditor';
 import { GroupMatricesByCategory, EnfrentamientoRow } from './fixtures/GroupsView';
 import { BracketByCategory } from './fixtures/BracketView';
+import { useCategoryFlow } from './fixtures/useCategoryFlow';
+import { useFixturesDerived } from './fixtures/useFixturesDerived';
 import { getErrorMessage } from '../../../lib/errors';
 
 type BracketEditor = ReturnType<typeof useScoreEditor<BracketMatch>>;
@@ -87,11 +88,9 @@ export function FixturesTab({
   // Modal open state — purely local UX. The actual work happens in
   // the async handlers below which bubble results up to the parent.
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
-  const [showModeDialog, setShowModeDialog] = useState(false);
   const [showManualGroups, setShowManualGroups] = useState(false);
   const [showManualBracket, setShowManualBracket] = useState(false);
   const [showBracketCrossings, setShowBracketCrossings] = useState(false);
-  const [showAutoSchedule, setShowAutoSchedule] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [pendingGroups, setPendingGroups] = useState<Record<string, string[]>>({});
   const [pendingSchedule, setPendingSchedule] = useState<ScheduleConfig | undefined>();
@@ -99,53 +98,13 @@ export function FixturesTab({
   // state on every "Generar" button so the admin can't double-submit.
   const [generating, setGenerating] = useState(false);
 
-  const groupNames = useMemo(() => {
-    const names = new Set<string>();
-    for (const m of matches) {
-      if (m.group) names.add(m.group);
-    }
-    return Array.from(names).sort();
-  }, [matches]);
+  // Picker state + per-category filtering lives in a dedicated hook so
+  // FixturesTab keeps its orchestration-only shape.
+  const flow = useCategoryFlow({ tournament, enrolledTeams, matches });
 
-  const matchesByGroup = useMemo(() => {
-    const map: Record<string, Match[]> = {};
-    for (const m of matches) {
-      if (m.group) {
-        if (!map[m.group]) map[m.group] = [];
-        map[m.group].push(m);
-      }
-    }
-    return map;
-  }, [matches]);
-
-  const standingsByGroup = useMemo(() => {
-    const map: Record<string, StandingsRow[]> = {};
-    const teamGroup = new Map<string, string>();
-    for (const m of matches) {
-      if (m.group) {
-        teamGroup.set(m.team1.id, m.group);
-        teamGroup.set(m.team2.id, m.group);
-      }
-    }
-    for (const s of standings) {
-      const group = teamGroup.get(s.team.id);
-      if (group) {
-        if (!map[group]) map[group] = [];
-        map[group].push(s);
-      }
-    }
-    return map;
-  }, [matches, standings]);
-
-  const matchesByPhaseGroup = useMemo(() => {
-    const grouped: Record<string, Match[]> = {};
-    for (const m of matches) {
-      const key = m.group ? `${m.phase} — ${m.group}` : m.phase;
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(m);
-    }
-    return Object.entries(grouped);
-  }, [matches]);
+  // Derived collections consumed by the render block.
+  const { groupNames, matchesByGroup, standingsByGroup, matchesByPhaseGroup } =
+    useFixturesDerived({ matches, standings });
 
   // ── Handlers ────────────────────────────────────────────────────
 
@@ -157,45 +116,49 @@ export function FixturesTab({
     onGenerated(result, tournamentMatches, bracket);
   };
 
-  const doGenerateFixtures = async (schedule?: ScheduleConfig) => {
-    setShowRegenerateDialog(false);
-    setShowModeDialog(false);
-    setGenerating(true);
-    try {
-      const result = await api.generateFixtures(id, schedule);
-      await refreshAfterGenerate(result);
-      toast.success('Cruces generados');
-    } catch (err) {
-      toast.error(getErrorMessage(err, 'Error al generar cruces'));
-    } finally {
-      setGenerating(false);
+  /**
+   * Dispatch the right manual modal once a category is resolved.
+   * Knockout format goes straight to bracket seeding; everything else
+   * starts with manual groups.
+   */
+  const openManualModal = () => {
+    if (tournament.format === 'knockout') {
+      setShowManualBracket(true);
+    } else {
+      setShowManualGroups(true);
     }
   };
 
+  /**
+   * Entry point for "Creación de Grupos". Auto-generation was removed —
+   * every flow is manual, scoped per-category.
+   *
+   *   · Existing fixtures → confirm regenerate first.
+   *   · 2+ categories     → open the picker via the flow hook.
+   *   · 1 (or none)       → the hook resolves immediately and we jump
+   *                         straight into the manual modal.
+   */
   const handleGenerateClick = () => {
     if (matches.length > 0 || bracketMatches.length > 0) {
       setShowRegenerateDialog(true);
       return;
     }
-    setShowModeDialog(true);
+    const resolved = flow.openInitialFlow();
+    if (resolved !== null) openManualModal();
   };
 
-  const handleSelectAutomatic = () => {
-    setShowModeDialog(false);
-    setShowAutoSchedule(true);
+  /** "Definir Eliminación Directa" button — post-groups bracket flow. */
+  const startPostGroupsCrossings = () => {
+    const resolved = flow.openPostGroupsFlow();
+    if (resolved !== null) setShowBracketCrossings(true);
   };
 
-  const handleAutoScheduleGenerate = (schedule: ScheduleConfig) => {
-    setShowAutoSchedule(false);
-    doGenerateFixtures(schedule);
-  };
-
-  const handleSelectManual = () => {
-    setShowModeDialog(false);
-    if (tournament.format === 'knockout') {
-      setShowManualBracket(true);
+  const handlePickCategory = (category: string) => {
+    const target = flow.pick(category);
+    if (target === 'post-groups') {
+      setShowBracketCrossings(true);
     } else {
-      setShowManualGroups(true);
+      openManualModal();
     }
   };
 
@@ -212,7 +175,11 @@ export function FixturesTab({
     }
     setGenerating(true);
     try {
-      const result = await api.generateManualFixtures(id, { groups, schedule });
+      const result = await api.generateManualFixtures(id, {
+        groups,
+        schedule,
+        categoryFilter: flow.pickedCategory ?? undefined,
+      });
       await refreshAfterGenerate(result);
       setShowManualGroups(false);
       toast.success('Cruces generados');
@@ -228,7 +195,10 @@ export function FixturesTab({
   ) => {
     setGenerating(true);
     try {
-      const result = await api.generateManualFixtures(id, { bracketSeeds: seeds });
+      const result = await api.generateManualFixtures(id, {
+        bracketSeeds: seeds,
+        categoryFilter: flow.pickedCategory ?? undefined,
+      });
       await refreshAfterGenerate(result);
       setShowManualBracket(false);
       toast.success('Bracket generado');
@@ -253,6 +223,7 @@ export function FixturesTab({
         groups: pendingGroups,
         schedule: pendingSchedule,
         bracketSeeds,
+        categoryFilter: flow.pickedCategory ?? undefined,
       });
       await refreshAfterGenerate(result);
       setShowBracketCrossings(false);
@@ -316,7 +287,7 @@ export function FixturesTab({
           </Button>
           {tournament.format === 'groups+knockout' && matches.length > 0 && (
             <Button
-              onClick={() => setShowBracketCrossings(true)}
+              onClick={startPostGroupsCrossings}
               disabled={generating}
               className="bg-spk-win hover:bg-spk-win/90 text-white w-full sm:w-auto"
             >
@@ -415,7 +386,7 @@ export function FixturesTab({
             <AlertDialogAction
               onClick={() => {
                 setShowRegenerateDialog(false);
-                setShowModeDialog(true);
+                startCategoryFlow();
               }}
               className="bg-spk-red hover:bg-spk-red-dark"
             >
@@ -444,24 +415,17 @@ export function FixturesTab({
         </AlertDialogContent>
       </AlertDialog>
 
-      <FixtureModeDialog
-        open={showModeDialog}
-        onClose={() => setShowModeDialog(false)}
-        onSelectAutomatic={handleSelectAutomatic}
-        onSelectManual={handleSelectManual}
-      />
-
-      <AutomaticScheduleModal
-        open={showAutoSchedule}
-        onClose={() => setShowAutoSchedule(false)}
-        onGenerate={handleAutoScheduleGenerate}
-        generating={generating}
-        defaultCourtCount={tournament.courts.length || 1}
+      <CategoryPickerDialog
+        open={flow.showPicker}
+        categories={flow.pickerCategories}
+        enrolledTeams={enrolledTeams}
+        onClose={flow.closePicker}
+        onPick={handlePickCategory}
       />
 
       <ManualGroupsModal
         open={showManualGroups}
-        teams={enrolledTeams}
+        teams={flow.teamsForPickedCategory}
         onClose={() => setShowManualGroups(false)}
         onGenerate={handleManualGroupsGenerate}
         generating={generating}
@@ -470,7 +434,7 @@ export function FixturesTab({
 
       <ManualBracketModal
         open={showManualBracket}
-        teams={enrolledTeams}
+        teams={flow.teamsForPickedCategory}
         onClose={() => setShowManualBracket(false)}
         onGenerate={handleManualBracketGenerate}
         generating={generating}
@@ -479,7 +443,9 @@ export function FixturesTab({
       <BracketCrossingsModal
         open={showBracketCrossings}
         groupNames={
-          Object.keys(pendingGroups).length > 0 ? Object.keys(pendingGroups) : groupNames
+          Object.keys(pendingGroups).length > 0
+            ? Object.keys(pendingGroups)
+            : flow.groupNamesForPickedCategory
         }
         onClose={() => {
           setShowBracketCrossings(false);

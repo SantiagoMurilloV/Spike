@@ -16,7 +16,12 @@ import {
 } from './fixture/algorithms';
 import { calculateMatchTimes } from './fixture/schedule';
 import { mapBracketRow } from './fixture/mappers';
-import { persistMatches, persistBracket, clearTournamentFixtures } from './fixture/persist';
+import {
+  persistMatches,
+  persistBracket,
+  clearTournamentFixtures,
+  clearCategoryFixtures,
+} from './fixture/persist';
 
 // Legacy named exports kept for any server-side caller that imports
 // helpers by name from this file directly.
@@ -49,7 +54,11 @@ export type { MatchFixture, BracketFixture, ScheduleConfig } from './fixture/typ
  *                                   placeholders from current standings.
  */
 export class FixtureGenerator {
-  async generate(tournamentId: string, schedule?: ScheduleConfig): Promise<FixtureResult> {
+  async generate(
+    tournamentId: string,
+    schedule?: ScheduleConfig,
+    categoryFilter?: string,
+  ): Promise<FixtureResult> {
     const pool = getPool();
 
     const tournamentResult = await pool.query(
@@ -60,10 +69,15 @@ export class FixtureGenerator {
     const tournament = tournamentResult.rows[0];
     const format = tournament.format as Tournament['format'];
 
-    const teamsByCategory = await enrollmentService.getEnrolledTeamsByCategory(tournamentId);
-    const allTeams = teamsByCategory.flatMap((c) => c.teams.map((et) => et.team));
+    const allByCategory = await enrollmentService.getEnrolledTeamsByCategory(tournamentId);
+    // When the admin picked a specific category, ignore every other
+    // one — we keep existing fixtures of the other categories intact.
+    const teamsByCategory = categoryFilter
+      ? allByCategory.filter((c) => c.category === categoryFilter)
+      : allByCategory;
+    const teamsInScope = teamsByCategory.flatMap((c) => c.teams.map((et) => et.team));
 
-    if (allTeams.length < MIN_TEAMS[format]) {
+    if (teamsInScope.length < MIN_TEAMS[format]) {
       throw new ValidationError(MIN_TEAMS_MESSAGES[format]);
     }
 
@@ -80,7 +94,14 @@ export class FixtureGenerator {
       bracketFixtures.push(...bracket);
     }
 
-    return this.commit(tournamentId, tournament, matchFixtures, bracketFixtures, schedule);
+    return this.commit(
+      tournamentId,
+      tournament,
+      matchFixtures,
+      bracketFixtures,
+      schedule,
+      categoryFilter,
+    );
   }
 
   async generateManual(
@@ -89,6 +110,12 @@ export class FixtureGenerator {
       groups?: Record<string, string[]>;
       bracketSeeds?: Array<{ position: number; teamId: string | null; label?: string }>;
       schedule?: ScheduleConfig;
+      /**
+       * Explicit category the admin picked on the picker dialog.
+       * When present, overrides per-group auto-detection and scopes
+       * the clear-and-replace to that category only.
+       */
+      categoryFilter?: string;
     },
   ): Promise<FixtureResult> {
     const pool = getPool();
@@ -107,7 +134,11 @@ export class FixtureGenerator {
 
     validateManualInput(options, enrolledIds);
 
+    // When the admin explicitly picked a category, use it verbatim so
+    // every group / bracket row gets the same prefix. Falling back to
+    // the auto-detection for legacy callers that don't pass it yet.
     const detectCategory = (teamIds: string[]): string => {
+      if (options.categoryFilter) return options.categoryFilter;
       const categories = new Set<string>();
       for (const tid of teamIds) {
         const team = teamsById.get(tid);
@@ -129,6 +160,7 @@ export class FixtureGenerator {
       matchFixtures,
       bracketFixtures,
       options.schedule,
+      options.categoryFilter,
     );
   }
 
@@ -244,7 +276,9 @@ export class FixtureGenerator {
 
   /**
    * Shared transactional write path used by generate() + generateManual():
-   *   · DELETE existing matches + bracket_matches for this tournament.
+   *   · DELETE existing matches + bracket_matches (scoped to the
+   *     category when `categoryFilter` is provided; tournament-wide
+   *     otherwise).
    *   · Schedule the incoming MatchFixtures into court/date/time slots.
    *   · INSERT both tables; commit or roll back.
    */
@@ -254,12 +288,17 @@ export class FixtureGenerator {
     matchFixtures: MatchFixture[],
     bracketFixtures: BracketFixture[],
     schedule: ScheduleConfig | undefined,
+    categoryFilter?: string,
   ): Promise<FixtureResult> {
     const pool = getPool();
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      await clearTournamentFixtures(client, tournamentId);
+      if (categoryFilter) {
+        await clearCategoryFixtures(client, tournamentId, categoryFilter);
+      } else {
+        await clearTournamentFixtures(client, tournamentId);
+      }
 
       const startDate = tournament.start_date
         ? new Date(tournament.start_date as string).toISOString().split('T')[0]
