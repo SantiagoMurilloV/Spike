@@ -10,6 +10,9 @@ interface AutomaticScheduleModalProps {
   onGenerate: (schedule: ScheduleConfig) => void;
   generating: boolean;
   defaultCourtCount?: number;
+  /** Court names declared on the tournament. Forwarded to ScheduleFields
+   *  so the admin sees which specific courts will host matches. */
+  availableCourts?: string[];
 }
 
 /**
@@ -23,6 +26,7 @@ export function AutomaticScheduleModal({
   onGenerate,
   generating,
   defaultCourtCount,
+  availableCourts,
 }: AutomaticScheduleModalProps) {
   const [schedule, setSchedule] = useState<ScheduleConfig>({
     ...DEFAULT_SCHEDULE,
@@ -53,7 +57,11 @@ export function AutomaticScheduleModal({
         <p className="text-sm text-black/60 mb-6">
           Configurá los horarios y canchas para los partidos:
         </p>
-        <ScheduleFields schedule={schedule} onChange={setSchedule} />
+        <ScheduleFields
+          schedule={schedule}
+          onChange={setSchedule}
+          availableCourts={availableCourts}
+        />
         <div className="flex justify-end gap-3 mt-6">
           <Button variant="outline" onClick={onClose}>
             Cancelar

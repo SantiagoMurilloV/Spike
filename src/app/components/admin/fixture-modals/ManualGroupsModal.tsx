@@ -20,6 +20,9 @@ interface ManualGroupsModalProps {
   onGenerate: (groups: Record<string, string[]>, schedule: ScheduleConfig) => void;
   generating: boolean;
   defaultCourtCount?: number;
+  /** Court names declared on the tournament. Forwarded to ScheduleFields
+   *  so the admin can see which courts the fixtures will land on. */
+  availableCourts?: string[];
 }
 
 const MIN_GROUPS = 2;
@@ -39,6 +42,7 @@ export function ManualGroupsModal({
   onGenerate,
   generating,
   defaultCourtCount,
+  availableCourts,
 }: ManualGroupsModalProps) {
   const [groupCount, setGroupCount] = useState(MIN_GROUPS);
   const [assignments, setAssignments] = useState<Record<string, string[]>>({});
@@ -221,7 +225,11 @@ export function ManualGroupsModal({
         </div>
 
         <div className="px-4 sm:px-6 pb-4">
-          <ScheduleFields schedule={schedule} onChange={setSchedule} />
+          <ScheduleFields
+            schedule={schedule}
+            onChange={setSchedule}
+            availableCourts={availableCourts}
+          />
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-6 border-t border-black/10">

@@ -26,6 +26,14 @@ export interface BracketCrossingsModalProps {
    * handler — this prop is purely presentational.
    */
   tier?: BracketTier | null;
+  /**
+   * Group placement where the placeholder list starts. Defaults to `1`
+   * (1st-place options). For the Plata step of a division tournament
+   * the parent passes `goldClassifiers + 1` so the list offers only
+   * the positions not already consumed by Oro (e.g. 3° / 4° when Oro
+   * took 1° and 2°).
+   */
+  startPosition?: number;
 }
 
 /**
@@ -45,6 +53,7 @@ export function BracketCrossingsModal({
   onGenerate,
   generating,
   tier = null,
+  startPosition = 1,
 }: BracketCrossingsModalProps) {
   const headline =
     tier === 'gold'
@@ -80,7 +89,8 @@ export function BracketCrossingsModal({
 
   const placeholderOptions = useMemo(() => {
     const list: Array<{ value: string; label: string }> = [];
-    for (let pos = 1; pos <= classifiersPerGroup; pos++) {
+    const endPos = startPosition + classifiersPerGroup - 1;
+    for (let pos = startPosition; pos <= endPos; pos++) {
       for (const gn of groupNames) {
         const letter = groupLetter(gn);
         const cat = categoryOfGroupName(gn);
@@ -92,7 +102,7 @@ export function BracketCrossingsModal({
       }
     }
     return list;
-  }, [groupNames, classifiersPerGroup, hasMultipleCategories]);
+  }, [groupNames, classifiersPerGroup, hasMultipleCategories, startPosition]);
 
   const totalSlots = useMemo(
     () => nextPow2(Math.max(groupNames.length * classifiersPerGroup, 2)),
@@ -103,8 +113,12 @@ export function BracketCrossingsModal({
   const [matchups, setMatchups] = useState<Array<[string | null, string | null]>>([]);
 
   useEffect(() => {
+    // Reset matchups whenever the generated bracket size or the starting
+    // placement position changes. The `startPosition` dep covers the
+    // Oro→Plata flip (gold uses 1°/2°, silver uses 3°/4°+) where
+    // matchCount can stay the same but the option labels shift.
     setMatchups(Array.from({ length: matchCount }, () => [null, null]));
-  }, [matchCount]);
+  }, [matchCount, startPosition]);
 
   const setSlot = (matchIdx: number, slotIdx: 0 | 1, value: string | null) => {
     setMatchups((prev) => {

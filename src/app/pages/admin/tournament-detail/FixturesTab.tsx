@@ -101,6 +101,11 @@ export function FixturesTab({
   // Mode the admin picked for this category — drives whether
   // completing the Oro modal opens another one for Plata.
   const [bracketMode, setBracketMode] = useState<BracketMode | null>(null);
+  // Starting group-placement offered by the Plata step. Derived from
+  // the max position the admin used when generating Oro — if Oro took
+  // 1° y 2°, Plata starts at 3°. Parsed from the seed labels
+  // (`"pos|groupName"`) that went to the backend.
+  const [silverStartPosition, setSilverStartPosition] = useState(3);
   // True while any generate-round-trip is in flight — drives disable
   // state on every "Generar" button so the admin can't double-submit.
   const [generating, setGenerating] = useState(false);
@@ -243,16 +248,28 @@ export function FixturesTab({
       // Division flow: after finishing Oro, re-open the modal for Plata.
       // After Plata (or the single-bracket flow), close and reset.
       if (bracketMode === 'division' && currentTier === 'gold') {
+        // Parse seed labels ("pos|groupName") to find the highest group
+        // placement Oro consumed. Plata starts right after — e.g. if
+        // Oro took 1° y 2°, Plata begins at 3°.
+        let maxGoldPosition = 0;
+        for (const s of seeds) {
+          const firstPipe = s.label.indexOf('|');
+          if (firstPipe === -1) continue;
+          const pos = parseInt(s.label.substring(0, firstPipe), 10);
+          if (!Number.isNaN(pos) && pos > maxGoldPosition) maxGoldPosition = pos;
+        }
+        setSilverStartPosition(maxGoldPosition > 0 ? maxGoldPosition + 1 : 3);
         toast.success('Bracket Oro generado. Ahora definí el bracket Plata.');
         setCurrentTier('silver');
         // Keep the modal open — swapping `tier` re-renders the header/
         // button but `useEffect` inside the modal resets the matchups
-        // when `matchCount` changes.
+        // when `matchCount` or `startPosition` changes.
         return;
       }
       setShowBracketCrossings(false);
       setCurrentTier(null);
       setBracketMode(null);
+      setSilverStartPosition(3);
       toast.success(
         currentTier === 'silver'
           ? `Bracket Plata generado con ${bracket.filter((b) => b.round.includes('|silver|')).length} partidos`
@@ -442,6 +459,7 @@ export function FixturesTab({
         onGenerate={handleManualGroupsGenerate}
         generating={generating}
         defaultCourtCount={tournament.courts.length || 1}
+        availableCourts={tournament.courts}
       />
 
       <ManualBracketModal
@@ -469,10 +487,12 @@ export function FixturesTab({
           setShowBracketCrossings(false);
           setCurrentTier(null);
           setBracketMode(null);
+          setSilverStartPosition(3);
         }}
         onGenerate={handlePostGroupsBracketCrossings}
         generating={generating}
         tier={currentTier}
+        startPosition={currentTier === 'silver' ? silverStartPosition : 1}
       />
     </>
   );
