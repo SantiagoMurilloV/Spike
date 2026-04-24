@@ -131,6 +131,15 @@ export interface Tournament {
   enrollmentDeadline?: string;
   /** Recommended roster cap per team. Default 12. */
   playersPerTeam?: number;
+  /**
+   * Post-groups bracket strategy:
+   *   · 'manual'     → admin picks matchups from the drag-pairs modal
+   *                    (single bracket, no Oro/Plata tier).
+   *   · 'divisions'  → crossings auto-generated VNL-style from the
+   *                    standings; produces Oro + Plata brackets.
+   * Defaults to 'manual' on the server for back-compat.
+   */
+  bracketMode?: 'manual' | 'divisions';
 }
 
 export interface BracketMatch {

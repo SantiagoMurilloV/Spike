@@ -19,6 +19,8 @@ export interface FieldErrors {
   server?: string;
 }
 
+export type BracketMode = NonNullable<Tournament['bracketMode']>;
+
 /** Shape of the form model held by useTournamentForm. */
 export interface TournamentFormState {
   name: string;
@@ -34,6 +36,7 @@ export interface TournamentFormState {
   categories: string[];
   enrollmentDeadline: string;
   playersPerTeam: number;
+  bracketMode: BracketMode;
 }
 
 export const DEFAULT_COURTS: CourtEntry[] = [
@@ -56,5 +59,6 @@ export function emptyForm(): TournamentFormState {
     categories: [],
     enrollmentDeadline: '',
     playersPerTeam: 12,
+    bracketMode: 'manual',
   };
 }

@@ -40,6 +40,14 @@ export interface Tournament {
    * at create time so a team can exceed if the admin allows.
    */
   playersPerTeam?: number;
+  /**
+   * Which post-groups bracket strategy this tournament uses:
+   *   · 'manual'     → admin picks matchups manually from the drag UI
+   *   · 'divisions'  → auto VNL seeding, produces Oro + Plata from the
+   *                    standings table.
+   * Defaults to 'manual' so legacy tournaments keep their prior flow.
+   */
+  bracketMode?: 'manual' | 'divisions';
   createdAt?: string;
   updatedAt?: string;
 }
@@ -182,6 +190,8 @@ export interface CreateTournamentDto {
   enrollmentDeadline?: string | null;
   /** Recommended roster cap (default 12). */
   playersPerTeam?: number;
+  /** 'manual' = drag-pairs flow · 'divisions' = auto VNL Oro/Plata. */
+  bracketMode?: 'manual' | 'divisions';
 }
 
 export type UpdateTournamentDto = Partial<CreateTournamentDto>;

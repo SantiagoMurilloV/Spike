@@ -178,6 +178,27 @@ export function TournamentFormModal({
         ]}
       />
 
+      {(form.formData.format === 'groups+knockout' || form.formData.format === 'knockout') && (
+        <div>
+          <SelectField
+            label="Tipo de cruces de eliminatoria *"
+            value={form.formData.bracketMode}
+            onChange={(v) =>
+              form.patch({ bracketMode: v as 'manual' | 'divisions' })
+            }
+            options={[
+              { value: 'manual', label: 'Clasificación normal (manual)' },
+              { value: 'divisions', label: 'Por divisiones (Oro + Plata, automático)' },
+            ]}
+          />
+          <p className="mt-1 text-xs text-black/50">
+            {form.formData.bracketMode === 'divisions'
+              ? 'Los cruces se arman automáticamente siguiendo el seeding VNL desde la tabla de clasificación. 1°s y 2°s van a Oro, 3°s y 4°s a Plata.'
+              : 'El administrador elige los cruces a mano desde el panel.'}
+          </p>
+        </div>
+      )}
+
       <CourtsField
         courts={form.formData.courts}
         error={form.errors.courts}

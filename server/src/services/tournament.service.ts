@@ -56,6 +56,10 @@ function mapRow(row: Record<string, unknown>): Tournament {
     ownerId: (row.owner_id as string | null) ?? undefined,
     enrollmentDeadline: normalizeDate(row.enrollment_deadline),
     playersPerTeam: (row.players_per_team as number | null) ?? undefined,
+    bracketMode:
+      ((row.bracket_mode as string | null) === 'divisions'
+        ? 'divisions'
+        : 'manual') as Tournament['bracketMode'],
     createdAt: row.created_at as string | undefined,
     updatedAt: row.updated_at as string | undefined,
   };
@@ -201,9 +205,10 @@ export class TournamentService {
     this.validateData(data);
     await this.assertQuota(ownerId);
     const pool = getPool();
+    const bracketMode = data.bracketMode === 'divisions' ? 'divisions' : 'manual';
     const result = await pool.query(
-      `INSERT INTO tournaments (name, sport, club, start_date, end_date, description, cover_image, logo, status, teams_count, format, courts, court_locations, categories, owner_id, enrollment_deadline, players_per_team)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      `INSERT INTO tournaments (name, sport, club, start_date, end_date, description, cover_image, logo, status, teams_count, format, courts, court_locations, categories, owner_id, enrollment_deadline, players_per_team, bracket_mode)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        RETURNING *`,
       [
         data.name,
@@ -223,6 +228,7 @@ export class TournamentService {
         ownerId,
         data.enrollmentDeadline || null,
         data.playersPerTeam ?? 12,
+        bracketMode,
       ],
     );
     return mapRow(result.rows[0]);
@@ -261,14 +267,23 @@ export class TournamentService {
       categories: 'categories',
       enrollmentDeadline: 'enrollment_deadline',
       playersPerTeam: 'players_per_team',
+      bracketMode: 'bracket_mode',
     };
 
     for (const [key, column] of Object.entries(columnMap)) {
       if ((data as Record<string, unknown>)[key] !== undefined) {
         fields.push(column + ' = $' + idx);
-        // jsonb column requires stringified JSON
+        // jsonb column requires stringified JSON; bracketMode is clamped
+        // to the two supported enum values so a client cannot smuggle an
+        // arbitrary string in.
         const rawValue = (data as Record<string, unknown>)[key];
-        values.push(key === 'courtLocations' ? JSON.stringify(rawValue ?? {}) : rawValue);
+        let stored: unknown = rawValue;
+        if (key === 'courtLocations') {
+          stored = JSON.stringify(rawValue ?? {});
+        } else if (key === 'bracketMode') {
+          stored = rawValue === 'divisions' ? 'divisions' : 'manual';
+        }
+        values.push(stored);
         idx++;
       }
     }

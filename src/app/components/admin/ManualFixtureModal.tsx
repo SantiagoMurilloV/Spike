@@ -13,6 +13,7 @@ export { ManualGroupsModal } from './fixture-modals/ManualGroupsModal';
 export { ManualBracketModal } from './fixture-modals/ManualBracketModal';
 export { ManualBracketPositionsModal } from './fixture-modals/ManualBracketPositionsModal';
 export { BracketCrossingsModal } from './fixture-modals/BracketCrossingsModal';
+export { ManualBracketCrossingsModal } from './fixture-modals/ManualBracketCrossingsModal';
 export type { ScheduleConfig } from './fixture-modals/shared';
 export type { ManualBracketPositionsProps } from './fixture-modals/ManualBracketPositionsModal';
 export type { BracketCrossingsModalProps } from './fixture-modals/BracketCrossingsModal';

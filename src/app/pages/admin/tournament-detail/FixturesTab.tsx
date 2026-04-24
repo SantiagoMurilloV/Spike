@@ -23,12 +23,11 @@ import {
 } from '../../../components/ui/alert-dialog';
 import {
   CategoryPickerDialog,
-  BracketModePickerDialog,
   ManualGroupsModal,
   ManualBracketModal,
   BracketCrossingsModal,
+  ManualBracketCrossingsModal,
   type ScheduleConfig,
-  type BracketMode,
 } from '../../../components/admin/ManualFixtureModal';
 import type { BracketTier } from '../../../lib/phase';
 import type { useScoreEditor } from '../../../hooks/useScoreEditor';
@@ -91,21 +90,24 @@ export function FixturesTab({
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
   const [showManualGroups, setShowManualGroups] = useState(false);
   const [showManualBracket, setShowManualBracket] = useState(false);
-  const [showBracketMode, setShowBracketMode] = useState(false);
   const [showBracketCrossings, setShowBracketCrossings] = useState(false);
+  const [showManualCrossings, setShowManualCrossings] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
-  // Tier for the currently-open BracketCrossingsModal: `'gold'` during
-  // the first step of the division flow, `'silver'` during the second,
-  // `null` for the legacy single-bracket flow.
+  // Tier for the currently-open BracketCrossingsModal when the tournament
+  // runs in division mode: `'gold'` during the first step, `'silver'`
+  // during the second, `null` while the modal isn't open / the tournament
+  // runs in manual mode.
   const [currentTier, setCurrentTier] = useState<BracketTier | null>(null);
-  // Mode the admin picked for this category — drives whether
-  // completing the Oro modal opens another one for Plata.
-  const [bracketMode, setBracketMode] = useState<BracketMode | null>(null);
   // Starting group-placement offered by the Plata step. Derived from
-  // the max position the admin used when generating Oro — if Oro took
-  // 1° y 2°, Plata starts at 3°. Parsed from the seed labels
+  // the max position used when generating Oro — if Oro took 1° y 2°,
+  // Plata starts at 3°. Parsed from the seed labels
   // (`"pos|groupName"`) that went to the backend.
   const [silverStartPosition, setSilverStartPosition] = useState(3);
+
+  /** Tournament-level bracket strategy — chosen on creation. Drives which
+   *  modal opens for "Definir Eliminación Directa". Defaults to 'manual'
+   *  so legacy tournaments without the field keep their old behavior. */
+  const bracketMode: 'manual' | 'divisions' = tournament.bracketMode ?? 'manual';
   // True while any generate-round-trip is in flight — drives disable
   // state on every "Generar" button so the admin can't double-submit.
   const [generating, setGenerating] = useState(false);
@@ -161,32 +163,41 @@ export function FixturesTab({
     if (resolved !== null) openManualModal();
   };
 
-  /** "Definir Eliminación Directa" button — post-groups bracket flow.
-   *  Always goes through the mode picker (single vs Oro+Plata) once a
-   *  category is resolved. Single-category + one-group tournaments
-   *  still need the mode step so the admin consciously opts in or out
-   *  of the division. */
+  /**
+   * "Definir Eliminación Directa" button — post-groups bracket flow.
+   * The crossings strategy is decided at tournament creation
+   * (`tournament.bracketMode`), so there's no per-generation picker
+   * anymore:
+   *   · 'manual'    → open the drag-pairs {@link ManualBracketCrossingsModal}.
+   *   · 'divisions' → open the auto VNL {@link BracketCrossingsModal}
+   *                   pre-tagged with `tier='gold'`; after a successful
+   *                   Oro generate the handler re-opens it with
+   *                   `tier='silver'` until both tiers are persisted.
+   */
   const startPostGroupsCrossings = () => {
     const resolved = flow.openPostGroupsFlow();
-    if (resolved !== null) setShowBracketMode(true);
+    if (resolved !== null) openCrossingsModal();
   };
 
   const handlePickCategory = (category: string) => {
     const target = flow.pick(category);
     if (target === 'post-groups') {
-      setShowBracketMode(true);
+      openCrossingsModal();
     } else {
       openManualModal();
     }
   };
 
-  /** Transition from the mode picker to the crossings modal, tagging
-   *  the first step of the division flow as the Oro bracket. */
-  const handlePickBracketMode = (mode: BracketMode) => {
-    setBracketMode(mode);
-    setShowBracketMode(false);
-    setCurrentTier(mode === 'division' ? 'gold' : null);
-    setShowBracketCrossings(true);
+  /** Route the post-groups flow to the right modal based on the
+   *  tournament-level bracket mode. */
+  const openCrossingsModal = () => {
+    if (bracketMode === 'divisions') {
+      setCurrentTier('gold');
+      setShowBracketCrossings(true);
+    } else {
+      setCurrentTier(null);
+      setShowManualCrossings(true);
+    }
   };
 
   /**
@@ -247,7 +258,7 @@ export function FixturesTab({
       onBracketUpdated(bracket);
       // Division flow: after finishing Oro, re-open the modal for Plata.
       // After Plata (or the single-bracket flow), close and reset.
-      if (bracketMode === 'division' && currentTier === 'gold') {
+      if (bracketMode === 'divisions' && currentTier === 'gold') {
         // Parse seed labels ("pos|groupName") to find the highest group
         // placement Oro consumed. Plata starts right after — e.g. if
         // Oro took 1° y 2°, Plata begins at 3°.
@@ -267,8 +278,8 @@ export function FixturesTab({
         return;
       }
       setShowBracketCrossings(false);
+      setShowManualCrossings(false);
       setCurrentTier(null);
-      setBracketMode(null);
       setSilverStartPosition(3);
       toast.success(
         currentTier === 'silver'
@@ -470,29 +481,29 @@ export function FixturesTab({
         generating={generating}
       />
 
-      <BracketModePickerDialog
-        open={showBracketMode}
-        category={flow.pickedCategory}
-        onClose={() => {
-          setShowBracketMode(false);
-          flow.reset();
-        }}
-        onPick={handlePickBracketMode}
-      />
-
       <BracketCrossingsModal
         open={showBracketCrossings}
         groupNames={flow.groupNamesForPickedCategory}
         onClose={() => {
           setShowBracketCrossings(false);
           setCurrentTier(null);
-          setBracketMode(null);
           setSilverStartPosition(3);
         }}
         onGenerate={handlePostGroupsBracketCrossings}
         generating={generating}
         tier={currentTier}
         startPosition={currentTier === 'silver' ? silverStartPosition : 1}
+      />
+
+      <ManualBracketCrossingsModal
+        open={showManualCrossings}
+        groupNames={flow.groupNamesForPickedCategory}
+        onClose={() => {
+          setShowManualCrossings(false);
+          setCurrentTier(null);
+        }}
+        onGenerate={handlePostGroupsBracketCrossings}
+        generating={generating}
       />
     </>
   );

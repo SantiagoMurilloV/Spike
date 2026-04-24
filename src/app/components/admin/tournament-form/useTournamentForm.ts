@@ -71,6 +71,7 @@ export function useTournamentForm({
       categories: tournament.categories ? [...tournament.categories] : [],
       enrollmentDeadline: tournament.enrollmentDeadline ?? '',
       playersPerTeam: tournament.playersPerTeam ?? 12,
+      bracketMode: tournament.bracketMode ?? 'manual',
     });
     setCoverFile(null);
     setCoverPreview(tournament.coverImage ?? null);
@@ -190,6 +191,7 @@ export function useTournamentForm({
         categories: formData.categories,
         enrollmentDeadline: formData.enrollmentDeadline || undefined,
         playersPerTeam: formData.playersPerTeam,
+        bracketMode: formData.bracketMode,
       };
 
       try {
