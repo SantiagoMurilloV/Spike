@@ -235,8 +235,12 @@ function rankCategory(
     };
   });
 
+  // Sort order — classif-points first so the table reorders live as
+  // scores come in (a team racking up points climbs past teams with
+  // fewer points, even if they're "1° of another group"). Group
+  // position only breaks ties between teams otherwise identical on
+  // every performance metric, so it just stabilises the display.
   rows.sort((a, b) => {
-    if (a.groupPosition !== b.groupPosition) return a.groupPosition - b.groupPosition;
     if (a.points !== b.points) return b.points - a.points;
     const setDiffA = a.setsFor - a.setsAgainst;
     const setDiffB = b.setsFor - b.setsAgainst;
@@ -247,6 +251,7 @@ function rankCategory(
     if (ratioA !== ratioB) return ratioB - ratioA;
     if (a.setsFor !== b.setsFor) return b.setsFor - a.setsFor;
     if (a.wins !== b.wins) return b.wins - a.wins;
+    if (a.groupPosition !== b.groupPosition) return a.groupPosition - b.groupPosition;
     return a.team.name.localeCompare(b.team.name);
   });
 
@@ -318,9 +323,17 @@ function CategoryStandingsTable({ rows }: { rows: CategoryRankedRow[] }) {
               return (
                 <motion.tr
                   key={row.team.id}
+                  layout
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.035, duration: 0.25 }}
+                  transition={{
+                    // Entrance animation fans in top-to-bottom, while
+                    // the layout spring handles live reordering once
+                    // points change — keyed on `row.team.id` above so
+                    // framer tracks the same row as it moves.
+                    layout: { type: 'spring', stiffness: 320, damping: 32 },
+                    default: { delay: index * 0.035, duration: 0.25 },
+                  }}
                   className="group relative transition-colors"
                   style={{
                     borderBottom: 'var(--border-hairline)',
@@ -432,7 +445,7 @@ function CategoryStandingsTable({ rows }: { rows: CategoryRankedRow[] }) {
             <span className="font-bold">Podio</span>
           </div>
           <div className="text-black/50 font-medium">
-            Orden: posición en grupo → clasif → dif. sets → razón de puntos
+            Orden: clasif → dif. sets → razón de puntos → sets a favor
           </div>
         </div>
       </div>
