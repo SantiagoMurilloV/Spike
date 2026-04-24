@@ -1,6 +1,8 @@
-import { useState, type ReactNode } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { useState, type ReactNode, type ComponentType } from 'react';
+import { ChevronDown, type LucideProps } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+
+type LucideIcon = ComponentType<LucideProps>;
 
 interface CategorySectionProps {
   title: string;
@@ -10,6 +12,18 @@ interface CategorySectionProps {
   subtitle?: string;
   /** Start expanded. Defaults to false so admins open what they need. */
   defaultOpen?: boolean;
+  /**
+   * Optional leading icon shown before the title (e.g. Award for
+   * División Oro, Medal for División Plata).
+   */
+  icon?: LucideIcon;
+  /**
+   * Tailwind text color classes applied to the icon + title so each
+   * tier / group can carry its own visual tone (e.g. `text-amber-500`
+   * for Oro, `text-slate-400` for Plata). Overrides the default
+   * `text-black/70` title color when provided.
+   */
+  accentClassName?: string;
   children: ReactNode;
 }
 
@@ -24,10 +38,13 @@ export function CategorySection({
   count,
   subtitle,
   defaultOpen = false,
+  icon: Icon,
+  accentClassName,
   children,
 }: CategorySectionProps) {
   const [open, setOpen] = useState(defaultOpen);
   const contentId = `cat-body-${title.replace(/\s+/g, '-')}`;
+  const accentTextClass = accentClassName ?? 'text-black/70';
 
   return (
     <div className="border-b border-black/10 last:border-b-0">
@@ -36,19 +53,27 @@ export function CategorySection({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls={contentId}
-        className="w-full flex items-center justify-between gap-3 px-1 py-3 text-left text-black/70 hover:text-black transition-colors"
+        className={`w-full flex items-center justify-between gap-3 px-1 py-3 text-left transition-colors ${
+          accentClassName ? `${accentTextClass} hover:opacity-80` : 'text-black/70 hover:text-black'
+        }`}
       >
         <div className="flex items-center gap-3 min-w-0">
           <motion.span
             animate={{ rotate: open ? 0 : -90 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="inline-flex text-black/40"
+            className={`inline-flex ${accentClassName ? accentTextClass : 'text-black/40'}`}
             aria-hidden="true"
           >
             <ChevronDown className="w-4 h-4" />
           </motion.span>
+          {Icon && (
+            <Icon
+              className={`w-4 h-4 flex-shrink-0 ${accentTextClass}`}
+              aria-hidden="true"
+            />
+          )}
           <span
-            className="text-sm font-semibold uppercase truncate"
+            className={`text-sm font-semibold uppercase truncate ${accentTextClass}`}
             style={{ fontFamily: 'Barlow Condensed, sans-serif', letterSpacing: '0.1em' }}
           >
             {title}

@@ -1,4 +1,4 @@
-import { Edit } from 'lucide-react';
+import { Edit, Award, Medal } from 'lucide-react';
 import { BracketMatch } from '../../../../types';
 import { Badge } from '../../../../components/ui/badge';
 import { CategorySection } from '../../../../components/admin/CategorySection';
@@ -44,6 +44,17 @@ function tierHeading(tier: BracketTier) {
 }
 
 /**
+ * Visual accents shared with BracketCrossingsModal + public BracketView:
+ *   · Oro   → Award + amber-500
+ *   · Plata → Medal + slate-400
+ * Centralised here so every place that labels a tier looks the same.
+ */
+const TIER_ACCENT: Record<BracketTier, { icon: typeof Award; className: string }> = {
+  gold: { icon: Award, className: 'text-amber-500' },
+  silver: { icon: Medal, className: 'text-slate-400' },
+};
+
+/**
  * Bracket-match list organized by category — collapses to accordions
  * when there's more than one category, else renders inline. Each row
  * has an inline score editor tied to the shared `BracketEditor` hook.
@@ -84,22 +95,26 @@ export function BracketByCategory({
     }
     // Oro/Plata: each tier gets its own collapsible so the admin can
     // expand them independently, mirroring the category-level dropdowns.
+    // The section carries the tier's accent (amber for Oro, slate for
+    // Plata) so the two brackets read apart at a glance.
     return (
       <div className="space-y-0">
-        {buckets.map((b) =>
-          b.tier ? (
+        {buckets.map((b) => {
+          if (!b.tier) return <div key="_none">{renderRows(b.matches)}</div>;
+          const accent = TIER_ACCENT[b.tier];
+          return (
             <CategorySection
               key={b.tier}
               title={tierHeading(b.tier)}
               count={b.matches.length}
               defaultOpen
+              icon={accent.icon}
+              accentClassName={accent.className}
             >
               {renderRows(b.matches)}
             </CategorySection>
-          ) : (
-            <div key="_none">{renderRows(b.matches)}</div>
-          ),
-        )}
+          );
+        })}
       </div>
     );
   };
