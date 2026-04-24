@@ -201,25 +201,53 @@ export class BracketGenerator {
     const currentRound = bracketMatch.round as string;
     const currentPosition = bracketMatch.position as number;
 
-    // Parse category prefix from round name
-    const [categoryPrefix, roundName] = currentRound.includes('|')
-      ? [currentRound.split('|')[0], currentRound.split('|').slice(1).join('|')]
-      : ['', currentRound];
+    // Parse category prefix + tier + round name from the round string.
+    // Three supported shapes:
+    //   · "final"                      → legacy single-category
+    //   · "Category|final"             → category-scoped, non-tiered
+    //   · "Category|gold|final"        → Oro/Plata división (tier middle)
+    const rawParts = currentRound.includes('|') ? currentRound.split('|') : [currentRound];
+    let categoryPrefix = '';
+    let tierSegment: 'gold' | 'silver' | '' = '';
+    let roundName = currentRound;
+    if (rawParts.length >= 3 && (rawParts[1] === 'gold' || rawParts[1] === 'silver')) {
+      categoryPrefix = rawParts[0];
+      tierSegment = rawParts[1] as 'gold' | 'silver';
+      roundName = rawParts.slice(2).join('|');
+    } else if (rawParts.length >= 2) {
+      categoryPrefix = rawParts[0];
+      roundName = rawParts.slice(1).join('|');
+    }
 
-    const prefixRound = (name: string) => categoryPrefix ? `${categoryPrefix}|${name}` : name;
+    const prefixRound = (name: string) => {
+      if (categoryPrefix && tierSegment) return `${categoryPrefix}|${tierSegment}|${name}`;
+      if (categoryPrefix) return `${categoryPrefix}|${name}`;
+      return name;
+    };
 
-    // Determine total teams in the bracket to figure out rounds
-    // Only count matches with the same category prefix
+    // Determine total teams in the bracket to figure out rounds. Scope
+    // the count to the SAME sub-bracket: when the round is tiered, only
+    // count rows of the same tier (Oro ≠ Plata). When non-tiered, only
+    // count 2-segment rows of that category so coexisting tiered rows
+    // don't inflate the count.
     const allMatchesResult = await pool.query(
       'SELECT round, position FROM bracket_matches WHERE tournament_id = $1 ORDER BY round, position',
       [tournamentId]
     );
 
-    // Filter to same category prefix
+    const tierRoundPrefix = tierSegment ? `${categoryPrefix}|${tierSegment}|` : '';
     const sameCategoryMatches = allMatchesResult.rows.filter((r: Record<string, unknown>) => {
       const rRound = r.round as string;
+      if (categoryPrefix && tierSegment) {
+        return rRound.startsWith(tierRoundPrefix) && !rRound.endsWith('|tercer-puesto');
+      }
       if (categoryPrefix) {
-        return rRound.startsWith(categoryPrefix + '|') && !rRound.endsWith('|tercer-puesto');
+        if (rRound.endsWith('|tercer-puesto')) return false;
+        if (!rRound.startsWith(categoryPrefix + '|')) return false;
+        // Exclude any tiered rows so the single-bracket count stays clean.
+        const parts = rRound.split('|');
+        if (parts.length >= 3 && (parts[1] === 'gold' || parts[1] === 'silver')) return false;
+        return true;
       }
       return !rRound.includes('|') && rRound !== 'tercer-puesto';
     });

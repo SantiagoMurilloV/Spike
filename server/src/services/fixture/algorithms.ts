@@ -270,10 +270,10 @@ export function buildBracketFromSeeds(
     matchesInRound = matchesInRound / 2;
   }
 
-  // 3rd-place match: always present for single-bracket & gold tier,
-  // omitted for silver tier (per product decision: silver has final only).
-  const includeThirdPlace = bracketTier !== 'silver';
-  if (totalRounds >= 2 && includeThirdPlace) {
+  // 3rd-place match: always present when the bracket has at least a
+  // semifinal round. Both Oro and Plata get their own tercer-puesto so
+  // each division produces a full 1°/2°/3° podium independently.
+  if (totalRounds >= 2) {
     fixtures.push({
       round: totalRounds,
       position: 2,
