@@ -9,7 +9,11 @@ const FONT = { fontFamily: 'Barlow Condensed, sans-serif' };
 
 /** Row consumed by {@link CategoryStandingsTable}. Keeps the original
  *  group position for sorting + display while exposing a recomputed
- *  `globalPosition` for the ranking column. */
+ *  `globalPosition` for the ranking column. Rally counters
+ *  (`pointsFor` / `pointsAgainst`) are the raw point totals scored
+ *  across every set of every group-phase match — a standard volleyball
+ *  column independent of the match-points (`points`) used for
+ *  classification. */
 interface CategoryRankedRow {
   globalPosition: number;
   groupLetter: string;
@@ -20,6 +24,11 @@ interface CategoryRankedRow {
   losses: number;
   setsFor: number;
   setsAgainst: number;
+  /** Raw rally points scored. */
+  pointsFor: number;
+  /** Raw rally points conceded. */
+  pointsAgainst: number;
+  /** Match / classification points (3 / 2 / 1 / 0 per result). */
   points: number;
   isQualified?: boolean;
 }
@@ -31,6 +40,12 @@ const MEDAL_BACKGROUNDS = [
 ];
 
 const MEDAL_COLORS = ['#FFB300', '#C0C0C0', '#CD7F32'];
+
+/** Warm-yellow fill used for rows that classified to the bracket. Sits
+ *  on top of any medal tint so the qualification read stays dominant.
+ *  Opacity is high enough to be obvious without blowing out the text. */
+const QUALIFIED_ROW_BG =
+  'linear-gradient(to right, rgba(253, 216, 53, 0.42), rgba(253, 216, 53, 0.12) 70%)';
 
 /**
  * "Tabla de clasificación" tab — public-facing overall standings view.
@@ -92,6 +107,23 @@ function GlobalByCategory({
     if (!teamToGroup.has(m.team2.id)) teamToGroup.set(m.team2.id, m.group);
   }
 
+  // Aggregate rally points per team across every set of every group-phase
+  // match. Only matches with `sets` (live or completed) contribute.
+  const rallyByTeam = new Map<string, { for: number; against: number }>();
+  for (const m of matches) {
+    if (!m.group || !m.sets || m.sets.length === 0) continue;
+    const t1 = rallyByTeam.get(m.team1.id) ?? { for: 0, against: 0 };
+    const t2 = rallyByTeam.get(m.team2.id) ?? { for: 0, against: 0 };
+    for (const s of m.sets) {
+      t1.for += s.team1;
+      t1.against += s.team2;
+      t2.for += s.team2;
+      t2.against += s.team1;
+    }
+    rallyByTeam.set(m.team1.id, t1);
+    rallyByTeam.set(m.team2.id, t2);
+  }
+
   // Bucket groups by category so multi-category tournaments keep their
   // own red-underlined header + their own overall table.
   const categoryMap = new Map<string, string[]>();
@@ -112,7 +144,7 @@ function GlobalByCategory({
           const gn = teamToGroup.get(s.team.id);
           return gn ? catGroupSet.has(gn) : false;
         });
-        const ranked = rankCategory(catStandings, teamToGroup);
+        const ranked = rankCategory(catStandings, teamToGroup, rallyByTeam);
         if (ranked.length === 0) return null;
         return (
           <div key={category || '_default'}>
@@ -124,10 +156,7 @@ function GlobalByCategory({
                 {category.toUpperCase()}
               </h2>
             )}
-            <CategoryStandingsTable
-              rows={ranked}
-              title={category ? category.toUpperCase() : 'CLASIFICACIÓN'}
-            />
+            <CategoryStandingsTable rows={ranked} />
           </div>
         );
       })}
@@ -143,27 +172,37 @@ function GlobalByCategory({
 function rankCategory(
   catStandings: StandingsRow[],
   teamToGroup: Map<string, string>,
+  rallyByTeam: Map<string, { for: number; against: number }>,
 ): CategoryRankedRow[] {
-  const rows: CategoryRankedRow[] = catStandings.map((s) => ({
-    globalPosition: 0, // assigned after sort
-    groupLetter: groupLetter(teamToGroup.get(s.team.id) ?? '') || '—',
-    groupPosition: s.position,
-    team: s.team,
-    played: s.played,
-    wins: s.wins,
-    losses: s.losses,
-    setsFor: s.setsFor,
-    setsAgainst: s.setsAgainst,
-    points: s.points,
-    isQualified: s.isQualified,
-  }));
+  const rows: CategoryRankedRow[] = catStandings.map((s) => {
+    const rally = rallyByTeam.get(s.team.id) ?? { for: 0, against: 0 };
+    return {
+      globalPosition: 0, // assigned after sort
+      groupLetter: groupLetter(teamToGroup.get(s.team.id) ?? '') || '—',
+      groupPosition: s.position,
+      team: s.team,
+      played: s.played,
+      wins: s.wins,
+      losses: s.losses,
+      setsFor: s.setsFor,
+      setsAgainst: s.setsAgainst,
+      pointsFor: rally.for,
+      pointsAgainst: rally.against,
+      points: s.points,
+      isQualified: s.isQualified,
+    };
+  });
 
   rows.sort((a, b) => {
     if (a.groupPosition !== b.groupPosition) return a.groupPosition - b.groupPosition;
     if (a.points !== b.points) return b.points - a.points;
-    const diffA = a.setsFor - a.setsAgainst;
-    const diffB = b.setsFor - b.setsAgainst;
-    if (diffA !== diffB) return diffB - diffA;
+    const setDiffA = a.setsFor - a.setsAgainst;
+    const setDiffB = b.setsFor - b.setsAgainst;
+    if (setDiffA !== setDiffB) return setDiffB - setDiffA;
+    // Rally-point ratio (standard FIVB tiebreaker): higher is better.
+    const ratioA = a.pointsAgainst === 0 ? a.pointsFor : a.pointsFor / a.pointsAgainst;
+    const ratioB = b.pointsAgainst === 0 ? b.pointsFor : b.pointsFor / b.pointsAgainst;
+    if (ratioA !== ratioB) return ratioB - ratioA;
     if (a.setsFor !== b.setsFor) return b.setsFor - a.setsFor;
     if (a.wins !== b.wins) return b.wins - a.wins;
     return a.team.name.localeCompare(b.team.name);
@@ -174,18 +213,14 @@ function rankCategory(
 }
 
 /**
- * Flat category-wide standings table. Similar look to the per-group
- * `StandingsTable` (sticky black header, medal tints on the podium,
- * qualified left stripe) but adds a "Grupo" column so the reader
- * knows which pool each row came from.
+ * Flat category-wide standings table. The category title already lives
+ * in the red-underlined `<h2>` above so the table itself starts straight
+ * at the column header — no redundant title bar. Qualified rows (the
+ * teams that advanced to bracket) are highlighted with a warm yellow
+ * background; the podium still carries the medal tints when qualifying
+ * isn't flagged yet (groups in progress).
  */
-function CategoryStandingsTable({
-  rows,
-  title,
-}: {
-  rows: CategoryRankedRow[];
-  title: string;
-}) {
+function CategoryStandingsTable({ rows }: { rows: CategoryRankedRow[] }) {
   return (
     <div
       className="bg-white overflow-hidden"
@@ -194,16 +229,6 @@ function CategoryStandingsTable({
         borderRadius: 'var(--radius-card)',
       }}
     >
-      <div
-        className="bg-black text-white px-5 py-3 font-bold uppercase border-b border-white/10 flex items-center justify-between"
-        style={{ ...FONT, letterSpacing: '0.06em' }}
-      >
-        <h3 className="text-base sm:text-lg tracking-wider">{title}</h3>
-        <span className="text-[11px] text-white/60 font-medium">
-          {rows.length} equipos
-        </span>
-      </div>
-
       <div className="overflow-x-auto max-h-[75vh] overflow-y-auto">
         <table className="w-full">
           <thead
@@ -213,7 +238,7 @@ function CategoryStandingsTable({
             <tr className="text-[10px] sm:text-[11px] uppercase">
               <th className="px-2 sm:px-4 py-3 text-left font-bold w-10 sm:w-12">#</th>
               <th className="px-2 sm:px-4 py-3 text-left font-bold">Equipo</th>
-              <th className="px-2 py-3 text-center font-bold w-12" title="Grupo">
+              <th className="px-2 py-3 text-center font-bold w-14" title="Grupo">
                 Grupo
               </th>
               <th
@@ -227,7 +252,18 @@ function CategoryStandingsTable({
                 PP
               </th>
               <th className="hidden md:table-cell px-2 py-3 text-right font-bold w-16">Sets</th>
-              <th className="px-2 sm:px-4 py-3 text-right font-bold w-11 sm:w-12">Pts</th>
+              <th
+                className="hidden md:table-cell px-2 py-3 text-right font-bold w-20"
+                title="Puntos a favor / en contra sumados en todos los sets"
+              >
+                Puntos
+              </th>
+              <th
+                className="px-2 sm:px-4 py-3 text-right font-bold w-11 sm:w-12"
+                title="Puntos de clasificación"
+              >
+                Clasif
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -235,6 +271,7 @@ function CategoryStandingsTable({
               const isPodium = index < 3;
               const medalBg = isPodium ? MEDAL_BACKGROUNDS[index] : undefined;
               const medalColor = isPodium ? MEDAL_COLORS[index] : undefined;
+              const rowBg = row.isQualified ? QUALIFIED_ROW_BG : medalBg;
 
               return (
                 <motion.tr
@@ -245,8 +282,10 @@ function CategoryStandingsTable({
                   className="group relative transition-colors"
                   style={{
                     borderBottom: 'var(--border-hairline)',
-                    background: medalBg,
-                    borderLeft: row.isQualified ? '3px solid #E31E24' : '3px solid transparent',
+                    background: rowBg,
+                    borderLeft: row.isQualified
+                      ? '3px solid #FBC02D'
+                      : '3px solid transparent',
                   }}
                 >
                   <td className="px-2 sm:px-4 py-2.5 sm:py-3">
@@ -283,7 +322,8 @@ function CategoryStandingsTable({
                           className="sm:hidden text-[10px] text-black/50 mt-0.5 tabular-nums"
                           style={{ ...FONT, letterSpacing: '0.04em' }}
                         >
-                          PJ {row.played} · PP {row.losses} · {row.setsFor}/{row.setsAgainst}
+                          PJ {row.played} · Sets {row.setsFor}/{row.setsAgainst} ·{' '}
+                          Pts {row.pointsFor}/{row.pointsAgainst}
                         </div>
                       </div>
                     </div>
@@ -314,6 +354,12 @@ function CategoryStandingsTable({
                     {row.setsFor}/{row.setsAgainst}
                   </td>
                   <td
+                    className="hidden md:table-cell px-2 py-3 text-right text-xs tabular-nums text-black/60"
+                    title="Puntos a favor / en contra en todos los sets"
+                  >
+                    {row.pointsFor}/{row.pointsAgainst}
+                  </td>
+                  <td
                     className="px-2 sm:px-4 py-2.5 sm:py-3 text-right font-bold text-lg sm:text-xl tabular-nums"
                     style={{ ...FONT, color: '#0F0F14' }}
                   >
@@ -334,7 +380,7 @@ function CategoryStandingsTable({
           <div className="flex items-center gap-1.5">
             <div
               className="w-3 h-3 rounded-sm"
-              style={{ background: '#E31E24', borderLeft: '3px solid #E31E24' }}
+              style={{ background: '#FBC02D' }}
               aria-hidden="true"
             />
             <span className="font-bold">Clasificado a bracket</span>
@@ -344,7 +390,7 @@ function CategoryStandingsTable({
             <span className="font-bold">Podio</span>
           </div>
           <div className="text-black/50 font-medium">
-            Orden: posición en grupo → puntos → diferencia de sets
+            Orden: posición en grupo → clasif → dif. sets → razón de puntos
           </div>
         </div>
       </div>
