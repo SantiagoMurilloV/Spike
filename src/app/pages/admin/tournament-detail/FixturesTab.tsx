@@ -326,20 +326,39 @@ export function FixturesTab({
             )}
             Creación de Grupos
           </Button>
-          {tournament.format === 'groups+knockout' && matches.length > 0 && (
-            <Button
-              onClick={startPostGroupsCrossings}
-              disabled={generating}
-              className="bg-spk-win hover:bg-spk-win/90 text-white w-full sm:w-auto"
-            >
-              {generating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Trophy className="w-4 h-4" />
-              )}
-              Definir Eliminación Directa
-            </Button>
-          )}
+          {tournament.format === 'groups+knockout' &&
+            matches.length > 0 &&
+            bracketMode === 'manual' && (
+              <Button
+                onClick={startPostGroupsCrossings}
+                disabled={generating}
+                className="bg-spk-win hover:bg-spk-win/90 text-white w-full sm:w-auto"
+              >
+                {generating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trophy className="w-4 h-4" />
+                )}
+                Definir Eliminación Directa
+              </Button>
+            )}
+          {tournament.format === 'groups+knockout' &&
+            matches.length > 0 &&
+            bracketMode === 'divisions' && (
+              <div
+                className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-sm text-xs text-amber-800 w-full sm:w-auto"
+                style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
+                title="El bracket Oro + Plata se genera solo cuando todos los grupos de la categoría terminan."
+              >
+                <Trophy className="w-4 h-4 flex-shrink-0" />
+                <span className="font-semibold uppercase tracking-wider">
+                  Bracket por divisiones
+                </span>
+                <span className="text-amber-700/80">
+                  · se genera automático al terminar los grupos
+                </span>
+              </div>
+            )}
           {(matches.length > 0 || bracketMatches.length > 0) && (
             <Button
               onClick={onRecalculateStandings}
