@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Shuffle, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 import type { Team } from '../../../types';
 import { TeamAvatar } from '../../TeamAvatar';
 import { Button } from '../../ui/button';
@@ -12,6 +13,7 @@ import {
 } from '../../ui/select';
 import { ScheduleFields } from './ScheduleFields';
 import { DEFAULT_SCHEDULE, type ScheduleConfig } from './shared';
+import { autoDistributeGroups } from '../../../lib/autoGroups';
 
 interface ManualGroupsModalProps {
   open: boolean;
@@ -103,6 +105,22 @@ export function ManualGroupsModal({
 
   const canGenerate = unassignedTeams.length === 0 && teams.length > 0;
 
+  /**
+   * Run the auto-distribution algorithm and replace the current
+   * assignment grid. Respects `groupCount` so the admin's group-count
+   * picker stays authoritative — the algorithm just fills the buckets.
+   */
+  const handleAutoDistribute = () => {
+    if (teams.length === 0) return;
+    const { assignments: auto, warnings } = autoDistributeGroups(teams, groupCount);
+    setAssignments(auto);
+    if (warnings.length > 0) {
+      toast.warning(warnings[0], { description: warnings.slice(1).join(' · ') || undefined });
+    } else {
+      toast.success('Grupos distribuidos con separación por club y ciudad');
+    }
+  };
+
   const handleGenerate = () => {
     const groups: Record<string, string[]> = {};
     for (const name of groupNames) {
@@ -137,16 +155,34 @@ export function ManualGroupsModal({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-          <div className="flex items-center gap-3 mb-4 sm:mb-6">
-            <span className="text-sm font-medium">Grupos:</span>
-            <Button size="sm" variant="outline" onClick={removeGroup} disabled={groupCount <= MIN_GROUPS}>
-              −
-            </Button>
-            <span className="text-lg font-bold w-8 text-center">{groupCount}</span>
-            <Button size="sm" variant="outline" onClick={addGroup} disabled={groupCount >= MAX_GROUPS}>
-              +
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium">Grupos:</span>
+              <Button size="sm" variant="outline" onClick={removeGroup} disabled={groupCount <= MIN_GROUPS}>
+                −
+              </Button>
+              <span className="text-lg font-bold w-8 text-center">{groupCount}</span>
+              <Button size="sm" variant="outline" onClick={addGroup} disabled={groupCount >= MAX_GROUPS}>
+                +
+              </Button>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleAutoDistribute}
+              disabled={teams.length === 0}
+              className="border-spk-blue text-spk-blue hover:bg-spk-blue/10 w-full sm:w-auto"
+              title="Reparte los equipos respetando club (no se repite) y ciudad (se intenta separar)"
+            >
+              <Shuffle className="w-4 h-4" />
+              Aleatorio
             </Button>
           </div>
+          <p className="hidden sm:flex text-[11px] text-black/45 items-center gap-1.5 -mt-3 mb-4">
+            <AlertTriangle className="w-3 h-3" />
+            "Aleatorio" reparte respetando el club (teams con el mismo primer nombre
+            quedan en grupos distintos) e intenta separar equipos de la misma ciudad.
+          </p>
 
           <div className="flex flex-col md:flex-row gap-4 md:gap-6">
             <div className="w-full md:w-64 md:flex-shrink-0">
