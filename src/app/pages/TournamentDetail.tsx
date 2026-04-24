@@ -29,8 +29,17 @@ export function TournamentDetail() {
   const [activeTab, setActiveTab] = useState<TabId>('teams');
   const [isFollowing, setIsFollowing] = useState(false);
 
-  const { tournament, matches, standings, bracket, enrolledTeams, loading, error, reload } =
-    useTournamentData(id);
+  const {
+    tournament,
+    matches,
+    standings,
+    bracket,
+    enrolledTeams,
+    loading,
+    error,
+    reload,
+    lastRefreshedAt,
+  } = useTournamentData(id);
 
   if (loading) {
     return (
@@ -139,7 +148,11 @@ export function TournamentDetail() {
         {activeTab === 'grupos' && <GruposTab matches={matches} standings={standings} />}
         {activeTab === 'matches' && <MatchesTab matches={matches} />}
         {activeTab === 'standings' && (
-          <StandingsTab matches={matches} standings={standings} />
+          <StandingsTab
+            matches={matches}
+            standings={standings}
+            lastRefreshedAt={lastRefreshedAt}
+          />
         )}
         {activeTab === 'bracket' && <BracketTab bracketMatches={bracket} />}
         {activeTab === 'info' && (
