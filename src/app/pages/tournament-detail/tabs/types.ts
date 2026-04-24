@@ -1,4 +1,4 @@
-export type TabId = 'matches' | 'grupos' | 'bracket' | 'teams' | 'info';
+export type TabId = 'matches' | 'grupos' | 'standings' | 'bracket' | 'teams' | 'info';
 
 export interface TabDescriptor {
   id: TabId;

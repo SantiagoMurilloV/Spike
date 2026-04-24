@@ -9,6 +9,7 @@ import { Footer } from './tournament-detail/Footer';
 import { TeamsTab } from './tournament-detail/tabs/TeamsTab';
 import { GruposTab } from './tournament-detail/tabs/GruposTab';
 import { MatchesTab } from './tournament-detail/tabs/MatchesTab';
+import { StandingsTab } from './tournament-detail/tabs/StandingsTab';
 import { BracketTab } from './tournament-detail/tabs/BracketTab';
 import { InfoTab } from './tournament-detail/tabs/InfoTab';
 import type { TabDescriptor, TabId } from './tournament-detail/tabs/types';
@@ -109,6 +110,7 @@ export function TournamentDetail() {
     },
     { id: 'grupos', label: 'Grupos', count: standings.length },
     { id: 'matches', label: 'Partidos', count: matches.length },
+    { id: 'standings', label: 'Clasificación', count: standings.length },
     { id: 'bracket', label: 'Bracket' },
     { id: 'info', label: 'Info' },
   ];
@@ -136,6 +138,9 @@ export function TournamentDetail() {
         )}
         {activeTab === 'grupos' && <GruposTab matches={matches} standings={standings} />}
         {activeTab === 'matches' && <MatchesTab matches={matches} />}
+        {activeTab === 'standings' && (
+          <StandingsTab matches={matches} standings={standings} />
+        )}
         {activeTab === 'bracket' && <BracketTab bracketMatches={bracket} />}
         {activeTab === 'info' && (
           <InfoTab
