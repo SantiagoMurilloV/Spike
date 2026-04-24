@@ -107,7 +107,6 @@ export function BracketByCategory({
               key={b.tier}
               title={tierHeading(b.tier)}
               count={b.matches.length}
-              defaultOpen
               icon={accent.icon}
               accentClassName={accent.className}
             >

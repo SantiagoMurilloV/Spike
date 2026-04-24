@@ -127,10 +127,31 @@ export async function clearCategoryBracket(
   tier?: BracketTier | null,
 ): Promise<void> {
   if (tier) {
-    const prefix = `${category}|${tier}|%`;
+    // 1. Wipe this tier's 3-segment rows ("Category|<tier>|roundName").
+    const tierPrefix = `${category}|${tier}|%`;
     await client.query(
       'DELETE FROM bracket_matches WHERE tournament_id = $1 AND round LIKE $2',
-      [tournamentId, prefix],
+      [tournamentId, tierPrefix],
+    );
+    // 2. Also purge legacy 2-segment rows ("Category|roundName") for
+    //    the same category — a tiered generation supersedes any
+    //    single-bracket mode that was there before, otherwise those
+    //    orphan rows show up in the UI as a phantom 3rd bracket
+    //    alongside Oro + Plata. The OTHER tier's 3-segment rows are
+    //    deliberately left alone so regenerating Oro keeps Plata (and
+    //    vice-versa).
+    await client.query(
+      `DELETE FROM bracket_matches
+         WHERE tournament_id = $1
+           AND round LIKE $2
+           AND round NOT LIKE $3
+           AND round NOT LIKE $4`,
+      [
+        tournamentId,
+        `${category}|%`,
+        `${category}|gold|%`,
+        `${category}|silver|%`,
+      ],
     );
     return;
   }
