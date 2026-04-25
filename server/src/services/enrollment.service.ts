@@ -8,6 +8,21 @@ interface EnrolledTeamsByCategory {
 }
 
 function mapTeamFromRow(row: Record<string, unknown>): Team {
+  // captain_username + credentials_generated_at are joined here so the
+  // enrolled-teams endpoint surfaces the captain handle without an
+  // extra round-trip per row. Skipping them is what made the public
+  // team list "lose" credentials after a reload — the front-end then
+  // saw `team.captainUsername === undefined` and treated the row as
+  // never-credentialed even though the column on `teams` was populated.
+  const generatedAtRaw = row.team_credentials_generated_at as
+    | Date
+    | string
+    | null
+    | undefined;
+  const generatedAt =
+    generatedAtRaw instanceof Date
+      ? generatedAtRaw.toISOString()
+      : (generatedAtRaw ?? undefined);
   return {
     id: row.team_id as string,
     name: row.team_name as string,
@@ -18,6 +33,8 @@ function mapTeamFromRow(row: Record<string, unknown>): Team {
     city: row.team_city as string | undefined,
     department: row.team_department as string | undefined,
     category: row.team_category as string | undefined,
+    captainUsername: (row.team_captain_username as string | null) ?? undefined,
+    credentialsGeneratedAt: generatedAt,
   };
 }
 
@@ -47,7 +64,9 @@ export class EnrollmentService {
       `SELECT tt.id, tt.tournament_id, tt.team_id,
               t.name AS team_name, t.initials AS team_initials, t.logo AS team_logo,
               t.primary_color AS team_primary_color, t.secondary_color AS team_secondary_color,
-              t.city AS team_city, t.department AS team_department, t.category AS team_category
+              t.city AS team_city, t.department AS team_department, t.category AS team_category,
+              t.captain_username AS team_captain_username,
+              t.credentials_generated_at AS team_credentials_generated_at
        FROM tournament_teams tt
        JOIN teams t ON tt.team_id = t.id
        WHERE tt.tournament_id = $1

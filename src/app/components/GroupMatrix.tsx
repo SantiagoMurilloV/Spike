@@ -54,18 +54,22 @@ export function GroupMatrix({ groupName, matches, standings }: GroupMatrixProps)
   return (
     <div className="bg-white border border-black/10 overflow-hidden rounded-sm">
       {/* Group Header */}
-      <div className="bg-black text-white px-4 sm:px-6 py-3 sm:py-4 font-bold border-b border-white/10" style={font}>
-        <h3 className="text-lg sm:text-xl tracking-wider">GRUPO {displayGroupName.toUpperCase()}</h3>
+      <div className="bg-black text-white px-3 sm:px-6 py-2 sm:py-4 font-bold border-b border-white/10" style={font}>
+        <h3 className="text-base sm:text-xl tracking-wider">GRUPO {displayGroupName.toUpperCase()}</h3>
       </div>
 
       {/* Results Matrix — horizontal scroll on mobile when teams > 3, with a
-          sticky team-name column so rows stay readable while scrolling. */}
+          sticky team-name column so rows stay readable while scrolling.
+          Mobile sizes shrunk one notch (Equipo col 90→72px, team cells
+          44→36px, paddings tighter) so a 6-team round-robin fits the
+          phone viewport without scrolling and an 8-team one barely
+          spills, making the scroll-affordance discoverable. */}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
               <th
-                className="px-2 sm:px-3 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-bold text-black/60 uppercase tracking-wider bg-black/5 border-b border-r border-black/10 min-w-[90px] sm:min-w-[140px] md:min-w-[160px] sticky left-0 z-10"
+                className="px-1.5 sm:px-3 py-1.5 sm:py-3 text-left text-[9px] sm:text-xs font-bold text-black/60 uppercase tracking-wider bg-black/5 border-b border-r border-black/10 min-w-[72px] sm:min-w-[140px] md:min-w-[160px] sticky left-0 z-10"
                 style={font}
               >
                 Equipo
@@ -73,7 +77,7 @@ export function GroupMatrix({ groupName, matches, standings }: GroupMatrixProps)
               {teams.map((t) => (
                 <th
                   key={t.id}
-                  className="px-1 sm:px-2 py-2 sm:py-3 text-center border-b border-r border-black/10 bg-black/5 min-w-[44px] sm:min-w-[56px] md:min-w-[64px]"
+                  className="px-0.5 sm:px-2 py-1.5 sm:py-3 text-center border-b border-r border-black/10 bg-black/5 min-w-[38px] sm:min-w-[56px] md:min-w-[64px]"
                 >
                   <div className="flex flex-col items-center gap-0.5 sm:gap-1">
                     <TeamAvatar team={t} size="xs" />
@@ -91,10 +95,10 @@ export function GroupMatrix({ groupName, matches, standings }: GroupMatrixProps)
           <tbody>
             {teams.map((rowTeam) => (
               <tr key={rowTeam.id}>
-                <td className="px-2 sm:px-3 py-1.5 sm:py-2 border-b border-r border-black/10 bg-white sticky left-0 z-10">
-                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                <td className="px-1.5 sm:px-3 py-1 sm:py-2 border-b border-r border-black/10 bg-white sticky left-0 z-10">
+                  <div className="flex items-center gap-1 sm:gap-2 min-w-0">
                     <TeamAvatar team={rowTeam} size="xs" />
-                    <span className="text-[11px] sm:text-sm font-medium truncate max-w-[60px] sm:max-w-[100px] md:max-w-[120px]">
+                    <span className="text-[10px] sm:text-sm font-medium truncate max-w-[44px] sm:max-w-[100px] md:max-w-[120px]">
                       {rowTeam.name}
                     </span>
                   </div>
@@ -104,7 +108,7 @@ export function GroupMatrix({ groupName, matches, standings }: GroupMatrixProps)
                     return (
                       <td
                         key={colTeam.id}
-                        className="px-1 sm:px-2 py-1.5 sm:py-2 text-center border-b border-r border-black/10 bg-black/10"
+                        className="px-0.5 sm:px-2 py-1 sm:py-2 text-center border-b border-r border-black/10 bg-black/10"
                       />
                     );
                   }
@@ -112,10 +116,10 @@ export function GroupMatrix({ groupName, matches, standings }: GroupMatrixProps)
                   return (
                     <td
                       key={colTeam.id}
-                      className="px-1 sm:px-2 py-1.5 sm:py-2 text-center border-b border-r border-black/10"
+                      className="px-0.5 sm:px-2 py-1 sm:py-2 text-center border-b border-r border-black/10"
                     >
                       {result ? (
-                        <span className="text-[11px] sm:text-sm whitespace-nowrap" style={font}>
+                        <span className="text-[10px] sm:text-sm whitespace-nowrap" style={font}>
                           <span className={result.rowWon ? 'font-bold text-spk-win' : 'text-black/60'}>
                             {result.row}
                           </span>
@@ -125,7 +129,7 @@ export function GroupMatrix({ groupName, matches, standings }: GroupMatrixProps)
                           </span>
                         </span>
                       ) : (
-                        <span className="text-black/30 text-xs sm:text-sm">—</span>
+                        <span className="text-black/30 text-[10px] sm:text-sm">—</span>
                       )}
                     </td>
                   );
