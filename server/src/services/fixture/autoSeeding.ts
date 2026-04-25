@@ -37,6 +37,37 @@ export function bracketSeedOrder(n: number): number[] {
   return order;
 }
 
+/**
+ * Apply the VNL [1, 8, 4, 5, 2, 7, 3, 6] pairing pattern to a list of
+ * team ids ALREADY sorted from best (seed 1) to worst (seed N) by
+ * cumulative cross-group ranking.
+ *
+ * Returns `{position, teamId}` seeds — `position` is the bracket slot
+ * index (1-based, top to bottom) and `teamId` is the resolved team
+ * directly. Skips byes when the input length is not a power of two.
+ *
+ * Use this instead of {@link autoVnlSeeds} when you want true VNL
+ * seeding — i.e. seed 1 = team with the best record across all groups
+ * (not 1° of group A by alphabetical accident). The caller is
+ * responsible for ranking the team list (see
+ * `FixtureGenerator.computeCumulativeRanking`).
+ */
+export function applyVnlPatternToRanking(
+  rankedTeamIds: string[],
+): Array<{ position: number; teamId: string }> {
+  const n = rankedTeamIds.length;
+  if (n < 2) return [];
+  const slots = nextPow2(Math.max(2, n));
+  const order = bracketSeedOrder(slots);
+  const seeds: Array<{ position: number; teamId: string }> = [];
+  for (let i = 0; i < order.length; i++) {
+    const seedIdx = order[i];
+    if (seedIdx > n) continue; // bye
+    seeds.push({ position: i + 1, teamId: rankedTeamIds[seedIdx - 1] });
+  }
+  return seeds;
+}
+
 export function autoVnlSeeds({
   groupNames,
   classifiersPerGroup,
