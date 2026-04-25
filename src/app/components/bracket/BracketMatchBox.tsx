@@ -180,7 +180,7 @@ function BracketTeamSlot({
       </text>
       <text
         x={x + nameX}
-        y={cy}
+        y={cy - (label ? 6 : 0)}
         dominantBaseline="central"
         className={`font-bold uppercase ${
           isLoser ? 'fill-black/45' : isWinner ? 'fill-black' : 'fill-black/80'
@@ -189,6 +189,22 @@ function BracketTeamSlot({
       >
         {truncatedName}
       </text>
+      {/* Seed badge — shown for resolved teams in the first round so
+          the VNL pairing pattern is readable straight off the bracket
+          (slot 1 = "1°A", slot 2 = "2°D", etc). The wrapper passes a
+          `label` only on the first round; later rounds keep their
+          minimal one-line layout. */}
+      {label && (
+        <text
+          x={x + nameX}
+          y={cy + 7}
+          dominantBaseline="central"
+          className="fill-black/45 font-semibold uppercase"
+          style={{ ...FONT, letterSpacing: '0.08em', fontSize: TEAM_NAME_FONT - 4 }}
+        >
+          {label}
+        </text>
+      )}
       {score !== undefined && (
         <text
           x={x + MATCH_W - scoreRightPad}

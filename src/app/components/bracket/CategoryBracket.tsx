@@ -46,7 +46,16 @@ export function CategoryBracket({
       .map((r) => ({
         round: r,
         label: parseRound(r).name,
-        matches: standard.filter((m) => m.round === r),
+        // Sort by `position` so the bracket always renders the seeds in
+        // VNL order from top to bottom — pos 1 (seeds 1 vs 8), pos 2
+        // (4 vs 5), pos 3 (2 vs 7), pos 4 (3 vs 6). The fixture
+        // generator already persists positions in this order, but the
+        // SQL `ORDER BY round, position` lexicographically can drift
+        // for two-digit positions; an explicit numeric sort keeps the
+        // visual order stable for any size bracket.
+        matches: standard
+          .filter((m) => m.round === r)
+          .sort((a, b) => a.position - b.position),
       }))
       .sort((a, b) => b.matches.length - a.matches.length);
   }, [standard]);
@@ -282,9 +291,14 @@ function RoundColumn({
 
 /**
  * Label cascade for a bracket slot:
- *   1. resolved team → no label
- *   2. backend placeholder → formatted label
- *   3. first round with NO placeholder → auto-seed fallback
+ *   1. first round with a backend placeholder → always show the seed
+ *      label ("1°A", "2°D") even when the team is resolved, so the
+ *      VNL pairing pattern is readable at a glance ([1,8,4,5,2,7,3,6])
+ *      instead of having to map team initials back to group positions.
+ *   2. later rounds with no team → fall back to the placeholder if
+ *      present (rare — usually those slots fill via advanceWinner).
+ *   3. first round with NO placeholder and no team → auto-seed fallback
+ *      so a brand-new bracket still shows what *will* go in each slot.
  */
 function resolveLabels(
   match: BracketMatch,
@@ -295,11 +309,24 @@ function resolveLabels(
   let label1: string | undefined;
   let label2: string | undefined;
 
-  if (!match.team1 && match.team1Placeholder) {
-    label1 = formatBracketPlaceholder(match.team1Placeholder);
-  }
-  if (!match.team2 && match.team2Placeholder) {
-    label2 = formatBracketPlaceholder(match.team2Placeholder);
+  // First round: always surface the placeholder, regardless of whether
+  // the team has been resolved. The slot renders the seed alongside
+  // the team initials so the admin and spectators see at a glance that
+  // pos 1 = 1° vs 8°, pos 2 = 4° vs 5°, etc.
+  if (roundIdx === 0) {
+    if (match.team1Placeholder) {
+      label1 = formatBracketPlaceholder(match.team1Placeholder);
+    }
+    if (match.team2Placeholder) {
+      label2 = formatBracketPlaceholder(match.team2Placeholder);
+    }
+  } else {
+    if (!match.team1 && match.team1Placeholder) {
+      label1 = formatBracketPlaceholder(match.team1Placeholder);
+    }
+    if (!match.team2 && match.team2Placeholder) {
+      label2 = formatBracketPlaceholder(match.team2Placeholder);
+    }
   }
 
   if (
