@@ -120,22 +120,26 @@ export function MatchesTab({ matches }: { matches: Match[] }) {
   const go = (id: string) => navigate(`/match/${id}`);
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-      <div className="space-y-6">
-        {/* Search */}
-        <div className="relative max-w-2xl">
-          <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-6 h-6 text-black/40" />
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-6 sm:space-y-8"
+    >
+      <div className="space-y-3 sm:space-y-4">
+        {/* Search — compact on mobile, expanded on desktop. */}
+        <div className="relative w-full sm:max-w-xl">
+          <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-black/40" />
           <input
             type="text"
             placeholder="Buscar por equipo..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full pl-16 pr-6 py-5 bg-black/5 border-2 border-black/10 rounded-sm text-lg focus:outline-none focus:border-black transition-colors placeholder:text-black/40"
+            className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-black/5 border border-black/10 rounded-sm text-sm sm:text-base focus:outline-none focus:border-black/40 transition-colors placeholder:text-black/40"
           />
         </div>
 
         {/* Phase pills — 5 fixed buckets covering tournament progression. */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
           <PhasePill
             active={phaseFilter === 'all'}
             onClick={() => setPhaseFilter('all')}
@@ -153,7 +157,7 @@ export function MatchesTab({ matches }: { matches: Match[] }) {
 
         {/* Category pills — dynamic, only shows up when there's >1 category. */}
         {categories.length > 1 && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
             <CategoryPill
               active={categoryFilter === 'all'}
               onClick={() => setCategoryFilter('all')}
@@ -174,15 +178,15 @@ export function MatchesTab({ matches }: { matches: Match[] }) {
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            className="flex items-center justify-between gap-4 px-4 py-3 bg-black/5 rounded-sm"
+            className="flex items-center justify-between gap-3 px-3 py-2 bg-black/5 rounded-sm"
           >
-            <p className="text-sm text-black/60">
+            <p className="text-xs text-black/60">
               Mostrando <span className="font-bold text-black">{filtered.length}</span> de{' '}
               {matches.length} partidos
             </p>
             <button
               onClick={clear}
-              className="flex items-center gap-2 px-3 py-1.5 bg-spk-red text-white rounded-sm text-xs font-bold uppercase tracking-wider"
+              className="flex items-center gap-1 px-2 py-1 bg-spk-red text-white rounded-sm text-[10px] font-bold uppercase tracking-wider"
               style={FONT}
             >
               <X className="w-3 h-3" />
@@ -193,28 +197,34 @@ export function MatchesTab({ matches }: { matches: Match[] }) {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="text-center py-20">
-          <Search className="w-16 h-16 text-black/20 mx-auto mb-6" />
-          <h3 className="text-2xl font-bold mb-3" style={FONT}>
+        <div className="text-center py-16">
+          <Search className="w-12 h-12 text-black/20 mx-auto mb-4" />
+          <h3 className="text-lg sm:text-xl font-bold mb-2" style={FONT}>
             NO SE ENCONTRARON PARTIDOS
           </h3>
-          <p className="text-black/60">Intenta con otros filtros</p>
+          <p className="text-sm text-black/60">Intenta con otros filtros</p>
         </div>
       ) : (
-        <div className="space-y-12">
+        <div className="space-y-6 sm:space-y-8">
           {live.length > 0 && (
             <section>
-              <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-black/10">
                 <motion.div
-                  className="w-3 h-3 bg-spk-red rounded-full"
+                  className="w-2 h-2 bg-spk-red rounded-full"
                   animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
                   transition={{ duration: 2, repeat: Infinity }}
                 />
-                <h3 className="text-2xl font-bold" style={FONT}>
-                  EN VIVO ({live.length})
+                <h3
+                  className="text-xs font-bold uppercase text-spk-red tracking-wider"
+                  style={FONT}
+                >
+                  En vivo
                 </h3>
+                <span className="text-[11px] text-black/40 tabular-nums">
+                  ({live.length})
+                </span>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {live.map((m) => (
                   <MatchCard key={m.id} match={m} onClick={() => go(m.id)} />
                 ))}
@@ -229,6 +239,7 @@ export function MatchesTab({ matches }: { matches: Match[] }) {
               phases={phases}
               total={total}
               defaultOpen={hasActiveFilters || idx === 0}
+              expandPhases={hasActiveFilters}
               onMatchClick={go}
             />
           ))}
@@ -251,10 +262,10 @@ function PhasePill({
 }) {
   return (
     <motion.button
-      whileHover={{ scale: 1.03 }}
+      whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.97 }}
       onClick={onClick}
-      className={`px-4 py-2 rounded-sm text-sm font-bold uppercase tracking-wider transition-colors ${
+      className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-sm text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-colors ${
         active ? 'bg-spk-red text-white' : 'bg-black/5 text-black/70 hover:bg-black/10'
       }`}
       style={FONT}
@@ -275,13 +286,13 @@ function CategoryPill({
 }) {
   return (
     <motion.button
-      whileHover={{ scale: 1.03 }}
+      whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.97 }}
       onClick={onClick}
-      className={`px-4 py-2 rounded-sm text-sm font-semibold tracking-wide transition-colors ${
+      className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-sm text-[11px] sm:text-xs font-semibold tracking-wide transition-colors ${
         active
           ? 'bg-black text-white'
-          : 'bg-white border-2 border-black/10 text-black/70 hover:border-black/40'
+          : 'bg-white border border-black/10 text-black/70 hover:border-black/40'
       }`}
     >
       {label}
@@ -307,36 +318,40 @@ function CategoryAccordion({
   phases,
   total,
   defaultOpen,
+  expandPhases,
   onMatchClick,
 }: {
   category: string;
   phases: PhaseSection[];
   total: number;
   defaultOpen: boolean;
+  /** When true, phase sub-sections also start expanded — used while a
+   *  filter is active so the result is visible without extra clicks. */
+  expandPhases: boolean;
   onMatchClick: (id: string) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section className="space-y-0">
+    <section>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-3 pb-2 sm:pb-3 border-b-[3px] border-spk-red text-left"
+        className="w-full flex items-center justify-between gap-3 pb-2 border-b-2 border-spk-red text-left transition-opacity hover:opacity-80"
       >
         <h2
-          className="text-2xl sm:text-3xl font-bold uppercase"
-          style={{ ...FONT, letterSpacing: '-0.02em' }}
+          className="text-base sm:text-lg font-bold uppercase truncate"
+          style={{ ...FONT, letterSpacing: '0.04em' }}
         >
           {category || 'Sin categoría'}
         </h2>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-black/40 tabular-nums">{total} partidos</span>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="text-[11px] text-black/40 tabular-nums">{total}</span>
           <motion.span
             animate={{ rotate: open ? 180 : 0 }}
             transition={{ duration: 0.2 }}
-            className="text-black/60"
+            className="text-black/50"
           >
-            <ChevronDown className="w-6 h-6" />
+            <ChevronDown className="w-4 h-4" />
           </motion.span>
         </div>
       </button>
@@ -350,12 +365,13 @@ function CategoryAccordion({
             transition={{ duration: 0.25 }}
             className="overflow-hidden"
           >
-            <div className="space-y-8 pt-6">
+            <div className="space-y-2 pt-4">
               {phases.map(({ phase, matches: phaseMatches }) => (
-                <PhaseGroup
+                <PhaseAccordion
                   key={phase}
                   phase={phase}
                   matches={phaseMatches}
+                  defaultOpen={expandPhases}
                   onClick={onMatchClick}
                 />
               ))}
@@ -367,32 +383,68 @@ function CategoryAccordion({
   );
 }
 
-function PhaseGroup({
+function PhaseAccordion({
   phase,
   matches,
+  defaultOpen,
   onClick,
 }: {
   phase: string;
   matches: Match[];
+  defaultOpen: boolean;
   onClick: (id: string) => void;
 }) {
+  // Phase sub-sections start collapsed by default when no filter is
+  // active — opening a category already shows everything, and keeping
+  // each phase closed avoids the "wall of cards" feeling on a
+  // tournament with many divisions. Under an active filter we open
+  // them so the result is visible without extra clicks.
+  const [open, setOpen] = useState(defaultOpen);
   if (matches.length === 0) return null;
   return (
     <div>
-      <div className="flex items-center gap-3 mb-4">
-        <h3
-          className="text-xl sm:text-2xl font-bold uppercase"
-          style={{ ...FONT, letterSpacing: '0.04em' }}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-2 px-2 py-2 border-b border-black/10 text-left transition-colors hover:bg-black/[0.02]"
+      >
+        <span
+          className="text-[11px] sm:text-xs font-bold uppercase text-black/70 tracking-[0.14em]"
+          style={FONT}
         >
           {phase}
-        </h3>
-        <span className="text-sm text-black/40 tabular-nums">({matches.length})</span>
-      </div>
-      <div className="space-y-3">
-        {matches.map((m) => (
-          <MatchCard key={m.id} match={m} onClick={() => onClick(m.id)} />
-        ))}
-      </div>
+        </span>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="text-[10px] sm:text-[11px] text-black/40 tabular-nums">
+            {matches.length}
+          </span>
+          <motion.span
+            animate={{ rotate: open ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+            className="text-black/40"
+          >
+            <ChevronDown className="w-3 h-3" />
+          </motion.span>
+        </div>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-2 pt-3">
+              {matches.map((m) => (
+                <MatchCard key={m.id} match={m} onClick={() => onClick(m.id)} />
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
