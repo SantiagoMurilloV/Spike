@@ -92,6 +92,100 @@ function formatHHMM(totalMinutes: number): string {
   return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 }
 
+// ── Cross-group cumulative ranking for VNL seeding ─────────────────
+//
+// Every bracket flow that talks about "seed N" used to mean "Nth team
+// alphabetically in the group letter list" (1°A, 1°B, … 2°A, 2°B). The
+// FIVB / VNL convention is different: seed 1 is the team with the BEST
+// cumulative record across all groups, not whoever happens to top
+// group A. This helper computes that ranking from the standings table.
+//
+// Tiebreakers, in order:
+//   1. points DESC (3 for 3-0 / 3-1, 2 for 3-2, 1 for 2-3, 0 for 0-3 / 1-3)
+//   2. set difference DESC (sets_for - sets_against)
+//   3. sets_for DESC
+//   4. wins DESC
+//   5. group position ASC (1°A beats 2°B if everything above ties)
+//   6. team_id ASC (deterministic order so re-runs produce the same seed)
+//
+// Only teams with at least one played match are considered — a 0-0
+// row would otherwise tie every other 0-0 row and the bracket would
+// seed against an alphabetical ghost ranking.
+
+interface RankingCandidate {
+  team_id: string;
+  group_name: string | null;
+  position: number;
+  played: number;
+  wins: number;
+  sets_for: number;
+  sets_against: number;
+  points: number;
+}
+
+function compareRankingRows(a: RankingCandidate, b: RankingCandidate): number {
+  if (a.points !== b.points) return b.points - a.points;
+  const dA = a.sets_for - a.sets_against;
+  const dB = b.sets_for - b.sets_against;
+  if (dA !== dB) return dB - dA;
+  if (a.sets_for !== b.sets_for) return b.sets_for - a.sets_for;
+  if (a.wins !== b.wins) return b.wins - a.wins;
+  if (a.position !== b.position) return a.position - b.position;
+  return a.team_id.localeCompare(b.team_id);
+}
+
+/**
+ * Pull the standings rows that belong to a category and a set of group
+ * positions (e.g. [1, 2] for Oro classifiers), then rank them
+ * cumulatively across groups using {@link compareRankingRows}.
+ */
+export async function computeCumulativeRanking(
+  tournamentId: string,
+  category: string,
+  positions: number[],
+): Promise<string[]> {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT team_id, group_name, position, played, wins,
+            sets_for, sets_against, points
+       FROM standings
+       WHERE tournament_id = $1
+         AND group_name LIKE $2
+         AND position = ANY($3)
+         AND played > 0`,
+    [tournamentId, `${category}|%`, positions],
+  );
+  const rows = result.rows as RankingCandidate[];
+  rows.sort(compareRankingRows);
+  return rows.map((r) => r.team_id);
+}
+
+// ── VNL slot-index helpers (mirror of autoSeeding.ts in fixture/) ──
+//
+// Duplicated here so the resolver can map a bracket position to its
+// VNL seed index without dragging in fixture.service. The recursive
+// pattern is short enough that copying it is cheaper than refactoring
+// the import graph (bracket.service is imported by fixture.service —
+// reversing the dependency would create a cycle).
+
+function nextPow2Local(n: number): number {
+  let p = 2;
+  while (p < n) p *= 2;
+  return p;
+}
+
+function bracketSeedOrderLocal(n: number): number[] {
+  if (n < 2 || (n & (n - 1)) !== 0) return [];
+  let order = [1];
+  while (order.length < n) {
+    const size = order.length * 2;
+    const next: number[] = [];
+    for (const s of order) next.push(s, size + 1 - s);
+    order = next;
+  }
+  return order;
+}
+
 /**
  * Normalize a value coming back from a pg DATE / TIMESTAMP column into
  * a Date set to local midnight. Accepts:
@@ -783,38 +877,66 @@ export class BracketGenerator {
   /**
    * Populate bracket_matches.team1_id / team2_id from group-phase standings.
    *
-   * Each first-round bracket slot carries a `team*_placeholder` in the
-   * format `"{position}|{groupName}"` (meaning the Nth-place team of the
-   * given category group). This method reads the current `standings`
-   * table and re-resolves every placeholder to the team currently
-   * sitting at that position — always overwriting so the bracket stays
-   * in sync as standings shift.
+   * Two seeding strategies depending on `tournament.bracket_mode`:
    *
-   * The placeholder also resolves while the group phase is still in
-   * progress, mirroring the live "tabla cambia → bracket cambia"
-   * behavior the public expects: as soon as a team scores enough to
-   * jump groups in the standings, the bracket re-paints with that
-   * team in the slot it just earned. We additionally require the team
-   * to have at least one completed match (`played >= 1`) so we don't
-   * seed bracket slots from a phantom 0-0 ranking on a torneo that
-   * hasn't started — there the slot stays "Por definir".
+   *   · `'divisions'` — VNL cumulative seeding. For every (category, tier)
+   *     pair we compute a cumulative cross-group ranking (best record in
+   *     the entire division → seed 1, second best → seed 2, …) and then
+   *     drop those team ids into the first-round slots following the VNL
+   *     [1, 8, 4, 5, 2, 7, 3, 6] pattern. Each slot's seed index comes
+   *     from {@link bracketSeedOrderLocal}, so two slots of the same match
+   *     are always [seed N, seed (N's bracket pair)].
+   *   · `'manual'` (or unset) — legacy mode: each slot keeps its
+   *     `team*_placeholder` of the form `"<pos>|<groupName>"`, and the
+   *     resolver maps it 1:1 to whichever team currently sits at that
+   *     (group, position).
+   *
+   * In both cases we only update slots whose materialized match (if any)
+   * is still `'upcoming'` — once a referee starts scoring, the match is
+   * the source of truth and the bracket holder is read-only.
    *
    * Returns the number of slots that had their team assignment updated.
    */
   async resolveBracketFromStandings(tournamentId: string): Promise<number> {
     const pool = getPool();
 
+    // Tournament metadata so we know which strategy to apply.
+    const tournRes = await pool.query(
+      'SELECT bracket_mode FROM tournaments WHERE id = $1',
+      [tournamentId],
+    );
+    if (tournRes.rows.length === 0) return 0;
+    const bracketMode = (tournRes.rows[0].bracket_mode as string | null) ?? 'manual';
+
     const standingsResult = await pool.query(
-      `SELECT team_id, group_name, position, played
+      `SELECT team_id, group_name, position, played, wins,
+              sets_for, sets_against, points
          FROM standings WHERE tournament_id = $1`,
       [tournamentId],
     );
-    const standings = standingsResult.rows as Array<{
-      team_id: string;
-      group_name: string | null;
-      position: number;
-      played: number;
-    }>;
+    const standings = standingsResult.rows as RankingCandidate[];
+
+    // Cumulative ranking is computed lazily per (category, tier) and
+    // cached so a tournament with many tiers / categories doesn't
+    // re-sort the same standings slice more than once.
+    const rankingCache = new Map<string, string[]>();
+    const cumulativeRanking = (
+      category: string,
+      positions: number[],
+    ): string[] => {
+      const key = `${category}::${positions.join(',')}`;
+      if (rankingCache.has(key)) return rankingCache.get(key)!;
+      const candidates = standings.filter((s) => {
+        if (!s.group_name) return false;
+        if (!s.group_name.startsWith(`${category}|`)) return false;
+        if (!positions.includes(s.position)) return false;
+        return s.played > 0;
+      });
+      const sorted = [...candidates].sort(compareRankingRows);
+      const ids = sorted.map((s) => s.team_id);
+      rankingCache.set(key, ids);
+      return ids;
+    };
 
     const resolvePlaceholder = (placeholder: string | null): string | null => {
       if (!placeholder) return null;
@@ -834,13 +956,22 @@ export class BracketGenerator {
       return found.team_id;
     };
 
-    // Only load matches that have at least one placeholder — team-advanced
-    // rounds (semifinals, finals) don't need re-resolution from standings.
+    // For divisions mode we need EVERY first-round bracket row of the
+    // tournament (placeholder or not) so we can re-seed by cumulative
+    // ranking. For manual mode we only need rows with placeholders to
+    // do the legacy lookup.
     const bmResult = await pool.query(
-      `SELECT id, team1_id, team2_id, team1_placeholder, team2_placeholder
-       FROM bracket_matches
-       WHERE tournament_id = $1
-         AND (team1_placeholder IS NOT NULL OR team2_placeholder IS NOT NULL)`,
+      bracketMode === 'divisions'
+        ? `SELECT id, round, position, team1_id, team2_id,
+                  team1_placeholder, team2_placeholder, status
+             FROM bracket_matches
+             WHERE tournament_id = $1`
+        : `SELECT id, round, position, team1_id, team2_id,
+                  team1_placeholder, team2_placeholder, status
+             FROM bracket_matches
+             WHERE tournament_id = $1
+               AND (team1_placeholder IS NOT NULL
+                    OR team2_placeholder IS NOT NULL)`,
       [tournamentId],
     );
 
@@ -858,28 +989,168 @@ export class BracketGenerator {
       return 0;
     }
 
+    // Look up materialized matches per bracket id — we keep
+    // bracket-stage `matches` rows in sync with the bracket, but only
+    // while they are still 'upcoming'. Once the referee starts scoring
+    // we leave both the bracket and its match alone.
+    const linkedMatchesRes = await pool.query(
+      `SELECT id, bracket_match_id, team1_id, team2_id, status
+         FROM matches
+         WHERE tournament_id = $1 AND bracket_match_id IS NOT NULL`,
+      [tournamentId],
+    );
+    const matchByBracketId = new Map<
+      string,
+      { id: string; team1_id: string; team2_id: string; status: string }
+    >();
+    for (const m of linkedMatchesRes.rows) {
+      matchByBracketId.set(m.bracket_match_id as string, {
+        id: m.id as string,
+        team1_id: m.team1_id as string,
+        team2_id: m.team2_id as string,
+        status: m.status as string,
+      });
+    }
+
     const client = await pool.connect();
     let updated = 0;
     try {
       await client.query('BEGIN');
 
-      for (const bm of bmResult.rows) {
-        // When a placeholder is present, trust it as the source of truth
-        // and always re-resolve. Slots without a placeholder (e.g. admin
-        // seeded directly, or filled by advanceWinner) keep their team id.
-        const newTeam1Id = bm.team1_placeholder
-          ? resolvePlaceholder(bm.team1_placeholder)
-          : bm.team1_id;
-        const newTeam2Id = bm.team2_placeholder
-          ? resolvePlaceholder(bm.team2_placeholder)
-          : bm.team2_id;
+      if (bracketMode === 'divisions') {
+        // ── Divisions: VNL cumulative seeding ──────────────────────
+        //
+        // Group every bracket row by (category, tier). For each group,
+        // identify the FIRST round (the one with the most matches),
+        // build the cumulative ranking for that tier, then drop seeds
+        // into slots in the order [bracketSeedOrder(slots)].
+        //
+        // Slots in non-first rounds keep their current team ids — those
+        // get filled by advanceWinner as bracket-stage matches finish.
+        type GroupKey = string; // "category::tier"
+        interface SlotRow {
+          id: string;
+          round: string;
+          position: number;
+          team1_id: string | null;
+          team2_id: string | null;
+          status: string;
+        }
+        const byKey = new Map<GroupKey, SlotRow[]>();
+        const tierByKey = new Map<GroupKey, 'gold' | 'silver' | null>();
+        const categoryByKey = new Map<GroupKey, string>();
+        for (const r of bmResult.rows) {
+          const round = r.round as string;
+          const parts = round.split('|');
+          let category = '';
+          let tier: 'gold' | 'silver' | null = null;
+          if (parts.length >= 3 && (parts[1] === 'gold' || parts[1] === 'silver')) {
+            category = parts[0];
+            tier = parts[1] as 'gold' | 'silver';
+          } else if (parts.length >= 2) {
+            category = parts[0];
+          }
+          const key: GroupKey = `${category}::${tier ?? ''}`;
+          const list = byKey.get(key) ?? [];
+          list.push({
+            id: r.id as string,
+            round,
+            position: r.position as number,
+            team1_id: r.team1_id as string | null,
+            team2_id: r.team2_id as string | null,
+            status: r.status as string,
+          });
+          byKey.set(key, list);
+          tierByKey.set(key, tier);
+          categoryByKey.set(key, category);
+        }
 
-        if (newTeam1Id !== bm.team1_id || newTeam2Id !== bm.team2_id) {
-          await client.query(
-            `UPDATE bracket_matches SET team1_id = $1, team2_id = $2 WHERE id = $3`,
-            [newTeam1Id, newTeam2Id, bm.id],
-          );
-          updated++;
+        for (const [key, slots] of byKey.entries()) {
+          // Find the first round inside this (category, tier). The
+          // first round is whichever round name has the most matches.
+          // Skip 3rd-place matches (`tercer-puesto`) — those are seeded
+          // by advanceWinner from the semifinal losers.
+          const standardSlots = slots.filter((s) => !s.round.endsWith('|tercer-puesto'));
+          if (standardSlots.length === 0) continue;
+          const roundCounts = new Map<string, number>();
+          for (const s of standardSlots) {
+            roundCounts.set(s.round, (roundCounts.get(s.round) || 0) + 1);
+          }
+          let firstRound: string | null = null;
+          let maxCount = 0;
+          for (const [r, c] of roundCounts.entries()) {
+            if (c > maxCount) {
+              maxCount = c;
+              firstRound = r;
+            }
+          }
+          if (!firstRound) continue;
+
+          const firstRoundSlots = standardSlots
+            .filter((s) => s.round === firstRound)
+            .sort((a, b) => a.position - b.position);
+
+          const tier = tierByKey.get(key) ?? null;
+          const category = categoryByKey.get(key) ?? '';
+          // Tier -> which group positions classify into this bracket.
+          //   · gold  → top two of every group
+          //   · silver → 3rd and 4th of every group (4th may be missing)
+          //   · null  → manual single bracket: top two as well
+          const positions = tier === 'silver' ? [3, 4] : [1, 2];
+          const ranking = cumulativeRanking(category, positions);
+          if (ranking.length === 0) continue;
+
+          const totalSlots = firstRoundSlots.length * 2;
+          const order = bracketSeedOrderLocal(totalSlots);
+          if (order.length === 0) continue;
+
+          for (let mIdx = 0; mIdx < firstRoundSlots.length; mIdx++) {
+            const slot = firstRoundSlots[mIdx];
+            const seedT1 = order[mIdx * 2]; // 1-indexed seed
+            const seedT2 = order[mIdx * 2 + 1];
+            const newT1 = ranking[seedT1 - 1] ?? null;
+            const newT2 = ranking[seedT2 - 1] ?? null;
+
+            // Skip slots whose materialized match is in progress / done
+            // — flipping team ids underneath an active match would be
+            // disastrous. The new ids will land the next time the slot
+            // is `upcoming` (after a regen).
+            const linked = matchByBracketId.get(slot.id);
+            if (linked && linked.status !== 'upcoming') continue;
+            if (slot.status !== 'upcoming') continue;
+
+            if (newT1 !== slot.team1_id || newT2 !== slot.team2_id) {
+              await client.query(
+                `UPDATE bracket_matches SET team1_id = $1, team2_id = $2 WHERE id = $3`,
+                [newT1, newT2, slot.id],
+              );
+              updated++;
+              if (linked) {
+                await client.query(
+                  `UPDATE matches SET team1_id = $1, team2_id = $2, updated_at = NOW() WHERE id = $3`,
+                  [newT1, newT2, linked.id],
+                );
+              }
+            }
+          }
+        }
+      } else {
+        // ── Manual mode: legacy 1:1 placeholder lookup ────────────
+        for (const bm of bmResult.rows) {
+          const newTeam1Id = bm.team1_placeholder
+            ? resolvePlaceholder(bm.team1_placeholder)
+            : bm.team1_id;
+          const newTeam2Id = bm.team2_placeholder
+            ? resolvePlaceholder(bm.team2_placeholder)
+            : bm.team2_id;
+
+          if (newTeam1Id !== bm.team1_id || newTeam2Id !== bm.team2_id) {
+            await client.query(
+              `UPDATE bracket_matches SET team1_id = $1, team2_id = $2 WHERE id = $3`,
+              [newTeam1Id, newTeam2Id, bm.id],
+            );
+            updated++;
+          }
         }
       }
 

@@ -10,6 +10,7 @@ import {
   formatBracketPlaceholder,
   generateSeedLabels,
 } from './helpers';
+import { bracketSeedOrder } from '../../lib/autoBracketSeeds';
 
 /**
  * Single-category bracket. Renders the knockout rounds as SVG columns
@@ -291,14 +292,17 @@ function RoundColumn({
 
 /**
  * Label cascade for a bracket slot:
- *   1. first round with a backend placeholder → always show the seed
- *      label ("1°A", "2°D") even when the team is resolved, so the
- *      VNL pairing pattern is readable at a glance ([1,8,4,5,2,7,3,6])
- *      instead of having to map team initials back to group positions.
- *   2. later rounds with no team → fall back to the placeholder if
+ *   1. First round of a tiered (gold / silver) bracket → seed badge
+ *      "#N" computed from the slot's vertical position. Tiered brackets
+ *      use cumulative cross-group VNL seeding, so seed 1 = best record
+ *      across all groups regardless of group letter.
+ *   2. First round with a `team*_placeholder` (legacy / manual mode) →
+ *      formatted "1°A" / "2°D" placeholder.
+ *   3. Later rounds with no team → fall back to the placeholder if
  *      present (rare — usually those slots fill via advanceWinner).
- *   3. first round with NO placeholder and no team → auto-seed fallback
- *      so a brand-new bracket still shows what *will* go in each slot.
+ *   4. First round with neither team nor placeholder → auto-seed
+ *      fallback so a brand-new bracket still shows what *will* go in
+ *      each slot.
  */
 function resolveLabels(
   match: BracketMatch,
@@ -309,11 +313,24 @@ function resolveLabels(
   let label1: string | undefined;
   let label2: string | undefined;
 
-  // First round: always surface the placeholder, regardless of whether
-  // the team has been resolved. The slot renders the seed alongside
-  // the team initials so the admin and spectators see at a glance that
-  // pos 1 = 1° vs 8°, pos 2 = 4° vs 5°, etc.
-  if (roundIdx === 0) {
+  const { tier } = parseRound(match.round);
+  const isTieredFirstRound = roundIdx === 0 && tier !== null;
+
+  if (isTieredFirstRound) {
+    // VNL seed badge: each slot's position in the bracket maps to a
+    // VNL seed via the recursive [1,8,4,5,2,7,3,6,…] order. Seed 1 is
+    // the best cumulative classifier in the division (see server
+    // resolveBracketFromStandings).
+    const totalSlots = matchCount * 2;
+    const order = totalSlots >= 2 ? bracketSeedOrder(totalSlots) : [];
+    const seed1 = order[mIdx * 2];
+    const seed2 = order[mIdx * 2 + 1];
+    if (seed1) label1 = `#${seed1}`;
+    if (seed2) label2 = `#${seed2}`;
+  } else if (roundIdx === 0) {
+    // Manual / non-tiered first round: show the placeholder mapping
+    // ("1°A", "2°D") so the admin sees which group position lands in
+    // each slot.
     if (match.team1Placeholder) {
       label1 = formatBracketPlaceholder(match.team1Placeholder);
     }
@@ -333,8 +350,8 @@ function resolveLabels(
     roundIdx === 0 &&
     !match.team1 &&
     !match.team2 &&
-    !match.team1Placeholder &&
-    !match.team2Placeholder
+    !label1 &&
+    !label2
   ) {
     const allGroups: string[] = [];
     for (let gi = 0; gi < Math.max(2, matchCount); gi++) {
