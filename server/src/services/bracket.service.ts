@@ -92,6 +92,44 @@ function formatHHMM(totalMinutes: number): string {
   return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 }
 
+/**
+ * Normalize a value coming back from a pg DATE / TIMESTAMP column into
+ * a Date set to local midnight. Accepts:
+ *   - Date instances (pg's default for DATE/TIMESTAMP)
+ *   - "YYYY-MM-DD" strings
+ *   - "YYYY-MM-DDTHH:mm:ss(.sss)Z" ISO strings
+ *   - null / undefined  → returns null so the caller can fall back
+ *
+ * Critical for the bracket materializer: passing the raw Date through a
+ * `value + 'T00:00:00'` template produced "Invalid time value" errors
+ * because JS coerced the Date to its full string form first.
+ */
+function parseDbDate(value: unknown): Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    // Strip the time-of-day so the cursor starts at midnight regardless
+    // of what timezone pg / our local box is in.
+    return new Date(value.toISOString().slice(0, 10) + 'T00:00:00');
+  }
+  if (typeof value === 'string') {
+    const tIdx = value.indexOf('T');
+    const datePart = tIdx === -1 ? value : value.slice(0, tIdx);
+    const parsed = new Date(datePart + 'T00:00:00');
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed;
+  }
+  return null;
+}
+
+/** YYYY-MM-DD slug for a Date (assumes the Date is at local midnight). */
+function dateToSlug(d: Date): string {
+  if (Number.isNaN(d.getTime())) {
+    return new Date().toISOString().slice(0, 10);
+  }
+  return d.toISOString().slice(0, 10);
+}
+
 function mapBracketRow(row: Record<string, unknown>): BracketMatch {
   const match: BracketMatch = {
     id: row.id as string,
@@ -549,7 +587,9 @@ export class BracketGenerator {
     let cursorMinutes: number;
     if (lastSlotRes.rows.length > 0) {
       const r = lastSlotRes.rows[0];
-      cursorDate = new Date((r.date as string) + 'T00:00:00');
+      // pg returns DATE columns as JS Date objects, not ISO strings —
+      // normalize before concatenating with a time fragment.
+      cursorDate = parseDbDate(r.date) ?? new Date();
       const [h, m] = (r.time as string).split(':').map((s) => parseInt(s, 10));
       cursorMinutes = h * 60 + m + DEFAULT_MATCH_MIN + DEFAULT_BREAK_MIN;
       // Roll forward if the last slot pushed us out of the day window.
@@ -558,8 +598,10 @@ export class BracketGenerator {
         cursorMinutes = DEFAULT_DAY_START_MIN;
       }
     } else {
-      const start = (tournament.start_date as string | null) ?? new Date().toISOString().split('T')[0];
-      cursorDate = new Date(start + 'T00:00:00');
+      // tournaments.start_date is also a DATE column → may arrive as a
+      // Date instance OR as a YYYY-MM-DD string depending on the driver
+      // path. parseDbDate handles both shapes.
+      cursorDate = parseDbDate(tournament.start_date) ?? new Date();
       cursorMinutes = DEFAULT_DAY_START_MIN;
     }
 
@@ -604,7 +646,7 @@ export class BracketGenerator {
           cursorMinutes = DEFAULT_DAY_START_MIN;
           courtIdx = 0;
         }
-        const dateStr = cursorDate.toISOString().split('T')[0];
+        const dateStr = dateToSlug(cursorDate);
         const time = formatHHMM(cursorMinutes);
         const court = courtNames[courtIdx % courtNames.length];
 
