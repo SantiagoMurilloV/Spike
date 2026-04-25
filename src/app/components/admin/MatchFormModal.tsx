@@ -126,6 +126,18 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
     }
   }, [isOpen]);
 
+  // Lock body scroll while the modal is open so wheel / touchmove
+  // events don't pass through to the page underneath. Restored on
+  // close (and on unmount, just in case).
+  useEffect(() => {
+    if (!isOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [isOpen]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -384,17 +396,28 @@ export function MatchFormModal({ isOpen, onClose, onSubmit, match }: MatchFormMo
               <label className="block text-sm font-bold mb-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
                 Fase *
               </label>
-              <select
+              {/*
+                Phase used to be a hardcoded `<select>` with five legacy
+                values (Fase de Grupos / Octavos / Cuartos de Final / …)
+                — those don't match what the system actually generates
+                today: matches carry phase strings like "Cuartos · Oro|
+                Infantil Femenino" or "Grupos|Mayores Masculino". A
+                strict select would silently fall back to the first
+                option whenever the saved value didn't match, which is
+                why editing a cuartos match showed "Fase de Grupos".
+
+                A free-text input shows the real phase verbatim. The
+                admin should rarely change it (the materializer manages
+                bracket-stage phases automatically), but we keep it
+                editable so legacy / hand-built matches can still be
+                relabeled when needed.
+              */}
+              <input
+                type="text"
                 value={formData.phase}
                 onChange={(e) => setFormData({ ...formData, phase: e.target.value })}
                 className="w-full px-4 py-2 border-2 border-black/10 rounded-sm focus:outline-none focus:border-spk-red"
-              >
-                <option value="Fase de Grupos">Fase de Grupos</option>
-                <option value="Octavos de Final">Octavos de Final</option>
-                <option value="Cuartos de Final">Cuartos de Final</option>
-                <option value="Semifinales">Semifinales</option>
-                <option value="Final">Final</option>
-              </select>
+              />
             </div>
             <div>
               <label className="block text-sm font-bold mb-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
