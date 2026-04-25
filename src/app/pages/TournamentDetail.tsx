@@ -155,7 +155,9 @@ export function TournamentDetail() {
             lastRefreshedAt={lastRefreshedAt}
           />
         )}
-        {activeTab === 'bracket' && <BracketTab bracketMatches={bracket} />}
+        {activeTab === 'bracket' && (
+          <BracketTab bracketMatches={bracket} lastRefreshedAt={lastRefreshedAt} />
+        )}
         {activeTab === 'info' && (
           <InfoTab
             tournament={tournament}
