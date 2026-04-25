@@ -316,7 +316,39 @@ export class TournamentService {
       'SELECT * FROM matches WHERE tournament_id = $1 ORDER BY date, time',
       [tournamentId]
     );
-    return result.rows.map(mapMatchRow);
+    const matches: Match[] = result.rows.map(mapMatchRow);
+    if (matches.length === 0) return matches;
+
+    // Attach per-set scores so the public clasificación tab can compute
+    // rally-point totals (`pointsFor` / `pointsAgainst`). Without this
+    // the column always renders 0/0 even after matches were played,
+    // because mapMatchRow only carries the aggregate score, not the
+    // individual sets. One query for every match in the tournament.
+    const matchIds = matches.map((m) => m.id);
+    const setsRes = await pool.query(
+      `SELECT id, match_id, set_number, team1_points, team2_points
+       FROM set_scores
+       WHERE match_id = ANY($1)
+       ORDER BY set_number`,
+      [matchIds],
+    );
+    const setsByMatch = new Map<string, Array<Match['sets'] extends Array<infer U> | undefined ? U : never>>();
+    for (const row of setsRes.rows as Array<Record<string, unknown>>) {
+      const matchId = row.match_id as string;
+      const list = setsByMatch.get(matchId) ?? [];
+      list.push({
+        id: row.id as string,
+        matchId,
+        setNumber: row.set_number as number,
+        team1Points: row.team1_points as number,
+        team2Points: row.team2_points as number,
+      });
+      setsByMatch.set(matchId, list);
+    }
+    for (const m of matches) {
+      m.sets = setsByMatch.get(m.id) ?? [];
+    }
+    return matches;
   }
 
   async getStandings(tournamentId: string): Promise<StandingsRow[]> {

@@ -325,6 +325,7 @@ describe('TournamentService CRUD operations', () => {
       mockPool(vi.fn()
         .mockResolvedValueOnce({ rows: [sampleRow()] }) // getById
         .mockResolvedValueOnce({ rows: [matchRow] })     // matches query
+        .mockResolvedValueOnce({ rows: [] })             // attached set_scores
       );
 
       const result = await service.getMatches('uuid-1');
@@ -332,6 +333,7 @@ describe('TournamentService CRUD operations', () => {
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('match-1');
       expect(result[0].tournamentId).toBe('uuid-1');
+      expect(result[0].sets).toEqual([]);
     });
 
     it('should throw NotFoundError if tournament does not exist', async () => {
