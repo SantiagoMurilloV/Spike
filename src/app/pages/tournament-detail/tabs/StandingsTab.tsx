@@ -332,39 +332,55 @@ function CategoryStandingsTable({
       }}
     >
       <div className="overflow-x-auto max-h-[75vh] overflow-y-auto">
-        <table className="w-full">
+        <table className="w-full table-fixed">
           <thead
             className="sticky top-0 z-10 bg-black text-white"
-            style={{ ...FONT, letterSpacing: '0.08em' }}
+            style={{ ...FONT, letterSpacing: '0.06em' }}
           >
-            <tr className="text-[10px] sm:text-[11px] uppercase">
-              <th className="px-2 sm:px-4 py-3 text-left font-bold w-10 sm:w-12">#</th>
-              <th className="px-2 sm:px-4 py-3 text-left font-bold">Equipo</th>
-              <th className="px-2 py-3 text-center font-bold w-14" title="Grupo">
-                Grupo
+            <tr className="text-[9px] sm:text-[11px] uppercase">
+              <th className="px-1 sm:px-3 py-2 sm:py-3 text-left font-bold w-7 sm:w-10">#</th>
+              <th className="px-1 sm:px-3 py-2 sm:py-3 text-left font-bold">Equipo</th>
+              <th
+                className="px-0.5 sm:px-2 py-2 sm:py-3 text-center font-bold w-9 sm:w-14"
+                title="Grupo"
+              >
+                Grp
               </th>
               <th
-                className="hidden sm:table-cell px-2 py-3 text-right font-bold w-10"
+                className="px-0.5 sm:px-2 py-2 sm:py-3 text-right font-bold w-7 sm:w-10"
                 title="Partidos jugados"
               >
                 PJ
               </th>
-              <th className="px-1.5 sm:px-2 py-3 text-right font-bold w-9 sm:w-10">PG</th>
-              <th className="hidden xs:table-cell sm:table-cell px-1.5 sm:px-2 py-3 text-right font-bold w-9 sm:w-10">
+              <th
+                className="px-0.5 sm:px-2 py-2 sm:py-3 text-right font-bold w-7 sm:w-10"
+                title="Partidos ganados"
+              >
+                PG
+              </th>
+              <th
+                className="px-0.5 sm:px-2 py-2 sm:py-3 text-right font-bold w-7 sm:w-10"
+                title="Partidos perdidos"
+              >
                 PP
               </th>
-              <th className="hidden md:table-cell px-2 py-3 text-right font-bold w-16">Sets</th>
               <th
-                className="hidden md:table-cell px-2 py-3 text-right font-bold w-20"
-                title="Puntos a favor / en contra sumados en todos los sets"
+                className="px-0.5 sm:px-2 py-2 sm:py-3 text-right font-bold w-11 sm:w-16"
+                title="Sets ganados / perdidos"
               >
-                Puntos
+                Sets
               </th>
               <th
-                className="px-2 sm:px-4 py-3 text-right font-bold w-11 sm:w-12"
+                className="px-0.5 sm:px-2 py-2 sm:py-3 text-right font-bold w-12 sm:w-20"
+                title="Puntos a favor / en contra sumados en todos los sets"
+              >
+                Pts
+              </th>
+              <th
+                className="px-0.5 sm:px-3 py-2 sm:py-3 text-right font-bold w-8 sm:w-12"
                 title="Puntos de clasificación"
               >
-                Clasif
+                Cls
               </th>
             </tr>
           </thead>
@@ -416,60 +432,52 @@ function CategoryStandingsTable({
                     borderLeft: `3px solid ${leftStripe}`,
                   }}
                 >
-                  <td className="px-2 sm:px-4 py-2.5 sm:py-3">
-                    <div className="flex items-center gap-1.5 sm:gap-2">
+                  <td className="px-1 sm:px-3 py-1.5 sm:py-2.5">
+                    <div className="flex items-center gap-1">
                       <span
-                        className="font-bold text-sm sm:text-base tabular-nums"
+                        className="font-bold text-xs sm:text-sm tabular-nums"
                         style={{ ...FONT, color: positionColor }}
                       >
                         {row.globalPosition}
                       </span>
                       {isDivisions && row.divisionBucket === 'gold' && (
                         <Award
-                          className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0"
+                          className="hidden sm:inline w-3.5 h-3.5 flex-shrink-0"
                           style={{ color: GOLD_COLOR }}
                           aria-hidden="true"
                         />
                       )}
                       {isDivisions && row.divisionBucket === 'silver' && (
                         <Medal
-                          className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0"
+                          className="hidden sm:inline w-3.5 h-3.5 flex-shrink-0"
                           style={{ color: SILVER_COLOR }}
                           aria-hidden="true"
                         />
                       )}
                       {!isDivisions && isPodium && (
                         <Trophy
-                          className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0"
+                          className="hidden sm:inline w-3.5 h-3.5 flex-shrink-0"
                           style={{ color: medalColor }}
                           aria-hidden="true"
                         />
                       )}
                     </div>
                   </td>
-                  <td className="px-2 sm:px-4 py-2.5 sm:py-3">
-                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                      <TeamAvatar team={row.team} size="sm" />
-                      <div className="min-w-0 flex-1">
-                        <div
-                          className="font-bold text-xs sm:text-sm uppercase truncate"
-                          style={{ ...FONT, letterSpacing: '0.02em' }}
-                        >
-                          {row.team.name}
-                        </div>
-                        <div
-                          className="sm:hidden text-[10px] text-black/50 mt-0.5 tabular-nums"
-                          style={{ ...FONT, letterSpacing: '0.04em' }}
-                        >
-                          PJ {row.played} · Sets {row.setsFor}/{row.setsAgainst} ·{' '}
-                          Pts {row.pointsFor}/{row.pointsAgainst}
-                        </div>
-                      </div>
+                  <td className="px-1 sm:px-3 py-1.5 sm:py-2.5">
+                    <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                      <TeamAvatar team={row.team} size="xs" />
+                      <span
+                        className="font-bold text-[11px] sm:text-sm uppercase truncate min-w-0"
+                        style={{ ...FONT, letterSpacing: '0.01em' }}
+                        title={row.team.name}
+                      >
+                        {row.team.name}
+                      </span>
                     </div>
                   </td>
-                  <td className="px-2 py-2.5 sm:py-3 text-center">
+                  <td className="px-0.5 sm:px-2 py-1.5 sm:py-2.5 text-center">
                     <span
-                      className="inline-flex items-center justify-center min-w-[28px] px-1.5 h-6 rounded-sm bg-black/5 text-[11px] font-bold text-black/70 tabular-nums"
+                      className="inline-flex items-center justify-center min-w-[24px] sm:min-w-[28px] px-1 h-5 sm:h-6 rounded-sm bg-black/5 text-[10px] sm:text-[11px] font-bold text-black/70 tabular-nums"
                       style={FONT}
                       title={`Grupo ${row.groupLetter} · ${row.groupPosition}° de su grupo`}
                     >
@@ -477,29 +485,29 @@ function CategoryStandingsTable({
                       <span className="text-black/40 ml-0.5">·{row.groupPosition}</span>
                     </span>
                   </td>
-                  <td className="hidden sm:table-cell px-2 py-3 text-right text-sm tabular-nums text-black/70">
+                  <td className="px-0.5 sm:px-2 py-1.5 sm:py-2.5 text-right text-[11px] sm:text-sm tabular-nums text-black/70">
                     {row.played}
                   </td>
                   <td
-                    className="px-1.5 sm:px-2 py-2.5 sm:py-3 text-right text-xs sm:text-sm font-bold tabular-nums"
+                    className="px-0.5 sm:px-2 py-1.5 sm:py-2.5 text-right text-[11px] sm:text-sm font-bold tabular-nums"
                     style={{ color: 'var(--feedback-win)' }}
                   >
                     {row.wins}
                   </td>
-                  <td className="hidden xs:table-cell sm:table-cell px-1.5 sm:px-2 py-3 text-right text-sm tabular-nums text-black/50">
+                  <td className="px-0.5 sm:px-2 py-1.5 sm:py-2.5 text-right text-[11px] sm:text-sm tabular-nums text-black/50">
                     {row.losses}
                   </td>
-                  <td className="hidden md:table-cell px-2 py-3 text-right text-xs tabular-nums text-black/60">
+                  <td className="px-0.5 sm:px-2 py-1.5 sm:py-2.5 text-right text-[10px] sm:text-xs tabular-nums text-black/60">
                     {row.setsFor}/{row.setsAgainst}
                   </td>
                   <td
-                    className="hidden md:table-cell px-2 py-3 text-right text-xs tabular-nums text-black/60"
+                    className="px-0.5 sm:px-2 py-1.5 sm:py-2.5 text-right text-[10px] sm:text-xs tabular-nums text-black/60"
                     title="Puntos a favor / en contra en todos los sets"
                   >
                     {row.pointsFor}/{row.pointsAgainst}
                   </td>
                   <td
-                    className="px-2 sm:px-4 py-2.5 sm:py-3 text-right font-bold text-lg sm:text-xl tabular-nums"
+                    className="px-1 sm:px-3 py-1.5 sm:py-2.5 text-right font-bold text-sm sm:text-xl tabular-nums"
                     style={{ ...FONT, color: '#0F0F14' }}
                   >
                     {row.points}
