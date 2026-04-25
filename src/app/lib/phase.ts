@@ -126,8 +126,13 @@ export function humanizePhase(label: string): string {
 //
 // Anything not in the list falls to the bottom in alphabetical order.
 const PHASE_ORDER: Record<string, number> = {
+  // Grupos — both raw ("grupos") and normalized labels ("Grupos",
+  // "Fase de grupos"). The public MatchesTab now displays "Fase de
+  // grupos" via resolvePhaseLabel().
   Grupos: 10,
   grupos: 10,
+  'Fase de grupos': 10,
+  'Fase de Grupos': 10,
   Liga: 20,
   liga: 20,
   Cuartos: 30,

@@ -8,6 +8,7 @@ import type { Match } from '../../../types';
 import { MatchCard } from '../../../components/MatchCard';
 import {
   categoryOfMatchPhase,
+  categoryOfGroupName,
   phaseLabelOnly,
   phaseOrderKey,
   phaseBucket,
@@ -15,6 +16,44 @@ import {
   PHASE_BUCKET_LABELS,
   type PhaseBucket,
 } from '../../../lib/phase';
+
+/**
+ * Resolve the category of a match across the two encoding shapes the
+ * codebase has accumulated:
+ *
+ *   1. New bracket-stage matches set `phase = "<round>|<category>"`,
+ *      e.g. "Cuartos · Oro|Infantil Femenino".
+ *   2. Round-robin matches set `phase = "grupos"` (no category) and
+ *      keep the category inside `group_name = "<category>|<letter>"`,
+ *      e.g. "Infantil Femenino|A".
+ *
+ * Old `categoryOfMatchPhase("grupos")` returned the whole string as a
+ * (bogus) category, which is why the public MatchesTab rendered a
+ * spurious "GRUPOS" category header alongside the real divisions.
+ */
+function resolveCategory(match: Match): string {
+  if (match.group) {
+    const fromGroup = categoryOfGroupName(match.group);
+    if (fromGroup) return fromGroup;
+  }
+  if (match.phase && match.phase.includes('|')) {
+    return categoryOfMatchPhase(match.phase);
+  }
+  return '';
+}
+
+/**
+ * Display label for the phase sub-header. Normalizes the legacy
+ * lowercase values that the round-robin generator persists ("grupos",
+ * "liga") into the same casing used everywhere else in the UI.
+ */
+function resolvePhaseLabel(match: Match): string {
+  const raw = phaseLabelOnly(match.phase ?? '').trim();
+  const lower = raw.toLowerCase();
+  if (lower === 'grupos') return 'Fase de grupos';
+  if (lower === 'liga') return 'Liga';
+  return raw || 'Sin fase';
+}
 
 const FONT = { fontFamily: 'Barlow Condensed, sans-serif' };
 
@@ -44,7 +83,7 @@ export function MatchesTab({ matches }: { matches: Match[] }) {
   const categories = useMemo(() => {
     const set = new Set<string>();
     for (const m of matches) {
-      const c = categoryOfMatchPhase(m.phase);
+      const c = resolveCategory(m);
       if (c) set.add(c);
     }
     return [...set].sort();
@@ -58,7 +97,7 @@ export function MatchesTab({ matches }: { matches: Match[] }) {
           q === '' ||
           m.team1.name.toLowerCase().includes(q) ||
           m.team2.name.toLowerCase().includes(q);
-        const cat = categoryOfMatchPhase(m.phase);
+        const cat = resolveCategory(m);
         const matchesCategory = categoryFilter === 'all' || cat === categoryFilter;
         const bucket = phaseBucket(m.phase);
         const matchesPhase = phaseFilter === 'all' || bucket === phaseFilter;
@@ -368,8 +407,8 @@ function groupByCategoryThenPhase(matches: Match[]): CategoryGroup[] {
   const map = new Map<string, Map<string, Match[]>>();
   for (const m of matches) {
     if (m.status === 'live') continue;
-    const category = categoryOfMatchPhase(m.phase);
-    const phaseLabel = phaseLabelOnly(m.phase);
+    const category = resolveCategory(m);
+    const phaseLabel = resolvePhaseLabel(m);
     if (!map.has(category)) map.set(category, new Map());
     const phaseMap = map.get(category)!;
     if (!phaseMap.has(phaseLabel)) phaseMap.set(phaseLabel, []);
@@ -380,6 +419,10 @@ function groupByCategoryThenPhase(matches: Match[]): CategoryGroup[] {
     .map(([category, phaseMap]) => {
       const phases = [...phaseMap.entries()]
         .sort(([a], [b]) => {
+          // phaseOrderKey expects a "phase|category" string — wrapping
+          // with a trailing pipe is enough for the lookup; both legacy
+          // ("Grupos", "Liga") and bracket variants map to fixed keys,
+          // and unknown labels fall to the bottom.
           const ka = phaseOrderKey(`${a}|`);
           const kb = phaseOrderKey(`${b}|`);
           if (ka !== kb) return ka - kb;
