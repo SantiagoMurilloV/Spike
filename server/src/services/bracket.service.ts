@@ -2,6 +2,96 @@ import { getPool } from '../config/database';
 import { BracketMatch, Team } from '../types';
 import { NotFoundError, ValidationError } from '../middleware/errorHandler';
 
+// ── Bracket-round → match.phase mapping ────────────────────────────
+//
+// `bracket_matches.round` carries up to three pipe segments:
+//   · "final"                       (legacy, single-category)
+//   · "Category|final"              (multi-category, no division)
+//   · "Category|gold|final"         (Oro / Plata división)
+//
+// Materialized matches need a `phase` value in the format
+// "<roundLabel>|<category>" so the existing `categoryOfMatchPhase`
+// helper keeps extracting the right category. The tier suffix lives
+// inside the round label so a single-pipe split still works
+// downstream — e.g. "Cuartos · Oro|Mayores Femenino".
+
+function prettyRoundName(roundName: string): string {
+  switch (roundName) {
+    case 'cuartos':
+      return 'Cuartos';
+    case 'semifinal':
+      return 'Semifinal';
+    case 'final':
+      return 'Final';
+    case 'tercer-puesto':
+      return 'Tercer puesto';
+    default: {
+      // Generic "ronda-N" → "Ronda N"
+      const ronda = roundName.match(/^ronda-(\d+)$/);
+      if (ronda) return `Ronda ${ronda[1]}`;
+      // Fallback: capitalize first letter of any other custom label
+      return roundName.charAt(0).toUpperCase() + roundName.slice(1);
+    }
+  }
+}
+
+function tierSuffix(tier: 'gold' | 'silver' | null): string {
+  if (tier === 'gold') return ' · Oro';
+  if (tier === 'silver') return ' · Plata';
+  return '';
+}
+
+/** Parse a bracket_matches.round string into its three logical parts. */
+function parseBracketRound(round: string): {
+  category: string;
+  tier: 'gold' | 'silver' | null;
+  roundName: string;
+} {
+  const parts = round.split('|');
+  if (parts.length >= 3 && (parts[1] === 'gold' || parts[1] === 'silver')) {
+    return { category: parts[0], tier: parts[1] as 'gold' | 'silver', roundName: parts.slice(2).join('|') };
+  }
+  if (parts.length >= 2) {
+    return { category: parts[0], tier: null, roundName: parts.slice(1).join('|') };
+  }
+  return { category: '', tier: null, roundName: round };
+}
+
+/**
+ * Build the `match.phase` string for a materialized bracket match. The
+ * format mirrors the existing "phase|category" convention used by
+ * round-robin matches (see `generateRoundRobin`), so the public
+ * `categoryOfMatchPhase` helper splits it correctly.
+ *
+ *   · "Cat|gold|cuartos"  → "Cuartos · Oro|Cat"
+ *   · "Cat|final"         → "Final|Cat"
+ *   · "semifinal"         → "Semifinal"        (legacy single-category)
+ */
+function bracketRoundToMatchPhase(round: string): string {
+  const { category, tier, roundName } = parseBracketRound(round);
+  const label = `${prettyRoundName(roundName)}${tierSuffix(tier)}`;
+  return category ? `${label}|${category}` : label;
+}
+
+// ── Schedule defaults for materialized bracket matches ─────────────
+//
+// Kept in lockstep with the values in `fixture/schedule.ts`. We cannot
+// import them from there without pulling the whole scheduler into this
+// file, and bracket materialization does NOT need the conflict-aware
+// sweep (each bracket round is sequential by construction). A simple
+// court-rotating cursor is enough.
+
+const DEFAULT_DAY_START_MIN = 8 * 60;
+const DEFAULT_DAY_END_MIN = 18 * 60;
+const DEFAULT_MATCH_MIN = 60;
+const DEFAULT_BREAK_MIN = 15;
+
+function formatHHMM(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+}
+
 function mapBracketRow(row: Record<string, unknown>): BracketMatch {
   const match: BracketMatch = {
     id: row.id as string,
@@ -310,12 +400,264 @@ export class BracketGenerator {
       }
     }
 
-    // Return the updated bracket match
+    // Read the updated bracket row BEFORE materialization so the
+    // caller's response data is independent of any materializer errors
+    // (also keeps the existing test fixtures' mock queue layout intact).
     const updatedResult = await pool.query(
       'SELECT * FROM bracket_matches WHERE id = $1',
       [bracketMatchId]
     );
-    return mapBracketRow(updatedResult.rows[0]);
+    const updated = mapBracketRow(updatedResult.rows[0]);
+
+    // After the winner propagates, the next-round slot may have just
+    // been filled (this side or the opposite). Materialize so a playable
+    // match shows up immediately in the public list / referee console.
+    // Best-effort: never block advancement on a materialization error.
+    try {
+      await this.materializePendingBracketMatches(tournamentId);
+    } catch (err) {
+      console.warn('[advanceWinner] materialize failed:', err);
+    }
+
+    return updated;
+  }
+
+  /**
+   * Materialize playable `matches` rows for every bracket slot whose two
+   * teams are already resolved.
+   *
+   * Why: bracket_matches stores the bracket structure and inline
+   * score/winner, but the public matches list, the referee console and
+   * the admin schedule all live on the regular `matches` table. Without
+   * this step, cuartos / semifinal / final / tercer-puesto rounds never
+   * appear in those flows.
+   *
+   * Behavior:
+   *   · Idempotent — re-runs after every bracket change. The unique
+   *     partial index on `matches.bracket_match_id` ensures we never
+   *     create more than one match per slot.
+   *   · Live re-sync — when a bracket slot's team ids change because
+   *     standings shifted (handled by `resolveBracketFromStandings`),
+   *     the materialized match's team ids get updated *only* while it
+   *     is still `upcoming`. Once a referee/admin starts scoring, the
+   *     match is treated as the source of truth.
+   *   · Schedule continuation — new matches are placed after the
+   *     latest scheduled slot of the tournament (group stage or earlier
+   *     bracket round), rotating across the tournament's courts. Admins
+   *     can edit date/time/court via the regular match edit UI.
+   *
+   * Returns the number of inserted + updated rows so the caller can
+   * decide whether to refresh client state.
+   */
+  async materializePendingBracketMatches(tournamentId: string): Promise<number> {
+    const pool = getPool();
+
+    // Tournament metadata for scheduling.
+    const tournRes = await pool.query(
+      'SELECT id, courts, start_date FROM tournaments WHERE id = $1',
+      [tournamentId],
+    );
+    if (tournRes.rows.length === 0) return 0;
+    const tournament = tournRes.rows[0];
+    const courts: string[] = (tournament.courts as string[] | null) ?? [];
+    const courtNames = courts.length > 0 ? courts : ['Cancha 1'];
+
+    // Bracket rows ready to be played: both teams resolved, distinct.
+    // Order by round + position so cuartos materialize before semis,
+    // which keeps the schedule monotonic.
+    const bmRes = await pool.query(
+      `SELECT id, team1_id, team2_id, round, position
+         FROM bracket_matches
+         WHERE tournament_id = $1
+           AND team1_id IS NOT NULL
+           AND team2_id IS NOT NULL
+           AND team1_id <> team2_id
+         ORDER BY round, position`,
+      [tournamentId],
+    );
+    if (bmRes.rows.length === 0) return 0;
+
+    // Existing materialized matches keyed by their bracket pointer so we
+    // can detect "already there" vs "needs team re-sync".
+    const existRes = await pool.query(
+      `SELECT id, bracket_match_id, team1_id, team2_id, status
+         FROM matches
+         WHERE tournament_id = $1 AND bracket_match_id IS NOT NULL`,
+      [tournamentId],
+    );
+    const existing = new Map<
+      string,
+      { id: string; team1_id: string; team2_id: string; status: string }
+    >();
+    for (const r of existRes.rows) {
+      existing.set(r.bracket_match_id as string, {
+        id: r.id as string,
+        team1_id: r.team1_id as string,
+        team2_id: r.team2_id as string,
+        status: r.status as string,
+      });
+    }
+
+    // Cursor for new slots — picks up after the latest scheduled match
+    // (any phase) for the tournament so the bracket extends the agenda
+    // instead of overlapping with grupos.
+    const lastSlotRes = await pool.query(
+      `SELECT date, time
+         FROM matches
+         WHERE tournament_id = $1
+         ORDER BY date DESC, time DESC
+         LIMIT 1`,
+      [tournamentId],
+    );
+    let cursorDate: Date;
+    let cursorMinutes: number;
+    if (lastSlotRes.rows.length > 0) {
+      const r = lastSlotRes.rows[0];
+      cursorDate = new Date((r.date as string) + 'T00:00:00');
+      const [h, m] = (r.time as string).split(':').map((s) => parseInt(s, 10));
+      cursorMinutes = h * 60 + m + DEFAULT_MATCH_MIN + DEFAULT_BREAK_MIN;
+      // Roll forward if the last slot pushed us out of the day window.
+      if (cursorMinutes + DEFAULT_MATCH_MIN > DEFAULT_DAY_END_MIN) {
+        cursorDate = new Date(cursorDate.getTime() + 86_400_000);
+        cursorMinutes = DEFAULT_DAY_START_MIN;
+      }
+    } else {
+      const start = (tournament.start_date as string | null) ?? new Date().toISOString().split('T')[0];
+      cursorDate = new Date(start + 'T00:00:00');
+      cursorMinutes = DEFAULT_DAY_START_MIN;
+    }
+
+    let courtIdx = 0;
+    let writes = 0;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      for (const bm of bmRes.rows) {
+        const bracketId = bm.id as string;
+        const team1Id = bm.team1_id as string;
+        const team2Id = bm.team2_id as string;
+        const round = bm.round as string;
+
+        const exists = existing.get(bracketId);
+        if (exists) {
+          // Re-sync teams while the materialized match hasn't been
+          // touched by the referee yet. Once a score lands the match
+          // is the source of truth.
+          if (
+            exists.status === 'upcoming' &&
+            (exists.team1_id !== team1Id || exists.team2_id !== team2Id)
+          ) {
+            await client.query(
+              `UPDATE matches SET team1_id = $1, team2_id = $2, updated_at = NOW() WHERE id = $3`,
+              [team1Id, team2Id, exists.id],
+            );
+            writes++;
+          }
+          continue;
+        }
+
+        // Allocate a slot — same minute across courts until they're full,
+        // then advance time. This mirrors the group-stage scheduler's
+        // multi-court parallelism without re-running the whole sweep.
+        if (cursorMinutes + DEFAULT_MATCH_MIN > DEFAULT_DAY_END_MIN) {
+          cursorDate = new Date(cursorDate.getTime() + 86_400_000);
+          cursorMinutes = DEFAULT_DAY_START_MIN;
+          courtIdx = 0;
+        }
+        const dateStr = cursorDate.toISOString().split('T')[0];
+        const time = formatHHMM(cursorMinutes);
+        const court = courtNames[courtIdx % courtNames.length];
+
+        const phase = bracketRoundToMatchPhase(round);
+
+        await client.query(
+          `INSERT INTO matches
+             (tournament_id, team1_id, team2_id, date, time, court, status, phase, bracket_match_id)
+           VALUES ($1, $2, $3, $4, $5, $6, 'upcoming', $7, $8)`,
+          [tournamentId, team1Id, team2Id, dateStr, time, court, phase, bracketId],
+        );
+        writes++;
+
+        courtIdx++;
+        // After filling every court at this minute, jump forward.
+        if (courtIdx % courtNames.length === 0) {
+          cursorMinutes += DEFAULT_MATCH_MIN + DEFAULT_BREAK_MIN;
+        }
+      }
+
+      await client.query('COMMIT');
+      return writes;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Sync a freshly-completed materialized match back into the bracket:
+   * record the score, mark the bracket row completed, and propagate the
+   * winner to the next round via {@link advanceWinner}.
+   *
+   * Called from `match.service` whenever a match with a non-null
+   * `bracket_match_id` flips its status to `completed`. Idempotent — if
+   * the bracket row is already completed, returns early so the call is
+   * safe to fire on every score save.
+   */
+  async syncBracketFromMatch(matchId: string): Promise<void> {
+    const pool = getPool();
+
+    const matchRes = await pool.query(
+      `SELECT id, bracket_match_id, team1_id, team2_id, status,
+              score_team1, score_team2
+         FROM matches WHERE id = $1`,
+      [matchId],
+    );
+    if (matchRes.rows.length === 0) return;
+    const match = matchRes.rows[0];
+    if (!match.bracket_match_id) return;
+    if (match.status !== 'completed') return;
+
+    const bmRes = await pool.query(
+      'SELECT id, status, team1_id, team2_id FROM bracket_matches WHERE id = $1',
+      [match.bracket_match_id],
+    );
+    if (bmRes.rows.length === 0) return;
+    const bm = bmRes.rows[0];
+
+    // Resolve winner — fall back to score comparison if sets are absent.
+    // The match service computes scoreTeam1/scoreTeam2 as sets-won by
+    // each side, so the comparison is already at the match level.
+    const score1 = (match.score_team1 as number | null) ?? 0;
+    const score2 = (match.score_team2 as number | null) ?? 0;
+    if (score1 === score2) return; // tied → can't determine a winner yet
+    const team1Id = bm.team1_id as string | null;
+    const team2Id = bm.team2_id as string | null;
+    if (!team1Id || !team2Id) return;
+    const winnerId = score1 > score2 ? team1Id : team2Id;
+
+    // Persist score + status on the bracket row first so subsequent
+    // `getBracket` calls reflect the latest result. Use coalesced score
+    // values so the bracket also displays the sets-won count.
+    await pool.query(
+      `UPDATE bracket_matches
+         SET score_team1 = $1, score_team2 = $2, status = 'completed'
+         WHERE id = $3`,
+      [score1, score2, bm.id],
+    );
+
+    if (bm.status === 'completed') return; // already advanced
+
+    try {
+      await this.advanceWinner(bm.id as string, winnerId);
+    } catch (err) {
+      // advanceWinner can throw "winner not in bracket match" while
+      // standings are still settling. Don't surface — the next score
+      // write will retry.
+      console.warn('[syncBracketFromMatch] advanceWinner failed:', err);
+    }
   }
 
   /**

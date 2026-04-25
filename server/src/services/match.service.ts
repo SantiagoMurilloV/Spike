@@ -66,6 +66,15 @@ async function refreshTournamentState(tournamentId: string): Promise<void> {
   } catch {
     // swallow — auto-bracket is best-effort, never blocks a score save
   }
+  try {
+    // Materialize playable matches for any bracket slot that just got
+    // its two teams resolved (either by the standings re-resolution
+    // above, or by a previous advanceWinner). Idempotent — only
+    // creates rows for slots that don't yet have a `matches` row.
+    await bracketGenerator.materializePendingBracketMatches(tournamentId);
+  } catch (err) {
+    console.warn('[refreshTournamentState] materialize failed:', err);
+  }
 }
 
 function mapRow(row: Record<string, unknown>): Match {
@@ -84,6 +93,7 @@ function mapRow(row: Record<string, unknown>): Match {
     phase: row.phase as string,
     groupName: row.group_name as string | undefined,
     duration: row.duration != null ? (row.duration as number) : undefined,
+    bracketMatchId: (row.bracket_match_id as string | null | undefined) ?? null,
     createdAt: row.created_at as string | undefined,
     updatedAt: row.updated_at as string | undefined,
   };
@@ -285,6 +295,17 @@ export class MatchService {
       await refreshTournamentState(tournamentId);
     }
 
+    // Mirror the score-update path: a bracket-stage match that just
+    // flipped to `completed` from the admin form should still propagate
+    // its winner to the next bracket round.
+    if (existing.bracketMatchId && data.status === 'completed' && existing.status !== 'completed') {
+      try {
+        await bracketGenerator.syncBracketFromMatch(id);
+      } catch (err) {
+        console.warn('[update] syncBracketFromMatch failed:', err);
+      }
+    }
+
     // Fire a push when the admin flips a match into 'live' from here.
     // Score corrections from the admin form skip the score-push flow —
     // that belongs to the referee console where the judge drives scoring.
@@ -401,6 +422,19 @@ export class MatchService {
       score.status !== undefined;
     if (scoreTouched) {
       await refreshTournamentState(existing.tournamentId);
+    }
+
+    // If this match is the materialization of a bracket slot and just
+    // landed in `completed`, push the result back into the bracket
+    // (records score, marks the bracket row completed, propagates the
+    // winner to the next round). Idempotent — safe to call on every
+    // score save; only triggers the actual advance once.
+    if (existing.bracketMatchId && score.status === 'completed') {
+      try {
+        await bracketGenerator.syncBracketFromMatch(id);
+      } catch (err) {
+        console.warn('[updateScore] syncBracketFromMatch failed:', err);
+      }
     }
 
     // Push dispatch (fire-and-forget):

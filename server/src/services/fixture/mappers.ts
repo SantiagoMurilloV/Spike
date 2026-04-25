@@ -21,6 +21,7 @@ export function mapMatchRow(row: Record<string, unknown>): Match {
     phase: row.phase as string,
     groupName: row.group_name as string | undefined,
     duration: row.duration != null ? (row.duration as number) : undefined,
+    bracketMatchId: (row.bracket_match_id as string | null | undefined) ?? null,
     createdAt: row.created_at as string | undefined,
     updatedAt: row.updated_at as string | undefined,
   };

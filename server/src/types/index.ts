@@ -108,6 +108,13 @@ export interface Match {
   groupName?: string;
   duration?: number;    // minutes
   sets?: SetScore[];
+  /**
+   * For materialized bracket-stage matches: pointer to the bracket_matches
+   * row that produced this match. NULL on group / liga rows. The pairing
+   * is one-to-one (unique partial index) and the score / status edited
+   * here propagates back to the bracket via the post-update sync hook.
+   */
+  bracketMatchId?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

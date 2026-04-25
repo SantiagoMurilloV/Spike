@@ -20,7 +20,7 @@ import {
   calculateGroupCount,
 } from './fixture/algorithms';
 import { calculateMatchTimes } from './fixture/schedule';
-import { mapBracketRow } from './fixture/mappers';
+import { mapBracketRow, mapMatchRow } from './fixture/mappers';
 import {
   persistMatches,
   persistBracket,
@@ -29,6 +29,7 @@ import {
   clearCategoryBracket,
 } from './fixture/persist';
 import { autoVnlSeeds } from './fixture/autoSeeding';
+import { bracketGenerator } from './bracket.service';
 
 // Legacy named exports kept for any server-side caller that imports
 // helpers by name from this file directly.
@@ -292,6 +293,16 @@ export class FixtureGenerator {
         [tournamentId],
       );
       await client.query('COMMIT');
+
+      // Seed playable `matches` rows for any first-round slot whose
+      // teams resolved cleanly from current standings. Best-effort —
+      // never blocks the bracket persistence.
+      try {
+        await bracketGenerator.materializePendingBracketMatches(tournamentId);
+      } catch (err) {
+        console.warn('[generateBracketCrossings] materialize failed:', err);
+      }
+
       return fullBracketResult.rows.map(mapBracketRow);
     } catch (error) {
       await client.query('ROLLBACK');
@@ -516,8 +527,27 @@ export class FixtureGenerator {
 
       await client.query('COMMIT');
 
+      // For pure-knockout tournaments the bracket is seeded with real
+      // teams up front — those slots need a `matches` row from the
+      // get-go so they show up in the matches tab and the referee
+      // console. Best-effort, won't block fixture generation.
+      try {
+        await bracketGenerator.materializePendingBracketMatches(tournamentId);
+      } catch (err) {
+        console.warn('[fixture.commit] materialize failed:', err);
+      }
+
+      // Return the materialized matches as well — re-read instead of
+      // relying on the persist call so the response carries the new
+      // bracket-stage rows (with their `bracketMatchId` pointer).
+      const refreshedMatchesRes = await getPool().query(
+        'SELECT * FROM matches WHERE tournament_id = $1 ORDER BY date, time',
+        [tournamentId],
+      );
+      const refreshedMatches = refreshedMatchesRes.rows.map(mapMatchRow);
+
       return {
-        matches,
+        matches: refreshedMatches.length > 0 ? refreshedMatches : matches,
         bracketMatches,
         generatedAt: new Date().toISOString(),
       };

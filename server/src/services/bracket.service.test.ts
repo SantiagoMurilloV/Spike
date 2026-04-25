@@ -583,8 +583,12 @@ describe('BracketGenerator — Winner advancement (Req 8.2)', () => {
 
       expect(result.winnerId).toBe('team-1');
 
-      // Only 4 queries total (no advancement update for final)
-      expect(queryFn).toHaveBeenCalledTimes(4);
+      // 4 advance queries + 1 first call inside the (best-effort)
+      // materializer that fires after advancement. The materializer's
+      // queue queries fail under the mock setup but the error is
+      // swallowed by the try/catch — what we care about here is that
+      // advancement itself didn't push a "next round" update.
+      expect(queryFn).toHaveBeenCalledTimes(5);
     });
 
     it('should throw NotFoundError when bracket match does not exist', async () => {
