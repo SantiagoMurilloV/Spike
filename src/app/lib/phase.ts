@@ -158,3 +158,56 @@ export function phaseOrderKey(phase: string): number {
   const label = phaseLabelOnly(phase);
   return PHASE_ORDER[label] ?? 999;
 }
+
+// ── Phase filter buckets ──────────────────────────────────────────
+//
+// The public matches tab exposes a 5-button filter over the entire
+// playoff progression. Each button collapses any tier variant
+// (Oro / Plata) into the same bucket so the user only thinks about
+// "estoy buscando cuartos", regardless of division.
+
+export type PhaseBucket =
+  | 'grupos'
+  | 'cuartos'
+  | 'semifinal'
+  | 'final'
+  | 'tercer-puesto';
+
+export const PHASE_BUCKET_LABELS: Record<PhaseBucket, string> = {
+  grupos: 'Fase de grupos',
+  cuartos: 'Cuartos',
+  semifinal: 'Semifinal',
+  final: 'Final',
+  'tercer-puesto': 'Tercer puesto',
+};
+
+/** Ordered list for rendering pill buttons left → right. */
+export const PHASE_BUCKETS: PhaseBucket[] = [
+  'grupos',
+  'cuartos',
+  'semifinal',
+  'final',
+  'tercer-puesto',
+];
+
+/**
+ * Match `match.phase` (already without category suffix preferred) to
+ * its filter bucket. Returns null when the phase doesn't fit any of
+ * the five buckets — those matches are still visible in the "todos"
+ * view but don't pile into a button.
+ *
+ *   · "Grupos" / "grupos" / "Liga" / "liga"      → 'grupos'
+ *   · "Cuartos" / "Cuartos · Oro" / "Cuartos · Plata" → 'cuartos'
+ *   · idem for Semifinal / Final / Tercer puesto
+ */
+export function phaseBucket(phase: string): PhaseBucket | null {
+  const label = phaseLabelOnly(phase).toLowerCase();
+  if (label === 'grupos' || label === 'liga') return 'grupos';
+  if (label.startsWith('cuartos')) return 'cuartos';
+  if (label.startsWith('semifinal')) return 'semifinal';
+  if (label.startsWith('tercer puesto')) return 'tercer-puesto';
+  // "final" matches must be checked AFTER "semifinal" so the prefix
+  // doesn't swallow them.
+  if (label.startsWith('final')) return 'final';
+  return null;
+}

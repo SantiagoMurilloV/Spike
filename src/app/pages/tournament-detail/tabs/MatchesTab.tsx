@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { motion } from 'motion/react';
-import { Search, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Search, X, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Match } from '../../../types';
@@ -10,6 +10,10 @@ import {
   categoryOfMatchPhase,
   phaseLabelOnly,
   phaseOrderKey,
+  phaseBucket,
+  PHASE_BUCKETS,
+  PHASE_BUCKET_LABELS,
+  type PhaseBucket,
 } from '../../../lib/phase';
 
 const FONT = { fontFamily: 'Barlow Condensed, sans-serif' };
@@ -18,23 +22,33 @@ const FONT = { fontFamily: 'Barlow Condensed, sans-serif' };
  * Public "Partidos" tab.
  *
  * Layout:
- *   · Filters: search + date (the phase filter from the legacy version
- *     is implicit now — every phase renders as its own header).
+ *   · Search by team name + filter pills:
+ *       - one pill per category (extracted from the matches in scope)
+ *       - five fixed phase pills: Grupos / Cuartos / Semifinal / Final
+ *         / Tercer puesto. Each phase pill collapses tier variants
+ *         (Oro / Plata) so a single "Cuartos" click matches both.
  *   · Live strip on top (every live match across categories) so the
  *     spectator notices a match in progress without scrolling.
- *   · Per-category section (h2 header) with phase sub-sections inside,
- *     ordered Grupos → Cuartos → Semifinal → Final → Tercer puesto and
- *     their Oro / Plata variants when the tournament uses divisions.
+ *   · When no filter is active, categories render as collapsible
+ *     accordions (closed by default after the first one) so the page
+ *     stays compact on tournaments with many divisions. Inside each
+ *     category, phase sub-headers preserve the tournament progression.
  */
 export function MatchesTab({ matches }: { matches: Match[] }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [date, setDate] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [phaseFilter, setPhaseFilter] = useState<PhaseBucket | 'all'>('all');
 
-  const dates = useMemo(
-    () => [...new Set(matches.map((m) => format(m.date, 'yyyy-MM-dd')))].sort(),
-    [matches],
-  );
+  // Categories that exist in the data — drives the dropdown on top.
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of matches) {
+      const c = categoryOfMatchPhase(m.phase);
+      if (c) set.add(c);
+    }
+    return [...set].sort();
+  }, [matches]);
 
   const filtered = useMemo(
     () =>
@@ -44,22 +58,24 @@ export function MatchesTab({ matches }: { matches: Match[] }) {
           q === '' ||
           m.team1.name.toLowerCase().includes(q) ||
           m.team2.name.toLowerCase().includes(q);
-        const matchesDate = date === 'all' || format(m.date, 'yyyy-MM-dd') === date;
-        return matchesSearch && matchesDate;
+        const cat = categoryOfMatchPhase(m.phase);
+        const matchesCategory = categoryFilter === 'all' || cat === categoryFilter;
+        const bucket = phaseBucket(m.phase);
+        const matchesPhase = phaseFilter === 'all' || bucket === phaseFilter;
+        return matchesSearch && matchesCategory && matchesPhase;
       }),
-    [matches, query, date],
+    [matches, query, categoryFilter, phaseFilter],
   );
 
-  // Live matches surface above the category list so spectators see
-  // them at a glance regardless of which category they belong to.
   const live = useMemo(() => filtered.filter((m) => m.status === 'live'), [filtered]);
-
   const grouped = useMemo(() => groupByCategoryThenPhase(filtered), [filtered]);
 
-  const hasActiveFilters = query !== '' || date !== 'all';
+  const hasActiveFilters =
+    query !== '' || categoryFilter !== 'all' || phaseFilter !== 'all';
   const clear = () => {
     setQuery('');
-    setDate('all');
+    setCategoryFilter('all');
+    setPhaseFilter('all');
   };
 
   const go = (id: string) => navigate(`/match/${id}`);
@@ -67,6 +83,7 @@ export function MatchesTab({ matches }: { matches: Match[] }) {
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
       <div className="space-y-6">
+        {/* Search */}
         <div className="relative max-w-2xl">
           <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-6 h-6 text-black/40" />
           <input
@@ -78,42 +95,60 @@ export function MatchesTab({ matches }: { matches: Match[] }) {
           />
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          <FilterSelect value={date} onChange={setDate}>
-            <option value="all">Todas las fechas</option>
-            {dates.map((d) => (
-              <option key={d} value={d}>
-                {format(new Date(d), "d 'de' MMMM", { locale: es })}
-              </option>
-            ))}
-          </FilterSelect>
-
-          {hasActiveFilters && (
-            <motion.button
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={clear}
-              className="flex items-center gap-2 px-4 py-3 bg-spk-red text-white rounded-sm text-sm font-bold uppercase tracking-wider"
-              style={FONT}
-            >
-              <X className="w-4 h-4" />
-              Limpiar
-            </motion.button>
-          )}
+        {/* Phase pills — 5 fixed buckets covering tournament progression. */}
+        <div className="flex flex-wrap gap-2">
+          <PhasePill
+            active={phaseFilter === 'all'}
+            onClick={() => setPhaseFilter('all')}
+            label="Todas las fases"
+          />
+          {PHASE_BUCKETS.map((b) => (
+            <PhasePill
+              key={b}
+              active={phaseFilter === b}
+              onClick={() => setPhaseFilter(b)}
+              label={PHASE_BUCKET_LABELS[b]}
+            />
+          ))}
         </div>
+
+        {/* Category pills — dynamic, only shows up when there's >1 category. */}
+        {categories.length > 1 && (
+          <div className="flex flex-wrap gap-2">
+            <CategoryPill
+              active={categoryFilter === 'all'}
+              onClick={() => setCategoryFilter('all')}
+              label="Todas las categorías"
+            />
+            {categories.map((c) => (
+              <CategoryPill
+                key={c}
+                active={categoryFilter === c}
+                onClick={() => setCategoryFilter(c)}
+                label={c}
+              />
+            ))}
+          </div>
+        )}
 
         {hasActiveFilters && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            className="px-4 py-3 bg-black/5 rounded-sm"
+            className="flex items-center justify-between gap-4 px-4 py-3 bg-black/5 rounded-sm"
           >
             <p className="text-sm text-black/60">
               Mostrando <span className="font-bold text-black">{filtered.length}</span> de{' '}
               {matches.length} partidos
             </p>
+            <button
+              onClick={clear}
+              className="flex items-center gap-2 px-3 py-1.5 bg-spk-red text-white rounded-sm text-xs font-bold uppercase tracking-wider"
+              style={FONT}
+            >
+              <X className="w-3 h-3" />
+              Limpiar
+            </button>
           </motion.div>
         )}
       </div>
@@ -148,29 +183,15 @@ export function MatchesTab({ matches }: { matches: Match[] }) {
             </section>
           )}
 
-          {grouped.map(({ category, phases }) => (
-            <section key={category || '_uncat'} className="space-y-6">
-              <h2
-                className="text-2xl sm:text-3xl font-bold pb-2 sm:pb-3 uppercase"
-                style={{
-                  ...FONT,
-                  letterSpacing: '-0.02em',
-                  borderBottom: '3px solid var(--brand-red)',
-                }}
-              >
-                {category || 'Sin categoría'}
-              </h2>
-              <div className="space-y-8">
-                {phases.map(({ phase, matches: phaseMatches }) => (
-                  <PhaseGroup
-                    key={phase}
-                    phase={phase}
-                    matches={phaseMatches}
-                    onClick={go}
-                  />
-                ))}
-              </div>
-            </section>
+          {grouped.map(({ category, phases, total }, idx) => (
+            <CategoryAccordion
+              key={category || '_uncat'}
+              category={category}
+              phases={phases}
+              total={total}
+              defaultOpen={hasActiveFilters || idx === 0}
+              onMatchClick={go}
+            />
           ))}
         </div>
       )}
@@ -178,89 +199,132 @@ export function MatchesTab({ matches }: { matches: Match[] }) {
   );
 }
 
-// ── Helpers ────────────────────────────────────────────────────────
+// ── Pills ──────────────────────────────────────────────────────────
 
-interface PhaseBucket {
+function PhasePill({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <motion.button
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      className={`px-4 py-2 rounded-sm text-sm font-bold uppercase tracking-wider transition-colors ${
+        active ? 'bg-spk-red text-white' : 'bg-black/5 text-black/70 hover:bg-black/10'
+      }`}
+      style={FONT}
+    >
+      {label}
+    </motion.button>
+  );
+}
+
+function CategoryPill({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <motion.button
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      className={`px-4 py-2 rounded-sm text-sm font-semibold tracking-wide transition-colors ${
+        active
+          ? 'bg-black text-white'
+          : 'bg-white border-2 border-black/10 text-black/70 hover:border-black/40'
+      }`}
+    >
+      {label}
+    </motion.button>
+  );
+}
+
+// ── Accordion + grouping ───────────────────────────────────────────
+
+interface PhaseSection {
   phase: string;
   matches: Match[];
 }
 
-interface CategoryBucket {
+interface CategoryGroup {
   category: string;
-  phases: PhaseBucket[];
+  phases: PhaseSection[];
+  total: number;
 }
 
-/**
- * Two-level grouping: category (h2) → phase (h3 inside). Phases are
- * ordered using {@link phaseOrderKey} so the public list reads like a
- * tournament timeline (Grupos first, Tercer puesto last). Live matches
- * are intentionally excluded — the page renders them in their own
- * "EN VIVO" section above this one.
- */
-function groupByCategoryThenPhase(matches: Match[]): CategoryBucket[] {
-  const map = new Map<string, Map<string, Match[]>>();
-  for (const m of matches) {
-    if (m.status === 'live') continue; // shown in the live strip
-    const category = categoryOfMatchPhase(m.phase);
-    const phaseLabel = phaseLabelOnly(m.phase);
-    if (!map.has(category)) map.set(category, new Map());
-    const phaseMap = map.get(category)!;
-    if (!phaseMap.has(phaseLabel)) phaseMap.set(phaseLabel, []);
-    phaseMap.get(phaseLabel)!.push(m);
-  }
-  return [...map.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([category, phaseMap]) => ({
-      category,
-      phases: [...phaseMap.entries()]
-        .sort(([a], [b]) => {
-          const ka = phaseOrderKey(`${a}|`);
-          const kb = phaseOrderKey(`${b}|`);
-          if (ka !== kb) return ka - kb;
-          return a.localeCompare(b);
-        })
-        .map(([phase, ms]) => ({
-          phase,
-          matches: sortMatchesForPhase(ms),
-        })),
-    }));
-}
-
-/**
- * Within a phase: upcoming first (chronological), then completed
- * (chronological too). Live matches are surfaced separately.
- */
-function sortMatchesForPhase(matches: Match[]): Match[] {
-  const ranked = (m: Match) => (m.status === 'upcoming' ? 0 : 1);
-  return [...matches].sort((a, b) => {
-    const ra = ranked(a);
-    const rb = ranked(b);
-    if (ra !== rb) return ra - rb;
-    const ta = a.date.getTime();
-    const tb = b.date.getTime();
-    if (ta !== tb) return ta - tb;
-    return (a.time ?? '').localeCompare(b.time ?? '');
-  });
-}
-
-function FilterSelect({
-  value,
-  onChange,
-  children,
+function CategoryAccordion({
+  category,
+  phases,
+  total,
+  defaultOpen,
+  onMatchClick,
 }: {
-  value: string;
-  onChange: (v: string) => void;
-  children: React.ReactNode;
+  category: string;
+  phases: PhaseSection[];
+  total: number;
+  defaultOpen: boolean;
+  onMatchClick: (id: string) => void;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="px-4 py-3 bg-black text-white rounded-sm text-sm font-bold uppercase tracking-wider focus:outline-none cursor-pointer"
-      style={FONT}
-    >
-      {children}
-    </select>
+    <section className="space-y-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-3 pb-2 sm:pb-3 border-b-[3px] border-spk-red text-left"
+      >
+        <h2
+          className="text-2xl sm:text-3xl font-bold uppercase"
+          style={{ ...FONT, letterSpacing: '-0.02em' }}
+        >
+          {category || 'Sin categoría'}
+        </h2>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-black/40 tabular-nums">{total} partidos</span>
+          <motion.span
+            animate={{ rotate: open ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+            className="text-black/60"
+          >
+            <ChevronDown className="w-6 h-6" />
+          </motion.span>
+        </div>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-8 pt-6">
+              {phases.map(({ phase, matches: phaseMatches }) => (
+                <PhaseGroup
+                  key={phase}
+                  phase={phase}
+                  matches={phaseMatches}
+                  onClick={onMatchClick}
+                />
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
   );
 }
 
@@ -292,4 +356,50 @@ function PhaseGroup({
       </div>
     </div>
   );
+}
+
+/**
+ * Two-level grouping: category (h2) → phase (h3 inside). Phases are
+ * ordered using {@link phaseOrderKey} so the public list reads like a
+ * tournament timeline. Live matches are intentionally excluded — the
+ * page renders them in their own "EN VIVO" section above this one.
+ */
+function groupByCategoryThenPhase(matches: Match[]): CategoryGroup[] {
+  const map = new Map<string, Map<string, Match[]>>();
+  for (const m of matches) {
+    if (m.status === 'live') continue;
+    const category = categoryOfMatchPhase(m.phase);
+    const phaseLabel = phaseLabelOnly(m.phase);
+    if (!map.has(category)) map.set(category, new Map());
+    const phaseMap = map.get(category)!;
+    if (!phaseMap.has(phaseLabel)) phaseMap.set(phaseLabel, []);
+    phaseMap.get(phaseLabel)!.push(m);
+  }
+  return [...map.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([category, phaseMap]) => {
+      const phases = [...phaseMap.entries()]
+        .sort(([a], [b]) => {
+          const ka = phaseOrderKey(`${a}|`);
+          const kb = phaseOrderKey(`${b}|`);
+          if (ka !== kb) return ka - kb;
+          return a.localeCompare(b);
+        })
+        .map(([phase, ms]) => ({ phase, matches: sortMatchesForPhase(ms) }));
+      const total = phases.reduce((acc, p) => acc + p.matches.length, 0);
+      return { category, phases, total };
+    });
+}
+
+function sortMatchesForPhase(matches: Match[]): Match[] {
+  const ranked = (m: Match) => (m.status === 'upcoming' ? 0 : 1);
+  return [...matches].sort((a, b) => {
+    const ra = ranked(a);
+    const rb = ranked(b);
+    if (ra !== rb) return ra - rb;
+    const ta = a.date.getTime();
+    const tb = b.date.getTime();
+    if (ta !== tb) return ta - tb;
+    return (a.time ?? '').localeCompare(b.time ?? '');
+  });
 }
