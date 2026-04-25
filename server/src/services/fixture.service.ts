@@ -372,17 +372,42 @@ export class FixtureGenerator {
       const played = playedRes.rows[0]?.played as number | undefined;
       if (!played || played === 0) continue;
 
-      // Skip if a bracket already exists for this category. Idempotent
-      // behavior keeps the auto-gen safe to run after every score write.
-      // The structure stays put while standings shift; only the
-      // resolved team ids reshuffle via resolveBracketFromStandings.
+      // Decide whether this category needs an Oro/Plata seed pass.
+      //
+      //   · No bracket rows for the category yet → seed.
+      //   · Already has `|gold|%` or `|silver|%` rows → already on the
+      //     division shape; skip (resolveBracketFromStandings keeps it
+      //     in sync).
+      //   · Has legacy 2-segment rows only (e.g. left over from a
+      //     previous bracketMode='manual' run before the admin flipped
+      //     to divisions) → WIPE the category and re-seed. Otherwise
+      //     the leftover bracket would live forever and the division
+      //     auto-gen would never kick in.
       const roundPrefix = category ? `${category}|%` : '%';
-      const bracketRes = await pool.query(
-        `SELECT COUNT(*)::int AS existing FROM bracket_matches
-         WHERE tournament_id = $1 AND round LIKE $2`,
-        [tournamentId, roundPrefix],
+      const tierRowsRes = await pool.query(
+        `SELECT
+           SUM(CASE WHEN round LIKE $2 OR round LIKE $3 THEN 1 ELSE 0 END)::int AS tiered,
+           COUNT(*)::int AS total
+         FROM bracket_matches
+         WHERE tournament_id = $1 AND round LIKE $4`,
+        [
+          tournamentId,
+          category ? `${category}|gold|%` : '%|gold|%',
+          category ? `${category}|silver|%` : '%|silver|%',
+          roundPrefix,
+        ],
       );
-      if ((bracketRes.rows[0].existing as number) > 0) continue;
+      const tieredCount = (tierRowsRes.rows[0]?.tiered as number) ?? 0;
+      const totalCount = (tierRowsRes.rows[0]?.total as number) ?? 0;
+      if (tieredCount > 0) continue; // already a division bracket
+      if (totalCount > 0) {
+        // Legacy non-division rows present — drop them so we can lay
+        // the proper Oro/Plata structure on top.
+        await pool.query(
+          'DELETE FROM bracket_matches WHERE tournament_id = $1 AND round LIKE $2',
+          [tournamentId, roundPrefix],
+        );
+      }
 
       // Oro (1° + 2° of each group). Two classifiers per group is the
       // VNL default and matches how the manual flow was wired before.
