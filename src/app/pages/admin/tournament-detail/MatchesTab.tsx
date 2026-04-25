@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Trophy, Filter, Edit, MapPin } from 'lucide-react';
+import { Trophy, Filter, Edit, MapPin, Pencil } from 'lucide-react';
+import { toast } from 'sonner';
 import { Match } from '../../../types';
 import { Badge } from '../../../components/ui/badge';
 import {
@@ -11,8 +12,11 @@ import {
 } from '../../../components/ui/select';
 import { CategorySection } from '../../../components/admin/CategorySection';
 import { ScoreSetsEditor } from '../../../components/admin/ScoreSetsEditor';
+import { MatchFormModal } from '../../../components/admin/MatchFormModal';
+import { api, type UpdateMatchDto } from '../../../services/api';
 import { categoryOfMatchPhase } from '../../../lib/phase';
 import { matchStatusLabel } from '../../../lib/status';
+import { getErrorMessage } from '../../../lib/errors';
 import type { useScoreEditor } from '../../../hooks/useScoreEditor';
 
 type ScoreEditor = ReturnType<typeof useScoreEditor<Match>>;
@@ -22,6 +26,9 @@ interface MatchesTabProps {
   /** Shared editor hook instance from the parent (so state persists
    *  across tab switches and stays in sync with other surfaces). */
   editor: ScoreEditor;
+  /** Patch a match in the parent state after the metadata-edit modal
+   *  saves successfully — keeps the list in sync without re-fetching. */
+  onMatchUpdated?: (match: Match) => void;
 }
 
 /**
@@ -30,10 +37,50 @@ interface MatchesTabProps {
  * score-editor from the parent because it's shared with the Cruces
  * tab.
  */
-export function MatchesTab({ matches, editor }: MatchesTabProps) {
+export function MatchesTab({ matches, editor, onMatchUpdated }: MatchesTabProps) {
   const [phaseFilter, setPhaseFilter] = useState<string>('all');
   const [groupFilter, setGroupFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [editingMatch, setEditingMatch] = useState<Match | undefined>();
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  const openEditModal = (m: Match) => {
+    setEditingMatch(m);
+    setIsEditModalOpen(true);
+  };
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+  };
+
+  // The MatchFormModal calls onSubmit with a fresh Match payload — we
+  // translate that into the wire DTO and PUT /matches/:id. Throws on
+  // failure so the modal keeps itself open and shows the error.
+  const handleEditSubmit = async (m: Match) => {
+    if (!editingMatch) return;
+    const dto: UpdateMatchDto = {
+      tournamentId: m.tournamentId,
+      team1Id: m.team1.id,
+      team2Id: m.team2.id,
+      date: m.date.toISOString().split('T')[0],
+      time: m.time,
+      court: m.court,
+      referee: m.referee,
+      status: m.status,
+      phase: m.phase,
+      groupName: m.group,
+      scoreTeam1: m.score?.team1,
+      scoreTeam2: m.score?.team2,
+      duration: m.duration,
+    };
+    try {
+      const updated = await api.updateMatch(editingMatch.id, dto);
+      onMatchUpdated?.(updated);
+      toast.success('Partido actualizado');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Error al actualizar partido'));
+      throw err;
+    }
+  };
 
   const phases = useMemo(() => [...new Set(matches.map((m) => m.phase))], [matches]);
   const groups = useMemo(
@@ -143,7 +190,12 @@ export function MatchesTab({ matches, editor }: MatchesTabProps) {
               </h3>
               <div className="space-y-2">
                 {split.live.map((m) => (
-                  <MatchCard key={m.id} match={m} editor={editor} />
+                  <MatchCard
+                    key={m.id}
+                    match={m}
+                    editor={editor}
+                    onOpenEditModal={openEditModal}
+                  />
                 ))}
               </div>
             </section>
@@ -158,13 +210,25 @@ export function MatchesTab({ matches, editor }: MatchesTabProps) {
             >
               <div className="space-y-2">
                 {catMatches.map((m) => (
-                  <MatchCard key={m.id} match={m} editor={editor} />
+                  <MatchCard
+                    key={m.id}
+                    match={m}
+                    editor={editor}
+                    onOpenEditModal={openEditModal}
+                  />
                 ))}
               </div>
             </CategorySection>
           ))}
         </div>
       )}
+
+      <MatchFormModal
+        isOpen={isEditModalOpen}
+        onClose={closeEditModal}
+        onSubmit={handleEditSubmit}
+        match={editingMatch}
+      />
     </>
   );
 }
@@ -173,7 +237,15 @@ export function MatchesTab({ matches, editor }: MatchesTabProps) {
  * Single match card with inline score-editor support. Owns no state —
  * all editor interaction goes through the shared hook.
  */
-function MatchCard({ match, editor }: { match: Match; editor: ScoreEditor }) {
+function MatchCard({
+  match,
+  editor,
+  onOpenEditModal,
+}: {
+  match: Match;
+  editor: ScoreEditor;
+  onOpenEditModal: (m: Match) => void;
+}) {
   const isEditing = editor.isEditing(match);
   const displayScore = isEditing ? editor.editedScore : match.score;
   return (
@@ -264,11 +336,21 @@ function MatchCard({ match, editor }: { match: Match; editor: ScoreEditor }) {
           onCancel={editor.cancel}
         />
       ) : (
-        <div className="flex justify-end mt-2">
+        <div className="flex justify-end gap-3 mt-2">
+          <button
+            type="button"
+            onClick={() => onOpenEditModal(match)}
+            className="flex items-center gap-1 text-xs text-black/60 hover:text-black transition-colors"
+            title="Editar fecha, hora, cancha, equipos…"
+          >
+            <Pencil className="w-3 h-3" />
+            Editar partido
+          </button>
           <button
             type="button"
             onClick={() => editor.start(match)}
             className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
+            title="Editar marcador y sets"
           >
             <Edit className="w-3 h-3" />
             Editar marcador

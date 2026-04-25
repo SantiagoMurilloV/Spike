@@ -434,7 +434,13 @@ export function AdminTournamentDetail() {
         </TabsContent>
 
         <TabsContent value="matches">
-          <MatchesTab matches={matches} editor={matchEditor} />
+          <MatchesTab
+            matches={matches}
+            editor={matchEditor}
+            onMatchUpdated={(updated) =>
+              setMatches((prev) => prev.map((m) => (m.id === updated.id ? updated : m)))
+            }
+          />
         </TabsContent>
       </Tabs>
     </div>
