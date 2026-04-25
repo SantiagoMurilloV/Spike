@@ -287,7 +287,40 @@ export class TeamService {
        ORDER BY date, time`,
       [teamId]
     );
-    return result.rows.map(mapMatchRow);
+    const matches: Match[] = result.rows.map(mapMatchRow);
+    if (matches.length === 0) return matches;
+
+    // Attach per-set scores so the public team-detail page can compute
+    // sets-for / sets-against and the rally-point totals. Without this
+    // the "Sets a favor/contra" card on /team/:id always rendered 0/0
+    // even after games were played, because mapMatchRow only reads the
+    // aggregate score columns. One follow-up query for every match
+    // touching this team.
+    const matchIds = matches.map((m) => m.id);
+    const setsRes = await pool.query(
+      `SELECT id, match_id, set_number, team1_points, team2_points
+       FROM set_scores
+       WHERE match_id = ANY($1)
+       ORDER BY set_number`,
+      [matchIds],
+    );
+    const setsByMatch = new Map<string, Match['sets']>();
+    for (const row of setsRes.rows as Array<Record<string, unknown>>) {
+      const matchId = row.match_id as string;
+      const list = setsByMatch.get(matchId) ?? [];
+      list!.push({
+        id: row.id as string,
+        matchId,
+        setNumber: row.set_number as number,
+        team1Points: row.team1_points as number,
+        team2Points: row.team2_points as number,
+      });
+      setsByMatch.set(matchId, list);
+    }
+    for (const m of matches) {
+      m.sets = setsByMatch.get(m.id) ?? [];
+    }
+    return matches;
   }
 
   validateData(data: CreateTeamDto): ValidationResult {
