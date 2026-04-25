@@ -446,21 +446,54 @@ export class BracketGenerator {
    *     bracket round), rotating across the tournament's courts. Admins
    *     can edit date/time/court via the regular match edit UI.
    *
-   * Returns the number of inserted + updated rows so the caller can
-   * decide whether to refresh client state.
+   * Returns a diagnostic snapshot so callers (and the admin "Recalcular
+   * cruces" toast) can show counts and quickly tell whether a no-op was
+   * because nothing needed materializing or because something is off.
+   *
+   *   · totalBracketRows           — every bracket_matches row
+   *   · slotsWithBothTeamsResolved — rows with team1_id AND team2_id
+   *   · slotsAlreadyMaterialized   — rows already pointing at a match
+   *   · matchesCreated             — INSERTs done by this call
+   *   · matchesUpdated             — UPDATEs (team re-sync on upcoming)
    */
-  async materializePendingBracketMatches(tournamentId: string): Promise<number> {
-    const pool = getPool();
+  async materializePendingBracketMatches(
+    tournamentId: string,
+  ): Promise<{
+    totalBracketRows: number;
+    slotsWithBothTeamsResolved: number;
+    slotsAlreadyMaterialized: number;
+    matchesCreated: number;
+    matchesUpdated: number;
+  }> {
+    const empty = {
+      totalBracketRows: 0,
+      slotsWithBothTeamsResolved: 0,
+      slotsAlreadyMaterialized: 0,
+      matchesCreated: 0,
+      matchesUpdated: 0,
+    };
 
     // Tournament metadata for scheduling.
+    const pool = getPool();
+
     const tournRes = await pool.query(
       'SELECT id, courts, start_date FROM tournaments WHERE id = $1',
       [tournamentId],
     );
-    if (tournRes.rows.length === 0) return 0;
+    if (tournRes.rows.length === 0) return empty;
     const tournament = tournRes.rows[0];
     const courts: string[] = (tournament.courts as string[] | null) ?? [];
     const courtNames = courts.length > 0 ? courts : ['Cancha 1'];
+
+    // Snapshot every bracket row for the tournament so we can report
+    // counters even when nothing materialized.
+    const bracketAllRes = await pool.query(
+      `SELECT id, team1_id, team2_id
+         FROM bracket_matches
+         WHERE tournament_id = $1`,
+      [tournamentId],
+    );
+    const totalBracketRows = bracketAllRes.rows.length;
 
     // Bracket rows ready to be played: both teams resolved, distinct.
     // Order by round + position so cuartos materialize before semis,
@@ -475,7 +508,10 @@ export class BracketGenerator {
          ORDER BY round, position`,
       [tournamentId],
     );
-    if (bmRes.rows.length === 0) return 0;
+    const slotsWithBothTeamsResolved = bmRes.rows.length;
+    if (slotsWithBothTeamsResolved === 0) {
+      return { ...empty, totalBracketRows };
+    }
 
     // Existing materialized matches keyed by their bracket pointer so we
     // can detect "already there" vs "needs team re-sync".
@@ -528,7 +564,9 @@ export class BracketGenerator {
     }
 
     let courtIdx = 0;
-    let writes = 0;
+    let matchesCreated = 0;
+    let matchesUpdated = 0;
+    let slotsAlreadyMaterialized = 0;
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -541,6 +579,7 @@ export class BracketGenerator {
 
         const exists = existing.get(bracketId);
         if (exists) {
+          slotsAlreadyMaterialized++;
           // Re-sync teams while the materialized match hasn't been
           // touched by the referee yet. Once a score lands the match
           // is the source of truth.
@@ -552,7 +591,7 @@ export class BracketGenerator {
               `UPDATE matches SET team1_id = $1, team2_id = $2, updated_at = NOW() WHERE id = $3`,
               [team1Id, team2Id, exists.id],
             );
-            writes++;
+            matchesUpdated++;
           }
           continue;
         }
@@ -577,7 +616,7 @@ export class BracketGenerator {
            VALUES ($1, $2, $3, $4, $5, $6, 'upcoming', $7, $8)`,
           [tournamentId, team1Id, team2Id, dateStr, time, court, phase, bracketId],
         );
-        writes++;
+        matchesCreated++;
 
         courtIdx++;
         // After filling every court at this minute, jump forward.
@@ -587,7 +626,13 @@ export class BracketGenerator {
       }
 
       await client.query('COMMIT');
-      return writes;
+      return {
+        totalBracketRows,
+        slotsWithBothTeamsResolved,
+        slotsAlreadyMaterialized,
+        matchesCreated,
+        matchesUpdated,
+      };
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;

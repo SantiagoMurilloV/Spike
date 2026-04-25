@@ -304,13 +304,39 @@ export function AdminTournamentDetail() {
     if (!id) return;
     setRecalculating(true);
     try {
-      const [fresh, bracket] = await Promise.all([
+      // recalculateStandings rebuilds the standings table and re-resolves
+      // bracket placeholders. resolveBracket on top of that triggers the
+      // bracket materializer (creates `matches` rows for slots whose two
+      // teams just got resolved) and returns a diagnostic snapshot we
+      // surface to the admin via toast.
+      const [fresh, resolved, freshMatches] = await Promise.all([
         api.recalculateStandings(id),
-        api.getTournamentBracket(id),
+        api.resolveBracket(id),
+        api.getTournamentMatches(id),
       ]);
       setStandings(fresh);
-      setBracketMatches(bracket);
-      toast.success('Tabla y bracket actualizados');
+      setBracketMatches(resolved.bracket);
+      setMatches(freshMatches);
+
+      const m = resolved.materialize;
+      if (m) {
+        const touched = m.matchesCreated + m.matchesUpdated;
+        if (touched > 0) {
+          toast.success(
+            `Tabla y bracket actualizados · ${m.matchesCreated} nuevos, ${m.matchesUpdated} ajustados`,
+          );
+        } else if (m.slotsWithBothTeamsResolved === 0) {
+          toast.success(
+            `Tabla actualizada · ${m.totalBracketRows} slots de bracket sin equipos definidos todavía`,
+          );
+        } else {
+          toast.success(
+            `Tabla y bracket actualizados · ${m.slotsAlreadyMaterialized}/${m.slotsWithBothTeamsResolved} partidos ya existían`,
+          );
+        }
+      } else {
+        toast.success('Tabla y bracket actualizados');
+      }
     } catch (err) {
       toast.error(getErrorMessage(err, 'No se pudo recalcular la tabla'));
     } finally {

@@ -313,8 +313,18 @@ export async function resolveBracket(req: Request, res: Response, next: NextFunc
     const id = req.params.id as string;
     validateUUID(id, 'ID de torneo');
     await bracketGenerator.resolveBracketFromStandings(id);
+    // Run materialize explicitly so the response carries the diagnostic
+    // snapshot. resolveBracketFromStandings already invokes it, but its
+    // return value is just the count of bracket-row updates — we want
+    // the materializer's own counters to surface in the toast.
+    const materialize = await bracketGenerator
+      .materializePendingBracketMatches(id)
+      .catch((err) => {
+        console.warn('[resolveBracket] materialize failed:', err);
+        return null;
+      });
     const bracket = await bracketGenerator.getBracket(id);
-    res.json(bracket);
+    res.json({ bracket, materialize });
   } catch (error) {
     next(error);
   }

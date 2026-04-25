@@ -3,6 +3,15 @@ import type { BracketMatch } from '../../types';
 import type { BackendBracketMatch } from './backend-shapes';
 import { toFrontendBracketMatch } from './transformers';
 
+/** Diagnostic snapshot returned by the bracket materializer. */
+export interface BracketMaterializeReport {
+  totalBracketRows: number;
+  slotsWithBothTeamsResolved: number;
+  slotsAlreadyMaterialized: number;
+  matchesCreated: number;
+  matchesUpdated: number;
+}
+
 /**
  * Bracket endpoints — editing a single bracket match cascades on the
  * server (winner advancement, placeholder resolution) so the response
@@ -30,15 +39,27 @@ export const bracketApi = {
     return raw.map(toFrontendBracketMatch);
   },
 
-  /** Re-run placeholder resolution over the full bracket. Cheap on the
-   *  server; useful when standings move and we want bracket seeds to
-   *  reflect the new order without the admin touching anything. */
-  async resolveBracket(tournamentId: string): Promise<BracketMatch[]> {
-    const raw = await request<BackendBracketMatch[]>(
+  /** Re-run placeholder resolution over the full bracket plus a
+   *  materializer pass so any slot whose two teams are already resolved
+   *  produces a playable `matches` row. The response carries diagnostic
+   *  counters (totalBracketRows, slotsWithBothTeamsResolved,
+   *  slotsAlreadyMaterialized, matchesCreated, matchesUpdated) so the
+   *  admin "Recalcular cruces" toast can show what actually happened. */
+  async resolveBracket(tournamentId: string): Promise<{
+    bracket: BracketMatch[];
+    materialize: BracketMaterializeReport | null;
+  }> {
+    const raw = await request<{
+      bracket: BackendBracketMatch[];
+      materialize: BracketMaterializeReport | null;
+    }>(
       `/tournaments/${tournamentId}/resolve-bracket`,
       { method: 'POST' },
     );
-    return raw.map(toFrontendBracketMatch);
+    return {
+      bracket: raw.bracket.map(toFrontendBracketMatch),
+      materialize: raw.materialize,
+    };
   },
 
   /** Post-groups crossings — admin defines which group positions meet
