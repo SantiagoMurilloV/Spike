@@ -151,6 +151,7 @@ export function TournamentDetail() {
           <StandingsTab
             matches={matches}
             standings={standings}
+            bracketMode={tournament.bracketMode}
             lastRefreshedAt={lastRefreshedAt}
           />
         )}

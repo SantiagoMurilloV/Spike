@@ -1,12 +1,26 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { BarChart3, Trophy } from 'lucide-react';
-import type { Match, StandingsRow, Team } from '../../../types';
+import { Award, BarChart3, Medal, Trophy } from 'lucide-react';
+import type { Match, StandingsRow, Team, Tournament } from '../../../types';
 import { StandingsTable } from '../../../components/StandingsTable';
 import { TeamAvatar } from '../../../components/TeamAvatar';
 import { categoryOfGroupName, groupLetter } from '../../../lib/phase';
 
 const FONT = { fontFamily: 'Barlow Condensed, sans-serif' };
+
+type BracketMode = NonNullable<Tournament['bracketMode']>;
+type DivisionBucket = 'gold' | 'silver' | 'out';
+
+/** Group placement → division bucket. Always 1°/2° → Oro, 3°/4° → Plata,
+ *  5°+ → fuera de divisiones. Matches what the auto-bracket seeder
+ *  takes from each group. */
+function divisionBucket(groupPosition: number): DivisionBucket {
+  if (groupPosition <= 2) return 'gold';
+  if (groupPosition <= 4) return 'silver';
+  return 'out';
+}
+
+const BUCKET_ORDER: Record<DivisionBucket, number> = { gold: 0, silver: 1, out: 2 };
 
 /**
  * Tiny "En vivo" pill rendered above the tables. Pulses a dot and
@@ -65,6 +79,9 @@ interface CategoryRankedRow {
   /** Match / classification points (3 / 2 / 1 / 0 per result). */
   points: number;
   isQualified?: boolean;
+  /** Only meaningful in division-mode tournaments. Drives both the
+   *  primary sort bucket and the row tint (oro / plata / sin tinte). */
+  divisionBucket: DivisionBucket;
 }
 
 const MEDAL_BACKGROUNDS = [
@@ -75,36 +92,49 @@ const MEDAL_BACKGROUNDS = [
 
 const MEDAL_COLORS = ['#FFB300', '#C0C0C0', '#CD7F32'];
 
-/** Warm-yellow fill used for rows that classified to the bracket. Sits
- *  on top of any medal tint so the qualification read stays dominant.
- *  Opacity is high enough to be obvious without blowing out the text. */
+/** Warm-yellow fill used for rows that classified to the bracket on
+ *  manual-mode tournaments. */
 const QUALIFIED_ROW_BG =
   'linear-gradient(to right, rgba(253, 216, 53, 0.42), rgba(253, 216, 53, 0.12) 70%)';
 
+/** Backgrounds for division-mode tournaments — Oro and Plata classifiers
+ *  paint with the medal tint of their tier so the cutoff between the
+ *  two divisions reads at a glance. The "out" bucket stays plain so the
+ *  contrast lands on the rows that actually advanced. */
+const GOLD_ROW_BG =
+  'linear-gradient(to right, rgba(255, 179, 0, 0.34), rgba(255, 179, 0, 0.08) 70%)';
+const SILVER_ROW_BG =
+  'linear-gradient(to right, rgba(192, 192, 192, 0.34), rgba(192, 192, 192, 0.08) 70%)';
+
+const GOLD_COLOR = '#B7791F';
+const SILVER_COLOR = '#6B7280';
+
 /**
  * "Tabla de clasificación" tab — public-facing overall standings view.
- * For each category, computes one combined ranking across every group
- * using the standard volleyball tiebreaker cascade:
  *
- *   1. Group position  — every 1°-place ranks above every 2°-place
- *      regardless of points.
- *   2. Match points     — more points = higher.
- *   3. Set difference   — setsFor − setsAgainst.
- *   4. Sets for         — raw sets won.
- *   5. Match wins       — last-resort tiebreaker.
+ * Behaviour swings on `bracketMode`:
  *
- * That mirrors how VNL-style "who classified first" tables are laid
- * out on the public page: the team that finished 1° of its group with
- * the most points is globally 1°, then the next-best 1°, and so on
- * until the 1°s are exhausted; 2°s follow, etc.
+ *   · `'divisions'` → primary sort bucket is the division (Oro 1°/2°,
+ *     Plata 3°/4°, fuera 5°+). Rows paint with the bucket's medal
+ *     tint so spectators see the cutoff between divisions live.
+ *   · anything else → flat global leaderboard sorted by classif points
+ *     and the standard FIVB tiebreakers.
+ *
+ * Within each bucket the order still cascades classif → set diff →
+ * rally ratio → sets-for → wins so live score updates reshuffle teams
+ * inside their division.
  */
 export function StandingsTab({
   matches,
   standings,
+  bracketMode,
   lastRefreshedAt,
 }: {
   matches: Match[];
   standings: StandingsRow[];
+  /** Tournament's `bracketMode`. When undefined, behaves like
+   *  `'manual'` — flat global leaderboard. */
+  bracketMode?: BracketMode;
   /** Epoch-ms of the last successful poll in the parent hook. Drives
    *  the live badge at the top of the tab so spectators know the
    *  table auto-syncs with the scoreboard. */
@@ -114,6 +144,7 @@ export function StandingsTab({
     ...new Set(matches.filter((m) => m.group).map((m) => m.group!)),
   ].sort();
   const hasGroups = groupNames.length > 0;
+  const mode: BracketMode = bracketMode ?? 'manual';
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -121,7 +152,12 @@ export function StandingsTab({
         <LiveBadge lastRefreshedAt={lastRefreshedAt} />
       </div>
       {hasGroups ? (
-        <GlobalByCategory groupNames={groupNames} matches={matches} standings={standings} />
+        <GlobalByCategory
+          groupNames={groupNames}
+          matches={matches}
+          standings={standings}
+          bracketMode={mode}
+        />
       ) : standings.length > 0 ? (
         <StandingsTable standings={standings} groupName="Tabla General" />
       ) : (
@@ -135,10 +171,12 @@ function GlobalByCategory({
   groupNames,
   matches,
   standings,
+  bracketMode,
 }: {
   groupNames: string[];
   matches: Match[];
   standings: StandingsRow[];
+  bracketMode: BracketMode;
 }) {
   // Map `teamId → groupName` so we can attach the group letter to each
   // ranked row and rebuild per-category rankings below.
@@ -186,7 +224,7 @@ function GlobalByCategory({
           const gn = teamToGroup.get(s.team.id);
           return gn ? catGroupSet.has(gn) : false;
         });
-        const ranked = rankCategory(catStandings, teamToGroup, rallyByTeam);
+        const ranked = rankCategory(catStandings, teamToGroup, rallyByTeam, bracketMode);
         if (ranked.length === 0) return null;
         return (
           <div key={category || '_default'}>
@@ -198,7 +236,7 @@ function GlobalByCategory({
                 {category.toUpperCase()}
               </h2>
             )}
-            <CategoryStandingsTable rows={ranked} />
+            <CategoryStandingsTable rows={ranked} bracketMode={bracketMode} />
           </div>
         );
       })}
@@ -215,6 +253,7 @@ function rankCategory(
   catStandings: StandingsRow[],
   teamToGroup: Map<string, string>,
   rallyByTeam: Map<string, { for: number; against: number }>,
+  bracketMode: BracketMode,
 ): CategoryRankedRow[] {
   const rows: CategoryRankedRow[] = catStandings.map((s) => {
     const rally = rallyByTeam.get(s.team.id) ?? { for: 0, against: 0 };
@@ -232,15 +271,21 @@ function rankCategory(
       pointsAgainst: rally.against,
       points: s.points,
       isQualified: s.isQualified,
+      divisionBucket: divisionBucket(s.position),
     };
   });
 
-  // Sort order — classif-points first so the table reorders live as
-  // scores come in (a team racking up points climbs past teams with
-  // fewer points, even if they're "1° of another group"). Group
-  // position only breaks ties between teams otherwise identical on
-  // every performance metric, so it just stabilises the display.
+  // In division mode the bucket (Oro → Plata → fuera) is the primary
+  // sort key, so the table reads top-to-bottom as "who's in Oro, then
+  // who's in Plata, then everyone else". Manual mode flattens straight
+  // to the performance cascade so a team racking up points climbs
+  // across group positions immediately.
   rows.sort((a, b) => {
+    if (bracketMode === 'divisions') {
+      const ba = BUCKET_ORDER[a.divisionBucket];
+      const bb = BUCKET_ORDER[b.divisionBucket];
+      if (ba !== bb) return ba - bb;
+    }
     if (a.points !== b.points) return b.points - a.points;
     const setDiffA = a.setsFor - a.setsAgainst;
     const setDiffB = b.setsFor - b.setsAgainst;
@@ -262,12 +307,22 @@ function rankCategory(
 /**
  * Flat category-wide standings table. The category title already lives
  * in the red-underlined `<h2>` above so the table itself starts straight
- * at the column header — no redundant title bar. Qualified rows (the
- * teams that advanced to bracket) are highlighted with a warm yellow
- * background; the podium still carries the medal tints when qualifying
- * isn't flagged yet (groups in progress).
+ * at the column header — no redundant title bar.
+ *
+ * Row tinting depends on `bracketMode`:
+ *   · `'divisions'` → Oro classifiers (1°/2°) paint amber, Plata
+ *     classifiers (3°/4°) paint slate, fuera-de-división stays plain.
+ *   · `'manual'`    → keeps the legacy yellow `isQualified` highlight
+ *     plus the gold/silver/bronze podium tints on the top three.
  */
-function CategoryStandingsTable({ rows }: { rows: CategoryRankedRow[] }) {
+function CategoryStandingsTable({
+  rows,
+  bracketMode,
+}: {
+  rows: CategoryRankedRow[];
+  bracketMode: BracketMode;
+}) {
+  const isDivisions = bracketMode === 'divisions';
   return (
     <div
       className="bg-white overflow-hidden"
@@ -315,10 +370,34 @@ function CategoryStandingsTable({ rows }: { rows: CategoryRankedRow[] }) {
           </thead>
           <tbody>
             {rows.map((row, index) => {
-              const isPodium = index < 3;
+              const isPodium = !isDivisions && index < 3;
               const medalBg = isPodium ? MEDAL_BACKGROUNDS[index] : undefined;
               const medalColor = isPodium ? MEDAL_COLORS[index] : undefined;
-              const rowBg = row.isQualified ? QUALIFIED_ROW_BG : medalBg;
+
+              // Pick the row tint:
+              //   · Division mode → tint by Oro / Plata bucket.
+              //   · Manual mode → keep the legacy "isQualified" yellow
+              //     highlight, falling back to the medal tint on the
+              //     top three when groups haven't fully closed yet.
+              let rowBg: string | undefined;
+              let leftStripe = 'transparent';
+              let positionColor = medalColor ?? 'rgba(0,0,0,0.6)';
+              if (isDivisions) {
+                if (row.divisionBucket === 'gold') {
+                  rowBg = GOLD_ROW_BG;
+                  leftStripe = GOLD_COLOR;
+                  positionColor = GOLD_COLOR;
+                } else if (row.divisionBucket === 'silver') {
+                  rowBg = SILVER_ROW_BG;
+                  leftStripe = SILVER_COLOR;
+                  positionColor = SILVER_COLOR;
+                }
+              } else if (row.isQualified) {
+                rowBg = QUALIFIED_ROW_BG;
+                leftStripe = '#FBC02D';
+              } else if (medalBg) {
+                rowBg = medalBg;
+              }
 
               return (
                 <motion.tr
@@ -327,10 +406,6 @@ function CategoryStandingsTable({ rows }: { rows: CategoryRankedRow[] }) {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{
-                    // Entrance animation fans in top-to-bottom, while
-                    // the layout spring handles live reordering once
-                    // points change — keyed on `row.team.id` above so
-                    // framer tracks the same row as it moves.
                     layout: { type: 'spring', stiffness: 320, damping: 32 },
                     default: { delay: index * 0.035, duration: 0.25 },
                   }}
@@ -338,23 +413,32 @@ function CategoryStandingsTable({ rows }: { rows: CategoryRankedRow[] }) {
                   style={{
                     borderBottom: 'var(--border-hairline)',
                     background: rowBg,
-                    borderLeft: row.isQualified
-                      ? '3px solid #FBC02D'
-                      : '3px solid transparent',
+                    borderLeft: `3px solid ${leftStripe}`,
                   }}
                 >
                   <td className="px-2 sm:px-4 py-2.5 sm:py-3">
                     <div className="flex items-center gap-1.5 sm:gap-2">
                       <span
                         className="font-bold text-sm sm:text-base tabular-nums"
-                        style={{
-                          ...FONT,
-                          color: medalColor ?? 'rgba(0,0,0,0.6)',
-                        }}
+                        style={{ ...FONT, color: positionColor }}
                       >
                         {row.globalPosition}
                       </span>
-                      {isPodium && (
+                      {isDivisions && row.divisionBucket === 'gold' && (
+                        <Award
+                          className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0"
+                          style={{ color: GOLD_COLOR }}
+                          aria-hidden="true"
+                        />
+                      )}
+                      {isDivisions && row.divisionBucket === 'silver' && (
+                        <Medal
+                          className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0"
+                          style={{ color: SILVER_COLOR }}
+                          aria-hidden="true"
+                        />
+                      )}
+                      {!isDivisions && isPodium && (
                         <Trophy
                           className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0"
                           style={{ color: medalColor }}
@@ -432,21 +516,43 @@ function CategoryStandingsTable({ rows }: { rows: CategoryRankedRow[] }) {
           className="flex flex-wrap gap-4 text-[11px] text-black/60 uppercase"
           style={{ ...FONT, letterSpacing: '0.08em' }}
         >
-          <div className="flex items-center gap-1.5">
-            <div
-              className="w-3 h-3 rounded-sm"
-              style={{ background: '#FBC02D' }}
-              aria-hidden="true"
-            />
-            <span className="font-bold">Clasificado a bracket</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Trophy className="w-3.5 h-3.5 text-spk-gold" aria-hidden="true" />
-            <span className="font-bold">Podio</span>
-          </div>
-          <div className="text-black/50 font-medium">
-            Orden: clasif → dif. sets → razón de puntos → sets a favor
-          </div>
+          {isDivisions ? (
+            <>
+              <div className="flex items-center gap-1.5">
+                <Award className="w-3.5 h-3.5" style={{ color: GOLD_COLOR }} aria-hidden="true" />
+                <span className="font-bold">Clasifica a Oro (1° y 2°)</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Medal
+                  className="w-3.5 h-3.5"
+                  style={{ color: SILVER_COLOR }}
+                  aria-hidden="true"
+                />
+                <span className="font-bold">Clasifica a Plata (3° y 4°)</span>
+              </div>
+              <div className="text-black/50 font-medium">
+                Orden: división → clasif → dif. sets → razón de puntos
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-1.5">
+                <div
+                  className="w-3 h-3 rounded-sm"
+                  style={{ background: '#FBC02D' }}
+                  aria-hidden="true"
+                />
+                <span className="font-bold">Clasificado a bracket</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Trophy className="w-3.5 h-3.5 text-spk-gold" aria-hidden="true" />
+                <span className="font-bold">Podio</span>
+              </div>
+              <div className="text-black/50 font-medium">
+                Orden: clasif → dif. sets → razón de puntos → sets a favor
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
