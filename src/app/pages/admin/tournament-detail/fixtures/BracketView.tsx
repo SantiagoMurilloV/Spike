@@ -1,4 +1,4 @@
-import { Edit, Award, Medal } from 'lucide-react';
+import { Award, Medal } from 'lucide-react';
 import { BracketMatch } from '../../../../types';
 import { Badge } from '../../../../components/ui/badge';
 import { CategorySection } from '../../../../components/admin/CategorySection';
@@ -214,15 +214,15 @@ function BracketRow({ match: bm, editor }: { match: BracketMatch; editor: Bracke
       ) : (
         bm.team1 &&
         bm.team2 && (
+          // Bracket-stage matches now materialize as regular `matches`
+          // rows the moment both teams resolve. The marker / referee
+          // flow lives there (Partidos tab + /judge console), so the
+          // bracket card itself is read-only — we surface a hint to
+          // point the admin at the right place.
           <div className="flex justify-end mt-2">
-            <button
-              type="button"
-              onClick={() => editor.start(bm)}
-              className="flex items-center gap-1 text-xs text-spk-blue hover:text-spk-blue/80 transition-colors"
-            >
-              <Edit className="w-3 h-3" />
-              Editar
-            </button>
+            <span className="text-[11px] text-black/40 italic">
+              Editar desde la pestaña Partidos
+            </span>
           </div>
         )
       )}

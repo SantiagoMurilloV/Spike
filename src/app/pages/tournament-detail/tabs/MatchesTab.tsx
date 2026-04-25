@@ -6,24 +6,31 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Match } from '../../../types';
 import { MatchCard } from '../../../components/MatchCard';
+import {
+  categoryOfMatchPhase,
+  phaseLabelOnly,
+  phaseOrderKey,
+} from '../../../lib/phase';
 
 const FONT = { fontFamily: 'Barlow Condensed, sans-serif' };
 
 /**
- * "Partidos" tab — search + phase + date filters, matches split into
- * live / upcoming / completed. The Match card itself handles its own
- * layout; this tab only groups and labels.
+ * Public "Partidos" tab.
+ *
+ * Layout:
+ *   · Filters: search + date (the phase filter from the legacy version
+ *     is implicit now — every phase renders as its own header).
+ *   · Live strip on top (every live match across categories) so the
+ *     spectator notices a match in progress without scrolling.
+ *   · Per-category section (h2 header) with phase sub-sections inside,
+ *     ordered Grupos → Cuartos → Semifinal → Final → Tercer puesto and
+ *     their Oro / Plata variants when the tournament uses divisions.
  */
 export function MatchesTab({ matches }: { matches: Match[] }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [phase, setPhase] = useState<string>('all');
   const [date, setDate] = useState<string>('all');
 
-  const phases = useMemo(
-    () => [...new Set(matches.map((m) => m.phase).filter(Boolean))],
-    [matches],
-  );
   const dates = useMemo(
     () => [...new Set(matches.map((m) => format(m.date, 'yyyy-MM-dd')))].sort(),
     [matches],
@@ -34,22 +41,24 @@ export function MatchesTab({ matches }: { matches: Match[] }) {
       matches.filter((m) => {
         const q = query.toLowerCase();
         const matchesSearch =
-          q === '' || m.team1.name.toLowerCase().includes(q) || m.team2.name.toLowerCase().includes(q);
-        const matchesPhase = phase === 'all' || m.phase === phase;
+          q === '' ||
+          m.team1.name.toLowerCase().includes(q) ||
+          m.team2.name.toLowerCase().includes(q);
         const matchesDate = date === 'all' || format(m.date, 'yyyy-MM-dd') === date;
-        return matchesSearch && matchesPhase && matchesDate;
+        return matchesSearch && matchesDate;
       }),
-    [matches, query, phase, date],
+    [matches, query, date],
   );
 
-  const live = filtered.filter((m) => m.status === 'live');
-  const upcoming = filtered.filter((m) => m.status === 'upcoming');
-  const completed = filtered.filter((m) => m.status === 'completed');
+  // Live matches surface above the category list so spectators see
+  // them at a glance regardless of which category they belong to.
+  const live = useMemo(() => filtered.filter((m) => m.status === 'live'), [filtered]);
 
-  const hasActiveFilters = query !== '' || phase !== 'all' || date !== 'all';
+  const grouped = useMemo(() => groupByCategoryThenPhase(filtered), [filtered]);
+
+  const hasActiveFilters = query !== '' || date !== 'all';
   const clear = () => {
     setQuery('');
-    setPhase('all');
     setDate('all');
   };
 
@@ -70,15 +79,6 @@ export function MatchesTab({ matches }: { matches: Match[] }) {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <FilterSelect value={phase} onChange={setPhase}>
-            <option value="all">Todas las fases</option>
-            {phases.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </FilterSelect>
-
           <FilterSelect value={date} onChange={setDate}>
             <option value="all">Todas las fechas</option>
             {dates.map((d) => (
@@ -129,22 +129,118 @@ export function MatchesTab({ matches }: { matches: Match[] }) {
       ) : (
         <div className="space-y-12">
           {live.length > 0 && (
-            <MatchGroup title={`EN VIVO (${live.length})`} matches={live} onClick={go} live />
+            <section>
+              <div className="flex items-center gap-3 mb-6">
+                <motion.div
+                  className="w-3 h-3 bg-spk-red rounded-full"
+                  animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+                <h3 className="text-2xl font-bold" style={FONT}>
+                  EN VIVO ({live.length})
+                </h3>
+              </div>
+              <div className="space-y-4">
+                {live.map((m) => (
+                  <MatchCard key={m.id} match={m} onClick={() => go(m.id)} />
+                ))}
+              </div>
+            </section>
           )}
-          {upcoming.length > 0 && (
-            <MatchGroup title={`PRÓXIMOS (${upcoming.length})`} matches={upcoming} onClick={go} />
-          )}
-          {completed.length > 0 && (
-            <MatchGroup
-              title={`FINALIZADOS (${completed.length})`}
-              matches={completed}
-              onClick={go}
-            />
-          )}
+
+          {grouped.map(({ category, phases }) => (
+            <section key={category || '_uncat'} className="space-y-6">
+              <h2
+                className="text-2xl sm:text-3xl font-bold pb-2 sm:pb-3 uppercase"
+                style={{
+                  ...FONT,
+                  letterSpacing: '-0.02em',
+                  borderBottom: '3px solid var(--brand-red)',
+                }}
+              >
+                {category || 'Sin categoría'}
+              </h2>
+              <div className="space-y-8">
+                {phases.map(({ phase, matches: phaseMatches }) => (
+                  <PhaseGroup
+                    key={phase}
+                    phase={phase}
+                    matches={phaseMatches}
+                    onClick={go}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
       )}
     </motion.div>
   );
+}
+
+// ── Helpers ────────────────────────────────────────────────────────
+
+interface PhaseBucket {
+  phase: string;
+  matches: Match[];
+}
+
+interface CategoryBucket {
+  category: string;
+  phases: PhaseBucket[];
+}
+
+/**
+ * Two-level grouping: category (h2) → phase (h3 inside). Phases are
+ * ordered using {@link phaseOrderKey} so the public list reads like a
+ * tournament timeline (Grupos first, Tercer puesto last). Live matches
+ * are intentionally excluded — the page renders them in their own
+ * "EN VIVO" section above this one.
+ */
+function groupByCategoryThenPhase(matches: Match[]): CategoryBucket[] {
+  const map = new Map<string, Map<string, Match[]>>();
+  for (const m of matches) {
+    if (m.status === 'live') continue; // shown in the live strip
+    const category = categoryOfMatchPhase(m.phase);
+    const phaseLabel = phaseLabelOnly(m.phase);
+    if (!map.has(category)) map.set(category, new Map());
+    const phaseMap = map.get(category)!;
+    if (!phaseMap.has(phaseLabel)) phaseMap.set(phaseLabel, []);
+    phaseMap.get(phaseLabel)!.push(m);
+  }
+  return [...map.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([category, phaseMap]) => ({
+      category,
+      phases: [...phaseMap.entries()]
+        .sort(([a], [b]) => {
+          const ka = phaseOrderKey(`${a}|`);
+          const kb = phaseOrderKey(`${b}|`);
+          if (ka !== kb) return ka - kb;
+          return a.localeCompare(b);
+        })
+        .map(([phase, ms]) => ({
+          phase,
+          matches: sortMatchesForPhase(ms),
+        })),
+    }));
+}
+
+/**
+ * Within a phase: upcoming first (chronological), then completed
+ * (chronological too). Live matches are surfaced separately.
+ */
+function sortMatchesForPhase(matches: Match[]): Match[] {
+  const ranked = (m: Match) => (m.status === 'upcoming' ? 0 : 1);
+  return [...matches].sort((a, b) => {
+    const ra = ranked(a);
+    const rb = ranked(b);
+    if (ra !== rb) return ra - rb;
+    const ta = a.date.getTime();
+    const tb = b.date.getTime();
+    if (ta !== tb) return ta - tb;
+    return (a.time ?? '').localeCompare(b.time ?? '');
+  });
 }
 
 function FilterSelect({
@@ -168,34 +264,30 @@ function FilterSelect({
   );
 }
 
-function MatchGroup({
-  title,
+function PhaseGroup({
+  phase,
   matches,
   onClick,
-  live,
 }: {
-  title: string;
+  phase: string;
   matches: Match[];
   onClick: (id: string) => void;
-  live?: boolean;
 }) {
+  if (matches.length === 0) return null;
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
-        {live && (
-          <motion.div
-            className="w-3 h-3 bg-spk-red rounded-full"
-            animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          />
-        )}
-        <h3 className="text-2xl font-bold" style={FONT}>
-          {title}
+      <div className="flex items-center gap-3 mb-4">
+        <h3
+          className="text-xl sm:text-2xl font-bold uppercase"
+          style={{ ...FONT, letterSpacing: '0.04em' }}
+        >
+          {phase}
         </h3>
+        <span className="text-sm text-black/40 tabular-nums">({matches.length})</span>
       </div>
-      <div className="space-y-4">
-        {matches.map((match) => (
-          <MatchCard key={match.id} match={match} onClick={() => onClick(match.id)} />
+      <div className="space-y-3">
+        {matches.map((m) => (
+          <MatchCard key={m.id} match={m} onClick={() => onClick(m.id)} />
         ))}
       </div>
     </div>

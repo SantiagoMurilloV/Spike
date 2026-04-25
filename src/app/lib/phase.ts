@@ -115,3 +115,46 @@ export function buildBracketRound(
 export function humanizePhase(label: string): string {
   return label.replace(new RegExp(`\\${CATEGORY_SEP}`, 'g'), ' · ');
 }
+
+// ── Phase sorting (public matches list) ───────────────────────────
+//
+// Ordered tournament progression so the public MatchesTab can group
+// matches inside a category in chronological / playoff order:
+//
+//   Grupos → Liga → Cuartos → Cuartos · Oro → Cuartos · Plata →
+//   Semifinal → … → Final → … → Tercer puesto → …
+//
+// Anything not in the list falls to the bottom in alphabetical order.
+const PHASE_ORDER: Record<string, number> = {
+  Grupos: 10,
+  grupos: 10,
+  Liga: 20,
+  liga: 20,
+  Cuartos: 30,
+  'Cuartos · Oro': 31,
+  'Cuartos · Plata': 32,
+  Semifinal: 40,
+  'Semifinal · Oro': 41,
+  'Semifinal · Plata': 42,
+  Final: 50,
+  'Final · Oro': 51,
+  'Final · Plata': 52,
+  'Tercer puesto': 60,
+  'Tercer puesto · Oro': 61,
+  'Tercer puesto · Plata': 62,
+};
+
+/** Phase label without the "|category" suffix. */
+export function phaseLabelOnly(phase: string): string {
+  if (!phase.includes(CATEGORY_SEP)) return phase;
+  return firstSegment(phase);
+}
+
+/**
+ * Sort key for ordering phases within a single category. Smaller is
+ * earlier. Unknown labels go after every known label, alphabetically.
+ */
+export function phaseOrderKey(phase: string): number {
+  const label = phaseLabelOnly(phase);
+  return PHASE_ORDER[label] ?? 999;
+}
