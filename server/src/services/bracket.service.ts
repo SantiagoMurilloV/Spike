@@ -757,12 +757,24 @@ export class BracketGenerator {
       [tournamentId],
     );
 
-    if (bmResult.rows.length === 0) return 0;
+    if (bmResult.rows.length === 0) {
+      // Even if there are no placeholders to re-resolve, the bracket
+      // may already have all teams locked in and never went through a
+      // materialization pass (e.g. an old tournament generated before
+      // migration 018). Run materialize idempotently so "Recalcular
+      // cruces" always produces playable matches when it should.
+      try {
+        await this.materializePendingBracketMatches(tournamentId);
+      } catch (err) {
+        console.warn('[resolveBracketFromStandings] materialize failed:', err);
+      }
+      return 0;
+    }
 
     const client = await pool.connect();
+    let updated = 0;
     try {
       await client.query('BEGIN');
-      let updated = 0;
 
       for (const bm of bmResult.rows) {
         // When a placeholder is present, trust it as the source of truth
@@ -785,13 +797,25 @@ export class BracketGenerator {
       }
 
       await client.query('COMMIT');
-      return updated;
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
     } finally {
       client.release();
     }
+
+    // Always materialize after a re-resolve: even if `updated` is 0
+    // (no team ids actually changed), there may be slots whose teams
+    // resolved on a previous pass but never produced a `matches` row
+    // because the materializer wasn't deployed yet. Best-effort —
+    // never fail the recalc on a materialization error.
+    try {
+      await this.materializePendingBracketMatches(tournamentId);
+    } catch (err) {
+      console.warn('[resolveBracketFromStandings] materialize failed:', err);
+    }
+
+    return updated;
   }
 }
 
