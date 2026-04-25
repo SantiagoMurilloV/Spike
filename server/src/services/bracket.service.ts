@@ -355,32 +355,36 @@ export class BracketGenerator {
    * Populate bracket_matches.team1_id / team2_id from group-phase standings.
    *
    * Each first-round bracket slot carries a `team*_placeholder` in the
-   * format `"{position}|{groupName}"` (meaning the 1st-place team of the
-   * given category group). This method reads the
-   * current `standings` table and, for every slot that has a placeholder,
-   * re-resolves it to the actual team id — always overwriting the existing
-   * value so the bracket stays in sync if standings change.
+   * format `"{position}|{groupName}"` (meaning the Nth-place team of the
+   * given category group). This method reads the current `standings`
+   * table and re-resolves every placeholder to the team currently
+   * sitting at that position — always overwriting so the bracket stays
+   * in sync as standings shift.
+   *
+   * The placeholder also resolves while the group phase is still in
+   * progress, mirroring the live "tabla cambia → bracket cambia"
+   * behavior the public expects: as soon as a team scores enough to
+   * jump groups in the standings, the bracket re-paints with that
+   * team in the slot it just earned. We additionally require the team
+   * to have at least one completed match (`played >= 1`) so we don't
+   * seed bracket slots from a phantom 0-0 ranking on a torneo that
+   * hasn't started — there the slot stays "Por definir".
    *
    * Returns the number of slots that had their team assignment updated.
    */
   async resolveBracketFromStandings(tournamentId: string): Promise<number> {
     const pool = getPool();
 
-    // Fetch the current standings snapshot. We also read `is_qualified`
-    // here because the standings service now only flips that flag once
-    // the group phase is actually finished. That's exactly the signal we
-    // need to avoid seeding bracket slots from a phantom 0-0 ranking —
-    // before my fix the bracket would fill with whatever team happened
-    // to sit at position 1 alphabetically, which is useless to the public.
     const standingsResult = await pool.query(
-      'SELECT team_id, group_name, position, is_qualified FROM standings WHERE tournament_id = $1',
+      `SELECT team_id, group_name, position, played
+         FROM standings WHERE tournament_id = $1`,
       [tournamentId],
     );
     const standings = standingsResult.rows as Array<{
       team_id: string;
       group_name: string | null;
       position: number;
-      is_qualified: boolean;
+      played: number;
     }>;
 
     const resolvePlaceholder = (placeholder: string | null): string | null => {
@@ -393,10 +397,11 @@ export class BracketGenerator {
       const found = standings.find(
         (s) => s.group_name === groupName && s.position === pos,
       );
-      // Only resolve if the team is actually qualified — i.e. the group
-      // is complete. Otherwise leave the slot as "Por definir" so the
-      // public bracket doesn't lie about who's advancing.
-      if (!found || !found.is_qualified) return null;
+      // Need a populated standings row whose team has actually played
+      // at least once. This sidesteps the "everybody is at position 1
+      // alphabetically with 0-0" pre-tournament state without delaying
+      // the live preview until groups are 100% complete.
+      if (!found || found.played <= 0) return null;
       return found.team_id;
     };
 

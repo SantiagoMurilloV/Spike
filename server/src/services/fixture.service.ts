@@ -302,24 +302,27 @@ export class FixtureGenerator {
   }
 
   /**
-   * Auto-generate Oro/Plata brackets for every category whose group
-   * phase has wrapped up on a `bracket_mode = 'divisions'` tournament.
+   * Auto-generate Oro/Plata brackets for every category on a
+   * `bracket_mode = 'divisions'` tournament whose standings have at
+   * least one completed match.
    *
    * Fires idempotently from the match-update hook
    * ({@link ../match.service.ts:refreshTournamentState}) after the
    * standings recalc:
    *
    *   · Runs only when `tournaments.bracket_mode = 'divisions'`.
-   *   · Per category: skips if any group-phase match is still
-   *     `status != 'completed'`, or if a bracket row for that category
-   *     already exists (so later score edits don't trigger regeneration
-   *     — the regular `resolveBracketFromStandings` handles re-resolving
-   *     team ids against updated standings instead).
+   *   · Per category: skips if no group-phase match has been completed
+   *     yet (so an empty classification table never paints a phantom
+   *     bracket), or if a bracket row for that category already exists
+   *     (so later score edits don't trigger regeneration — the regular
+   *     `resolveBracketFromStandings` reshuffles team ids against
+   *     updated standings instead, which is exactly what we want for
+   *     the live "table moves → bracket moves" experience).
    *   · Oro  = 1° + 2° of every group, seeded VNL-style via
    *            {@link autoVnlSeeds}.
-   *   · Plata = 3° + 4° of every group (falls back to `classifiersPerGroup=1`
-   *            when groups only reach 3°; skipped entirely when no group
-   *            has a 3° place).
+   *   · Plata = 3° + 4° of every group (falls back to
+   *            `classifiersPerGroup=1` when groups only reach 3°;
+   *            skipped entirely when no group has a 3° place).
    *
    * Errors are swallowed by the caller so a failing auto-generation
    * never blocks a successful score write.
@@ -336,7 +339,7 @@ export class FixtureGenerator {
     if (bracketMode !== 'divisions') return;
 
     // Gather the set of group names this tournament uses across all
-    // categories so we can bucket and check completeness below.
+    // categories so we can bucket and check play-progress below.
     const groupsRes = await pool.query(
       `SELECT DISTINCT group_name FROM matches
        WHERE tournament_id = $1 AND group_name IS NOT NULL`,
@@ -356,19 +359,23 @@ export class FixtureGenerator {
     }
 
     for (const [category, groupNames] of categoryGroups.entries()) {
-      // Skip if any match in this category's groups hasn't completed.
-      const pendingRes = await pool.query(
-        `SELECT COUNT(*)::int AS pending FROM matches
+      // Don't seed a bracket until at least one group match has
+      // actually been played for the category — otherwise we'd paint a
+      // phantom Oro/Plata before the tournament even starts.
+      const playedRes = await pool.query(
+        `SELECT COUNT(*)::int AS played FROM matches
          WHERE tournament_id = $1
            AND group_name = ANY($2)
-           AND status != 'completed'`,
+           AND status = 'completed'`,
         [tournamentId, groupNames],
       );
-      const pending = pendingRes.rows[0]?.pending as number | undefined;
-      if (!pending || pending > 0) continue;
+      const played = playedRes.rows[0]?.played as number | undefined;
+      if (!played || played === 0) continue;
 
       // Skip if a bracket already exists for this category. Idempotent
       // behavior keeps the auto-gen safe to run after every score write.
+      // The structure stays put while standings shift; only the
+      // resolved team ids reshuffle via resolveBracketFromStandings.
       const roundPrefix = category ? `${category}|%` : '%';
       const bracketRes = await pool.query(
         `SELECT COUNT(*)::int AS existing FROM bracket_matches
