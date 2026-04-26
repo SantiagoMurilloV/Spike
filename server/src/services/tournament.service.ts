@@ -34,6 +34,27 @@ function normalizeDate(value: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * Clamp a possibly-undefined integer to a valid range with a default
+ * fallback. Used by the classifiers-per-group fields so an admin can't
+ * post 0 or 999 even if the frontend lets them type it. The CHECK
+ * constraints at the DB layer also reject out-of-range values, but
+ * doing it here surfaces a clean default instead of an SQL error.
+ */
+function clampInt(
+  value: number | undefined | null,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
+  if (value === undefined || value === null) return fallback;
+  if (!Number.isFinite(value)) return fallback;
+  const n = Math.floor(value);
+  if (n < min) return min;
+  if (n > max) return max;
+  return n;
+}
+
 function mapRow(row: Record<string, unknown>): Tournament {
   // court_locations may come as object (jsonb parsed by pg) or null/undefined
   const rawLocations = row.court_locations as Record<string, string> | null | undefined;
@@ -60,6 +81,10 @@ function mapRow(row: Record<string, unknown>): Tournament {
       ((row.bracket_mode as string | null) === 'divisions'
         ? 'divisions'
         : 'manual') as Tournament['bracketMode'],
+    goldClassifiersPerGroup:
+      (row.gold_classifiers_per_group as number | null) ?? undefined,
+    silverClassifiersPerGroup:
+      (row.silver_classifiers_per_group as number | null) ?? undefined,
     createdAt: row.created_at as string | undefined,
     updatedAt: row.updated_at as string | undefined,
   };
@@ -206,9 +231,14 @@ export class TournamentService {
     await this.assertQuota(ownerId);
     const pool = getPool();
     const bracketMode = data.bracketMode === 'divisions' ? 'divisions' : 'manual';
+    // Clamp classifier counts so admins can't create a bracket of 0 or
+    // a >8-team-per-group monster. The CHECK constraint at the DB
+    // would also reject these but we want a friendlier path.
+    const goldClassifiers = clampInt(data.goldClassifiersPerGroup, 1, 8, 2);
+    const silverClassifiers = clampInt(data.silverClassifiersPerGroup, 0, 8, 2);
     const result = await pool.query(
-      `INSERT INTO tournaments (name, sport, club, start_date, end_date, description, cover_image, logo, status, teams_count, format, courts, court_locations, categories, owner_id, enrollment_deadline, players_per_team, bracket_mode)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+      `INSERT INTO tournaments (name, sport, club, start_date, end_date, description, cover_image, logo, status, teams_count, format, courts, court_locations, categories, owner_id, enrollment_deadline, players_per_team, bracket_mode, gold_classifiers_per_group, silver_classifiers_per_group)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
        RETURNING *`,
       [
         data.name,
@@ -229,6 +259,8 @@ export class TournamentService {
         data.enrollmentDeadline || null,
         data.playersPerTeam ?? 12,
         bracketMode,
+        goldClassifiers,
+        silverClassifiers,
       ],
     );
     return mapRow(result.rows[0]);
@@ -268,6 +300,8 @@ export class TournamentService {
       enrollmentDeadline: 'enrollment_deadline',
       playersPerTeam: 'players_per_team',
       bracketMode: 'bracket_mode',
+      goldClassifiersPerGroup: 'gold_classifiers_per_group',
+      silverClassifiersPerGroup: 'silver_classifiers_per_group',
     };
 
     for (const [key, column] of Object.entries(columnMap)) {
@@ -275,13 +309,18 @@ export class TournamentService {
         fields.push(column + ' = $' + idx);
         // jsonb column requires stringified JSON; bracketMode is clamped
         // to the two supported enum values so a client cannot smuggle an
-        // arbitrary string in.
+        // arbitrary string in. Classifier counts go through clampInt so
+        // an out-of-range value silently snaps to the safe default.
         const rawValue = (data as Record<string, unknown>)[key];
         let stored: unknown = rawValue;
         if (key === 'courtLocations') {
           stored = JSON.stringify(rawValue ?? {});
         } else if (key === 'bracketMode') {
           stored = rawValue === 'divisions' ? 'divisions' : 'manual';
+        } else if (key === 'goldClassifiersPerGroup') {
+          stored = clampInt(rawValue as number | null | undefined, 1, 8, 2);
+        } else if (key === 'silverClassifiersPerGroup') {
+          stored = clampInt(rawValue as number | null | undefined, 0, 8, 2);
         }
         values.push(stored);
         idx++;

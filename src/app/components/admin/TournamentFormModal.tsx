@@ -179,7 +179,7 @@ export function TournamentFormModal({
       />
 
       {(form.formData.format === 'groups+knockout' || form.formData.format === 'knockout') && (
-        <div>
+        <div className="space-y-4">
           <SelectField
             label="Tipo de cruces de eliminatoria *"
             value={form.formData.bracketMode}
@@ -191,11 +191,58 @@ export function TournamentFormModal({
               { value: 'divisions', label: 'Por divisiones (Oro + Plata, automático)' },
             ]}
           />
-          <p className="mt-1 text-xs text-black/50">
+          <p className="text-xs text-black/50">
             {form.formData.bracketMode === 'divisions'
-              ? 'Los cruces se arman automáticamente siguiendo el seeding VNL desde la tabla de clasificación. 1°s y 2°s van a Oro, 3°s y 4°s a Plata.'
+              ? 'Los cruces se arman automáticamente siguiendo el seeding VNL desde la tabla de clasificación cumulativa cross-grupo.'
               : 'El administrador elige los cruces a mano desde el panel.'}
           </p>
+
+          {form.formData.bracketMode === 'divisions' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-black/[0.03] rounded-sm border border-black/10">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-black/70 mb-2" style={FONT}>
+                  Clasificados a Oro por grupo
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={8}
+                  value={form.formData.goldClassifiersPerGroup}
+                  onChange={(e) =>
+                    form.patch({ goldClassifiersPerGroup: parseInt(e.target.value, 10) || 1 })
+                  }
+                  className="w-full px-3 py-2 bg-white border border-black/15 rounded-sm focus:outline-none focus:border-spk-red"
+                />
+                <p className="mt-1 text-[11px] text-black/45">
+                  Top {form.formData.goldClassifiersPerGroup} de cada grupo entran al bracket Oro.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-black/70 mb-2" style={FONT}>
+                  Clasificados a Plata por grupo
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={8}
+                  value={form.formData.silverClassifiersPerGroup}
+                  onChange={(e) =>
+                    form.patch({ silverClassifiersPerGroup: parseInt(e.target.value, 10) || 0 })
+                  }
+                  className="w-full px-3 py-2 bg-white border border-black/15 rounded-sm focus:outline-none focus:border-spk-red"
+                />
+                <p className="mt-1 text-[11px] text-black/45">
+                  {form.formData.silverClassifiersPerGroup === 0
+                    ? 'Plata desactivada — solo se genera Oro.'
+                    : `Posiciones ${form.formData.goldClassifiersPerGroup + 1} a ${form.formData.goldClassifiersPerGroup + form.formData.silverClassifiersPerGroup} de cada grupo entran al bracket Plata.`}
+                </p>
+              </div>
+              <div className="sm:col-span-2 text-[11px] text-black/55">
+                Tip: para un bracket sin "byes", elegí valores que multipliquen tu número de grupos a una potencia de dos
+                (ej. 4 grupos × 2 = 8 → bracket de 8 limpio).
+              </div>
+            </div>
+          )}
         </div>
       )}
 

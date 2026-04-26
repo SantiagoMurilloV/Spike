@@ -72,6 +72,8 @@ export function useTournamentForm({
       enrollmentDeadline: tournament.enrollmentDeadline ?? '',
       playersPerTeam: tournament.playersPerTeam ?? 12,
       bracketMode: tournament.bracketMode ?? 'manual',
+      goldClassifiersPerGroup: tournament.goldClassifiersPerGroup ?? 2,
+      silverClassifiersPerGroup: tournament.silverClassifiersPerGroup ?? 2,
     });
     setCoverFile(null);
     setCoverPreview(tournament.coverImage ?? null);
@@ -192,6 +194,17 @@ export function useTournamentForm({
         enrollmentDeadline: formData.enrollmentDeadline || undefined,
         playersPerTeam: formData.playersPerTeam,
         bracketMode: formData.bracketMode,
+        // Only forward classifier counts when divisions mode is on,
+        // so a manual-mode tournament doesn't carry phantom values
+        // through the API payload.
+        goldClassifiersPerGroup:
+          formData.bracketMode === 'divisions'
+            ? formData.goldClassifiersPerGroup
+            : undefined,
+        silverClassifiersPerGroup:
+          formData.bracketMode === 'divisions'
+            ? formData.silverClassifiersPerGroup
+            : undefined,
       };
 
       try {

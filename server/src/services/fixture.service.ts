@@ -350,12 +350,17 @@ export class FixtureGenerator {
     const force = options.force === true;
 
     const tournamentRes = await pool.query(
-      'SELECT bracket_mode FROM tournaments WHERE id = $1',
+      `SELECT bracket_mode,
+              gold_classifiers_per_group,
+              silver_classifiers_per_group
+         FROM tournaments WHERE id = $1`,
       [tournamentId],
     );
     if (tournamentRes.rows.length === 0) return;
     const bracketMode = tournamentRes.rows[0].bracket_mode as string | null;
     if (bracketMode !== 'divisions') return;
+    const goldPerGroup = (tournamentRes.rows[0].gold_classifiers_per_group as number | null) ?? 2;
+    const silverPerGroup = (tournamentRes.rows[0].silver_classifiers_per_group as number | null) ?? 2;
 
     // Gather the set of group names this tournament uses across all
     // categories so we can bucket and check play-progress below.
@@ -478,15 +483,15 @@ export class FixtureGenerator {
         );
       }
 
-      // Oro = 1° + 2° of each group, ranked CROSS-GROUP by points,
-      // set difference, sets won, wins. Seed 1 = best record across
-      // all groups (NOT 1°A by alphabet) — matches how the public
-      // standings table presents the cumulative ranking and how the
-      // user expects the VNL pairing to read.
+      // Oro = top `goldPerGroup` of each group (admin-configured at
+      // tournament-creation time, default 2). Ranked CROSS-GROUP by
+      // points / set diff / sets won / wins, so seed 1 is the best
+      // record across all groups — not 1°A by alphabet.
+      const goldPositions = Array.from({ length: goldPerGroup }, (_, i) => i + 1);
       const goldRanking = await this.computeCumulativeRanking(
         tournamentId,
         category,
-        [1, 2],
+        goldPositions,
       );
       if (goldRanking.length < 2) continue;
       const goldSeeds = applyVnlPatternToRanking(goldRanking);
@@ -504,16 +509,28 @@ export class FixtureGenerator {
         continue;
       }
 
-      // Plata = 3° + 4° (drops to just 3° when groups don't reach 4th).
+      // Plata = next `silverPerGroup` of each group (positions
+      // goldPerGroup+1 .. goldPerGroup+silverPerGroup). When the
+      // tournament is configured with silverPerGroup = 0 the Plata
+      // bracket is intentionally skipped. We also clamp the upper
+      // position to whatever the standings actually have, so a 3-team
+      // group with goldPerGroup=2 silverPerGroup=2 still emits
+      // position 3 (without inventing a phantom 4th).
+      if (silverPerGroup <= 0) continue;
       const maxPosRes = await pool.query(
         `SELECT COALESCE(MAX(position), 0)::int AS max_pos FROM standings
          WHERE tournament_id = $1 AND group_name = ANY($2)`,
         [tournamentId, groupNames],
       );
       const maxPos = maxPosRes.rows[0]?.max_pos as number | undefined;
-      if (!maxPos || maxPos < 3) continue;
+      if (!maxPos || maxPos <= goldPerGroup) continue;
 
-      const silverPositions = maxPos >= 4 ? [3, 4] : [3];
+      const silverStart = goldPerGroup + 1;
+      const silverEnd = Math.min(goldPerGroup + silverPerGroup, maxPos);
+      const silverPositions: number[] = [];
+      for (let p = silverStart; p <= silverEnd; p++) silverPositions.push(p);
+      if (silverPositions.length === 0) continue;
+
       const silverRanking = await this.computeCumulativeRanking(
         tournamentId,
         category,

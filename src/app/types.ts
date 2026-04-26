@@ -140,6 +140,14 @@ export interface Tournament {
    * Defaults to 'manual' on the server for back-compat.
    */
   bracketMode?: 'manual' | 'divisions';
+  /**
+   * Divisions-only: classifiers per group that advance to each tier.
+   * Top `goldClassifiersPerGroup` of every group enter Oro; the next
+   * `silverClassifiersPerGroup` enter Plata. Defaults to 2 + 2 on the
+   * server. Set silver to 0 to disable Plata entirely.
+   */
+  goldClassifiersPerGroup?: number;
+  silverClassifiersPerGroup?: number;
 }
 
 export interface BracketMatch {

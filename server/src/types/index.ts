@@ -48,6 +48,15 @@ export interface Tournament {
    * Defaults to 'manual' so legacy tournaments keep their prior flow.
    */
   bracketMode?: 'manual' | 'divisions';
+  /**
+   * Divisions-only: how many teams per group advance to each tier.
+   * Top `goldClassifiersPerGroup` of every group enter the Oro
+   * bracket; the next `silverClassifiersPerGroup` enter Plata. Sum
+   * times groupCount = total classifiers (the bracket size for each
+   * tier is the next power of two of that). Defaults: 2 + 2.
+   */
+  goldClassifiersPerGroup?: number;
+  silverClassifiersPerGroup?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -199,6 +208,9 @@ export interface CreateTournamentDto {
   playersPerTeam?: number;
   /** 'manual' = drag-pairs flow · 'divisions' = auto VNL Oro/Plata. */
   bracketMode?: 'manual' | 'divisions';
+  /** Divisions-only: classifiers per group going to Oro / Plata. */
+  goldClassifiersPerGroup?: number;
+  silverClassifiersPerGroup?: number;
 }
 
 export type UpdateTournamentDto = Partial<CreateTournamentDto>;

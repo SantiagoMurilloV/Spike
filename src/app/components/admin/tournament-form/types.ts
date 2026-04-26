@@ -37,6 +37,10 @@ export interface TournamentFormState {
   enrollmentDeadline: string;
   playersPerTeam: number;
   bracketMode: BracketMode;
+  /** Divisions-only: top N of each group go to Oro. */
+  goldClassifiersPerGroup: number;
+  /** Divisions-only: next M of each group go to Plata (0 disables it). */
+  silverClassifiersPerGroup: number;
 }
 
 export const DEFAULT_COURTS: CourtEntry[] = [
@@ -60,5 +64,7 @@ export function emptyForm(): TournamentFormState {
     enrollmentDeadline: '',
     playersPerTeam: 12,
     bracketMode: 'manual',
+    goldClassifiersPerGroup: 2,
+    silverClassifiersPerGroup: 2,
   };
 }
