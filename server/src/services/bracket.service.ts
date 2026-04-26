@@ -1210,20 +1210,28 @@ export class BracketGenerator {
   /**
    * Auto-advance bye matches.
    *
-   * A "bye" is a bracket row whose first round ended up with exactly
+   * A "bye" is a FIRST-round bracket row that ended up with exactly
    * one team filled because the classifier count wasn't a power of
    * two: with 10 classifiers in a 16-slot bracket six matches are
    * `team vs nobody`. Volleyball convention: the lone team passes
    * through automatically.
    *
-   * Implementation:
-   *   · Find rows where status='upcoming', exactly one of team1_id /
-   *     team2_id is set, and the OTHER side has no placeholder
-   *     (meaning the standings re-resolver has nothing to fill that
-   *     slot with — it's not "still waiting", it's a real bye).
-   *   · For each such row, mark it `completed` with `winner_id = the
-   *     filled team`, then call `advanceWinner` so the bracket cascade
-   *     places the winner into the next round.
+   * Why the first-round restriction matters: a half-filled
+   * intermediate round (e.g. tercer-puesto with the first semifinal's
+   * loser already placed but the second one still pending) looks
+   * exactly like a bye if you only check team1/team2. Auto-closing
+   * those would prematurely complete the match and the second loser
+   * would never land. Only the bracket's entry point can legitimately
+   * carry a bye — the deeper rounds always fill via advanceWinner.
+   *
+   * Algorithm:
+   *   1. Load every bracket row, bucket by (category, tier), exclude
+   *      tercer-puesto (its slots fill from semifinal losers).
+   *   2. For each bucket, the first round is whichever round name has
+   *      the most matches.
+   *   3. For first-round rows where status='upcoming' and exactly one
+   *      team is filled and the empty side has no placeholder: mark
+   *      complete with the lone team as winner and advance.
    *
    * Idempotent: a row that's already completed won't match the
    * predicate, so calling this twice in a row is safe.
@@ -1231,30 +1239,77 @@ export class BracketGenerator {
   async processByesAndAdvance(tournamentId: string): Promise<number> {
     const pool = getPool();
 
-    const result = await pool.query(
-      `SELECT id, team1_id, team2_id
+    const allRowsRes = await pool.query(
+      `SELECT id, round, position, team1_id, team2_id,
+              team1_placeholder, team2_placeholder, status
          FROM bracket_matches
-         WHERE tournament_id = $1
-           AND status = 'upcoming'
-           AND (
-             (team1_id IS NOT NULL AND team2_id IS NULL AND team2_placeholder IS NULL)
-             OR (team1_id IS NULL AND team2_id IS NOT NULL AND team1_placeholder IS NULL)
-           )`,
+         WHERE tournament_id = $1`,
       [tournamentId],
     );
+    if (allRowsRes.rows.length === 0) return 0;
+
+    // Bucket rows by (category, tier), skipping tercer-puesto.
+    const buckets = new Map<string, Array<Record<string, unknown>>>();
+    for (const r of allRowsRes.rows) {
+      const round = r.round as string;
+      if (round.endsWith('|tercer-puesto') || round === 'tercer-puesto') continue;
+      const parts = round.split('|');
+      let key = '';
+      if (parts.length >= 3 && (parts[1] === 'gold' || parts[1] === 'silver')) {
+        key = `${parts[0]}::${parts[1]}`;
+      } else if (parts.length >= 2) {
+        key = `${parts[0]}::`;
+      } else {
+        key = `::`;
+      }
+      const list = buckets.get(key) ?? [];
+      list.push(r);
+      buckets.set(key, list);
+    }
 
     let advanced = 0;
-    for (const row of result.rows) {
-      const winnerId = (row.team1_id ?? row.team2_id) as string | null;
-      if (!winnerId) continue;
-      try {
-        await this.advanceWinner(row.id as string, winnerId);
-        advanced++;
-      } catch (err) {
-        console.warn(
-          `[processByesAndAdvance] advanceWinner failed for ${row.id}:`,
-          err,
-        );
+    for (const rows of buckets.values()) {
+      // Identify the first round: round name with the most matches.
+      const counts = new Map<string, number>();
+      for (const r of rows) {
+        const round = r.round as string;
+        counts.set(round, (counts.get(round) || 0) + 1);
+      }
+      let firstRound = '';
+      let maxN = 0;
+      for (const [round, n] of counts.entries()) {
+        if (n > maxN) {
+          maxN = n;
+          firstRound = round;
+        }
+      }
+      if (!firstRound) continue;
+
+      // Only first-round rows with one team set, no placeholder on the
+      // empty side, status=upcoming → real bye.
+      const candidates = rows.filter((r) => {
+        if (r.round !== firstRound) return false;
+        if (r.status !== 'upcoming') return false;
+        const t1 = r.team1_id as string | null;
+        const t2 = r.team2_id as string | null;
+        const ph1 = r.team1_placeholder as string | null;
+        const ph2 = r.team2_placeholder as string | null;
+        const oneSetOther = (!!t1 && !t2 && !ph2) || (!t1 && !!t2 && !ph1);
+        return oneSetOther;
+      });
+
+      for (const row of candidates) {
+        const winnerId = ((row.team1_id ?? row.team2_id) as string | null);
+        if (!winnerId) continue;
+        try {
+          await this.advanceWinner(row.id as string, winnerId);
+          advanced++;
+        } catch (err) {
+          console.warn(
+            `[processByesAndAdvance] advanceWinner failed for ${row.id}:`,
+            err,
+          );
+        }
       }
     }
     return advanced;
