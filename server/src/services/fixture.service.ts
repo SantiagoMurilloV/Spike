@@ -378,18 +378,27 @@ export class FixtureGenerator {
     }
 
     for (const [category, groupNames] of categoryGroups.entries()) {
-      // Don't seed a bracket until at least one group match has
-      // actually been played for the category — otherwise we'd paint a
-      // phantom Oro/Plata before the tournament even starts.
+      // Don't seed a bracket until EVERY group match in the category is
+      // completed. Generating from a partial standings table seeded the
+      // bracket with whichever 2 teams happened to have played any
+      // match — and once the bracket existed, the idempotent (no-force)
+      // path on subsequent score updates left it locked at that
+      // half-baked state. Two-stage check below: any match played at
+      // all (bail early on tournaments that haven't started) AND every
+      // scheduled match completed (tail of the group phase).
       const playedRes = await pool.query(
-        `SELECT COUNT(*)::int AS played FROM matches
-         WHERE tournament_id = $1
-           AND group_name = ANY($2)
-           AND status = 'completed'`,
+        `SELECT
+           COUNT(*) FILTER (WHERE status = 'completed')::int AS played,
+           COUNT(*)::int AS total
+         FROM matches
+         WHERE tournament_id = $1 AND group_name = ANY($2)`,
         [tournamentId, groupNames],
       );
-      const played = playedRes.rows[0]?.played as number | undefined;
-      if (!played || played === 0) continue;
+      const played = (playedRes.rows[0]?.played as number | undefined) ?? 0;
+      const total = (playedRes.rows[0]?.total as number | undefined) ?? 0;
+      if (played === 0) continue;        // tournament hasn't started
+      if (total === 0) continue;         // no group matches scheduled
+      if (played < total && !force) continue;  // group phase still in progress
 
       // Decide whether this category needs an Oro/Plata seed pass.
       //
