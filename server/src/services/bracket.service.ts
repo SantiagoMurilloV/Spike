@@ -1162,6 +1162,21 @@ export class BracketGenerator {
       client.release();
     }
 
+    // Auto-advance any first-round bye slot before the materializer
+    // runs. A bye is a bracket row where exactly one team is set and
+    // the other side has no team / no placeholder — happens whenever
+    // the classifier count isn't a power of two (e.g. 10 → bracket 16
+    // means 6 byes). Without this, those byes would sit forever as
+    // "Por definir" and the next round would never seed.
+    try {
+      const advanced = await this.processByesAndAdvance(tournamentId);
+      if (advanced > 0) {
+        console.log(`[resolveBracketFromStandings] auto-advanced ${advanced} bye(s)`);
+      }
+    } catch (err) {
+      console.warn('[resolveBracketFromStandings] processByesAndAdvance failed:', err);
+    }
+
     // Always materialize after a re-resolve: even if `updated` is 0
     // (no team ids actually changed), there may be slots whose teams
     // resolved on a previous pass but never produced a `matches` row
@@ -1174,6 +1189,59 @@ export class BracketGenerator {
     }
 
     return updated;
+  }
+
+  /**
+   * Auto-advance bye matches.
+   *
+   * A "bye" is a bracket row whose first round ended up with exactly
+   * one team filled because the classifier count wasn't a power of
+   * two: with 10 classifiers in a 16-slot bracket six matches are
+   * `team vs nobody`. Volleyball convention: the lone team passes
+   * through automatically.
+   *
+   * Implementation:
+   *   · Find rows where status='upcoming', exactly one of team1_id /
+   *     team2_id is set, and the OTHER side has no placeholder
+   *     (meaning the standings re-resolver has nothing to fill that
+   *     slot with — it's not "still waiting", it's a real bye).
+   *   · For each such row, mark it `completed` with `winner_id = the
+   *     filled team`, then call `advanceWinner` so the bracket cascade
+   *     places the winner into the next round.
+   *
+   * Idempotent: a row that's already completed won't match the
+   * predicate, so calling this twice in a row is safe.
+   */
+  async processByesAndAdvance(tournamentId: string): Promise<number> {
+    const pool = getPool();
+
+    const result = await pool.query(
+      `SELECT id, team1_id, team2_id
+         FROM bracket_matches
+         WHERE tournament_id = $1
+           AND status = 'upcoming'
+           AND (
+             (team1_id IS NOT NULL AND team2_id IS NULL AND team2_placeholder IS NULL)
+             OR (team1_id IS NULL AND team2_id IS NOT NULL AND team1_placeholder IS NULL)
+           )`,
+      [tournamentId],
+    );
+
+    let advanced = 0;
+    for (const row of result.rows) {
+      const winnerId = (row.team1_id ?? row.team2_id) as string | null;
+      if (!winnerId) continue;
+      try {
+        await this.advanceWinner(row.id as string, winnerId);
+        advanced++;
+      } catch (err) {
+        console.warn(
+          `[processByesAndAdvance] advanceWinner failed for ${row.id}:`,
+          err,
+        );
+      }
+    }
+    return advanced;
   }
 }
 
