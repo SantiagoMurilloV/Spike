@@ -266,15 +266,31 @@ function mapBracketRow(row: Record<string, unknown>): BracketMatch {
 }
 
 /**
- * Determines the rounds needed based on the number of qualified teams.
- * - 8 teams: cuartos → semifinal → final
- * - 4 teams: semifinal → final
- * - 2 teams: final only
+ * Round names for a bracket of `teamCount` teams. Mirrors
+ * `getRoundName` in `fixture/algorithms.ts` so a 16-slot bracket
+ * produces ['ronda-1', 'cuartos', 'semifinal', 'final'] (4 rounds)
+ * — not ['cuartos', 'semifinal', 'final'] (3 rounds) which would
+ * break advanceWinner for the first round of a 16+ bracket.
+ *
+ * Examples:
+ *   ·  2 teams →                                  ['final']
+ *   ·  4 teams →                       ['semifinal', 'final']
+ *   ·  8 teams →            ['cuartos', 'semifinal', 'final']
+ *   · 16 teams → ['ronda-1', 'cuartos', 'semifinal', 'final']
+ *   · 32 teams → ['ronda-1', 'ronda-2', 'cuartos', 'semifinal', 'final']
  */
 function getRounds(teamCount: number): string[] {
-  if (teamCount >= 8) return ['cuartos', 'semifinal', 'final'];
-  if (teamCount >= 4) return ['semifinal', 'final'];
-  return ['final'];
+  if (teamCount < 2) return [];
+  const totalRounds = Math.ceil(Math.log2(teamCount));
+  const rounds: string[] = [];
+  for (let i = 0; i < totalRounds; i++) {
+    const fromEnd = totalRounds - 1 - i;
+    if (fromEnd === 0) rounds.push('final');
+    else if (fromEnd === 1) rounds.push('semifinal');
+    else if (fromEnd === 2) rounds.push('cuartos');
+    else rounds.push(`ronda-${i + 1}`);
+  }
+  return rounds;
 }
 
 /**
