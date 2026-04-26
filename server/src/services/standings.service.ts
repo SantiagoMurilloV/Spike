@@ -35,14 +35,26 @@ export class StandingsCalculator {
     }
     const format = tournamentResult.rows[0].format as string;
 
-    // Get ALL matches for this tournament (any status) — so we can seed the
-    // standings with every team that belongs to a group, even if they haven't
-    // played yet. This makes the public group matrix show all teams with 0
-    // points instead of hiding the ones with no completed matches.
+    // Get ALL group-stage matches for this tournament (any status) — so
+    // we can seed the standings with every team that belongs to a group,
+    // even if they haven't played yet. This makes the public group
+    // matrix show all teams with 0 points instead of hiding the ones
+    // with no completed matches.
+    //
+    // Bracket-stage matches (cuartos, semis, final, tercer puesto)
+    // are EXCLUDED via `bracket_match_id IS NULL AND group_name IS NOT NULL`.
+    // Without this filter, completing a cuartos match would create a
+    // ghost standings row with `group_name = NULL` for each team in
+    // that match — visible in the public Clasificación as duplicate
+    // entries with partial stats (the team's group-stage row stays
+    // intact but a second "(no group)" row appears with the bracket
+    // match's score grafted on).
     const allMatchesResult = await pool.query(
       `SELECT m.id, m.team1_id, m.team2_id, m.score_team1, m.score_team2, m.group_name, m.status
        FROM matches m
-       WHERE m.tournament_id = $1`,
+       WHERE m.tournament_id = $1
+         AND m.bracket_match_id IS NULL
+         AND m.group_name IS NOT NULL`,
       [tournamentId]
     );
 
