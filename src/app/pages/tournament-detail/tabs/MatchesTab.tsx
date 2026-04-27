@@ -16,6 +16,7 @@ import {
   PHASE_BUCKET_LABELS,
   type PhaseBucket,
 } from '../../../lib/phase';
+import { CategoryFilterBar } from '../CategoryFilterBar';
 
 /**
  * Resolve the category of a match across the two encoding shapes the
@@ -155,24 +156,12 @@ export function MatchesTab({ matches }: { matches: Match[] }) {
           ))}
         </div>
 
-        {/* Category pills — dynamic, only shows up when there's >1 category. */}
-        {categories.length > 1 && (
-          <div className="flex flex-wrap gap-1.5 sm:gap-2">
-            <CategoryPill
-              active={categoryFilter === 'all'}
-              onClick={() => setCategoryFilter('all')}
-              label="Todas las categorías"
-            />
-            {categories.map((c) => (
-              <CategoryPill
-                key={c}
-                active={categoryFilter === c}
-                onClick={() => setCategoryFilter(c)}
-                label={c}
-              />
-            ))}
-          </div>
-        )}
+        {/* Category pills — dynamic, hidden when there's only one. */}
+        <CategoryFilterBar
+          categories={categories}
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+        />
 
         {hasActiveFilters && (
           <motion.div
@@ -269,31 +258,6 @@ function PhasePill({
         active ? 'bg-spk-red text-white' : 'bg-black/5 text-black/70 hover:bg-black/10'
       }`}
       style={FONT}
-    >
-      {label}
-    </motion.button>
-  );
-}
-
-function CategoryPill({
-  active,
-  onClick,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-}) {
-  return (
-    <motion.button
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.97 }}
-      onClick={onClick}
-      className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-sm text-[11px] sm:text-xs font-semibold tracking-wide transition-colors ${
-        active
-          ? 'bg-black text-white'
-          : 'bg-white border border-black/10 text-black/70 hover:border-black/40'
-      }`}
     >
       {label}
     </motion.button>

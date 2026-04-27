@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { Award, BarChart3, Medal, Trophy } from 'lucide-react';
 import type { Match, StandingsRow, Team, Tournament } from '../../../types';
@@ -5,6 +6,7 @@ import { StandingsTable } from '../../../components/StandingsTable';
 import { TeamAvatar } from '../../../components/TeamAvatar';
 import { categoryOfGroupName, groupLetter } from '../../../lib/phase';
 import { LiveBadge } from '../LiveBadge';
+import { CategoryFilterBar } from '../CategoryFilterBar';
 
 const FONT = { fontFamily: 'Barlow Condensed, sans-serif' };
 
@@ -107,15 +109,40 @@ export function StandingsTab({
    *  table auto-syncs with the scoreboard. */
   lastRefreshedAt?: number | null;
 }) {
-  const groupNames = [
-    ...new Set(matches.filter((m) => m.group).map((m) => m.group!)),
-  ].sort();
+  const groupNames = useMemo(
+    () => [...new Set(matches.filter((m) => m.group).map((m) => m.group!))].sort(),
+    [matches],
+  );
   const hasGroups = groupNames.length > 0;
   const mode: BracketMode = bracketMode ?? 'manual';
 
+  // Categories surfaced in the chip strip — derived from the actual
+  // group names so we never offer a chip with no underlying data.
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    for (const gn of groupNames) {
+      const c = categoryOfGroupName(gn);
+      if (c) set.add(c);
+    }
+    return [...set].sort();
+  }, [groupNames]);
+
+  const [categoryFilter, setCategoryFilter] = useState<string | 'all'>('all');
+
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="flex items-center justify-end mb-4">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-4 sm:space-y-6"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <CategoryFilterBar
+            categories={categories}
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+          />
+        </div>
         <LiveBadge lastRefreshedAt={lastRefreshedAt} />
       </div>
       {hasGroups ? (
@@ -124,6 +151,7 @@ export function StandingsTab({
           matches={matches}
           standings={standings}
           bracketMode={mode}
+          categoryFilter={categoryFilter}
         />
       ) : standings.length > 0 ? (
         <StandingsTable standings={standings} groupName="Tabla General" />
@@ -139,11 +167,13 @@ function GlobalByCategory({
   matches,
   standings,
   bracketMode,
+  categoryFilter,
 }: {
   groupNames: string[];
   matches: Match[];
   standings: StandingsRow[];
   bracketMode: BracketMode;
+  categoryFilter: string | 'all';
 }) {
   // Map `teamId → groupName` so we can attach the group letter to each
   // ranked row and rebuild per-category rankings below.
@@ -179,9 +209,21 @@ function GlobalByCategory({
     if (!categoryMap.has(category)) categoryMap.set(category, []);
     categoryMap.get(category)!.push(gName);
   }
-  const categories = [...categoryMap.entries()].sort(([a], [b]) => a.localeCompare(b));
+  let categories = [...categoryMap.entries()].sort(([a], [b]) => a.localeCompare(b));
+
+  // Apply chip filter — when a single category is selected the H2 is
+  // dropped because the active chip already labels the section.
+  if (categoryFilter !== 'all') {
+    categories = categories.filter(([c]) => c === categoryFilter);
+  }
   const hasMultipleCategories =
-    categories.length > 1 || (categories.length === 1 && categories[0][0] !== '');
+    categoryFilter === 'all' &&
+    (categories.length > 1 ||
+      (categories.length === 1 && categories[0][0] !== ''));
+
+  if (categories.length === 0) {
+    return <EmptyStandings />;
+  }
 
   return (
     <div className="space-y-10">
