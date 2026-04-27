@@ -100,13 +100,17 @@ function formatHHMM(totalMinutes: number): string {
 // cumulative record across all groups, not whoever happens to top
 // group A. This helper computes that ranking from the standings table.
 //
-// Tiebreakers, in order:
+// Tiebreakers, in order (mirrors `StandingsTab.tsx#rankCategory` so the
+// public Clasificación and the bracket seeds always agree on who's
+// "best of silver"):
 //   1. points DESC (3 for 3-0 / 3-1, 2 for 3-2, 1 for 2-3, 0 for 0-3 / 1-3)
 //   2. set difference DESC (sets_for - sets_against)
-//   3. sets_for DESC
-//   4. wins DESC
-//   5. group position ASC (1°A beats 2°B if everything above ties)
-//   6. team_id ASC (deterministic order so re-runs produce the same seed)
+//   3. rally-point ratio DESC (points_for / points_against) — FIVB
+//      tiebreaker, decides 5/4-set ties on actual rally performance
+//   4. sets_for DESC
+//   5. wins DESC
+//   6. group position ASC (1°A beats 2°B if everything above ties)
+//   7. team_id ASC (deterministic order so re-runs produce the same seed)
 //
 // Only teams with at least one played match are considered — a 0-0
 // row would otherwise tie every other 0-0 row and the bracket would
@@ -120,6 +124,8 @@ interface RankingCandidate {
   wins: number;
   sets_for: number;
   sets_against: number;
+  points_for: number;
+  points_against: number;
   points: number;
 }
 
@@ -128,6 +134,12 @@ function compareRankingRows(a: RankingCandidate, b: RankingCandidate): number {
   const dA = a.sets_for - a.sets_against;
   const dB = b.sets_for - b.sets_against;
   if (dA !== dB) return dB - dA;
+  // Rally-point ratio: a.points_against === 0 falls back to raw
+  // points_for so a team that's only played sweeps doesn't get
+  // shoved by a divide-by-zero. Same shape as StandingsTab.
+  const rA = a.points_against === 0 ? a.points_for : a.points_for / a.points_against;
+  const rB = b.points_against === 0 ? b.points_for : b.points_for / b.points_against;
+  if (rA !== rB) return rB - rA;
   if (a.sets_for !== b.sets_for) return b.sets_for - a.sets_for;
   if (a.wins !== b.wins) return b.wins - a.wins;
   if (a.position !== b.position) return a.position - b.position;
@@ -147,7 +159,7 @@ export async function computeCumulativeRanking(
   const pool = getPool();
   const result = await pool.query(
     `SELECT team_id, group_name, position, played, wins,
-            sets_for, sets_against, points
+            sets_for, sets_against, points_for, points_against, points
        FROM standings
        WHERE tournament_id = $1
          AND group_name LIKE $2
@@ -926,7 +938,7 @@ export class BracketGenerator {
 
     const standingsResult = await pool.query(
       `SELECT team_id, group_name, position, played, wins,
-              sets_for, sets_against, points
+              sets_for, sets_against, points_for, points_against, points
          FROM standings WHERE tournament_id = $1`,
       [tournamentId],
     );

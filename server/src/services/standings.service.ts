@@ -10,6 +10,12 @@ interface TeamStats {
   losses: number;
   setsFor: number;
   setsAgainst: number;
+  /** Rally points scored across every set of every group-phase match.
+   *  Mirrors the `pointsFor` totals the public Clasificación computes
+   *  on the fly so backend rankers can apply the same FIVB tiebreaker
+   *  (rally ratio) without recomputing from set_scores. */
+  pointsFor: number;
+  pointsAgainst: number;
   points: number;
 }
 
@@ -93,6 +99,8 @@ export class StandingsCalculator {
           losses: 0,
           setsFor: 0,
           setsAgainst: 0,
+          pointsFor: 0,
+          pointsAgainst: 0,
           points: 0,
         });
       }
@@ -177,6 +185,20 @@ export class StandingsCalculator {
       stats2.setsFor += setsWonByTeam2;
       stats2.setsAgainst += setsWonByTeam1;
 
+      // Rally-point totals across every set of this match. Mirrors the
+      // accumulator the public Clasificación builds on the client so the
+      // backend can apply the same FIVB rally-ratio tiebreaker when
+      // ranking classifiers for a division bracket. Falls back to 0 on
+      // matches recorded only via the legacy `score_team1/2` shortcut
+      // (no per-set rally data) — those match the frontend's behaviour
+      // since it also relies on `m.sets`.
+      for (const set of sets) {
+        stats1.pointsFor += set.team1Points;
+        stats1.pointsAgainst += set.team2Points;
+        stats2.pointsFor += set.team2Points;
+        stats2.pointsAgainst += set.team1Points;
+      }
+
       // Volleyball group-phase points (best-of-3):
       //   2-0 sweep → 3 pts winner / 0 pts loser
       //   2-1       → 2 pts winner / 1 pt  loser
@@ -216,6 +238,12 @@ export class StandingsCalculator {
       const diffA = a.setsFor - a.setsAgainst;
       const diffB = b.setsFor - b.setsAgainst;
       if (diffB !== diffA) return diffB - diffA;
+      // Rally-point ratio (FIVB tiebreaker): higher pointsFor/pointsAgainst
+      // ratio wins. Mirrors `StandingsTab.tsx` so the per-group order on
+      // disk matches what spectators see live.
+      const ratioA = a.pointsAgainst === 0 ? a.pointsFor : a.pointsFor / a.pointsAgainst;
+      const ratioB = b.pointsAgainst === 0 ? b.pointsFor : b.pointsFor / b.pointsAgainst;
+      if (ratioB !== ratioA) return ratioB - ratioA;
       return b.setsFor - a.setsFor;
     };
 
@@ -307,8 +335,8 @@ export class StandingsCalculator {
           position <= qualifyCount && groupIsComplete(stats.groupName);
 
         const result = await client.query(
-          `INSERT INTO standings (tournament_id, team_id, group_name, position, played, wins, losses, sets_for, sets_against, points, is_qualified)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          `INSERT INTO standings (tournament_id, team_id, group_name, position, played, wins, losses, sets_for, sets_against, points_for, points_against, points, is_qualified)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
            RETURNING *`,
           [
             tournamentId,
@@ -320,6 +348,8 @@ export class StandingsCalculator {
             stats.losses,
             stats.setsFor,
             stats.setsAgainst,
+            stats.pointsFor,
+            stats.pointsAgainst,
             stats.points,
             isQualified,
           ]
@@ -372,6 +402,8 @@ export class StandingsCalculator {
       losses: row.losses as number,
       setsFor: row.sets_for as number,
       setsAgainst: row.sets_against as number,
+      pointsFor: (row.points_for as number | null) ?? 0,
+      pointsAgainst: (row.points_against as number | null) ?? 0,
       points: row.points as number,
       isQualified: row.is_qualified as boolean,
     };

@@ -61,6 +61,8 @@ function standingsDbRow(overrides: Record<string, unknown> = {}): Record<string,
     losses: 0,
     sets_for: 2,
     sets_against: 1,
+    points_for: 0,
+    points_against: 0,
     points: 3,
     is_qualified: true,
     ...overrides,
@@ -123,8 +125,8 @@ describe('StandingsCalculator', () => {
             losses: params![6],
             sets_for: params![7],
             sets_against: params![8],
-            points: params![9],
-            is_qualified: params![10],
+            points: params![11],
+            is_qualified: params![12],
           });
           return Promise.resolve({ rows: [row] });
         }
@@ -164,8 +166,8 @@ describe('StandingsCalculator', () => {
             losses: params![6],
             sets_for: params![7],
             sets_against: params![8],
-            points: params![9],
-            is_qualified: params![10],
+            points: params![11],
+            is_qualified: params![12],
           });
           return Promise.resolve({ rows: [row] });
         }
@@ -208,8 +210,8 @@ describe('StandingsCalculator', () => {
             losses: params![6],
             sets_for: params![7],
             sets_against: params![8],
-            points: params![9],
-            is_qualified: params![10],
+            points: params![11],
+            is_qualified: params![12],
           });
           return Promise.resolve({ rows: [row] });
         }
@@ -269,8 +271,8 @@ describe('StandingsCalculator', () => {
             losses: params![6],
             sets_for: params![7],
             sets_against: params![8],
-            points: params![9],
-            is_qualified: params![10],
+            points: params![11],
+            is_qualified: params![12],
           });
           return Promise.resolve({ rows: [row] });
         }
@@ -306,7 +308,7 @@ describe('StandingsCalculator', () => {
         if (typeof sql === 'string' && sql.startsWith('INSERT INTO standings')) {
           const row = standingsDbRow({
             team_id: params![1],
-            points: params![9],
+            points: params![11],
             wins: params![5],
           });
           return Promise.resolve({ rows: [row] });
@@ -363,8 +365,8 @@ describe('StandingsCalculator', () => {
             losses: params![6],
             sets_for: params![7],
             sets_against: params![8],
-            points: params![9],
-            is_qualified: params![10],
+            points: params![11],
+            is_qualified: params![12],
           });
           return Promise.resolve({ rows: [row] });
         }
@@ -420,7 +422,7 @@ describe('StandingsCalculator', () => {
             losses: params![6],
             sets_for: params![7],
             sets_against: params![8],
-            points: params![9],
+            points: params![11],
           });
           return Promise.resolve({ rows: [row] });
         }
@@ -467,7 +469,7 @@ describe('StandingsCalculator', () => {
             played: params![4],
             wins: params![5],
             losses: params![6],
-            points: params![9],
+            points: params![11],
           });
           return Promise.resolve({ rows: [row] });
         }
@@ -520,8 +522,8 @@ describe('StandingsCalculator', () => {
             losses: params![6],
             sets_for: params![7],
             sets_against: params![8],
-            points: params![9],
-            is_qualified: params![10],
+            points: params![11],
+            is_qualified: params![12],
           });
           return Promise.resolve({ rows: [row] });
         }
@@ -676,8 +678,8 @@ describe('StandingsCalculator', () => {
             losses: params![6],
             sets_for: params![7],
             sets_against: params![8],
-            points: params![9],
-            is_qualified: params![10],
+            points: params![11],
+            is_qualified: params![12],
           });
           return Promise.resolve({ rows: [row] });
         }
@@ -734,8 +736,8 @@ describe('StandingsCalculator', () => {
             losses: params![6],
             sets_for: params![7],
             sets_against: params![8],
-            points: params![9],
-            is_qualified: params![10],
+            points: params![11],
+            is_qualified: params![12],
           });
           return Promise.resolve({ rows: [row] });
         }
@@ -829,7 +831,7 @@ describe('StandingsCalculator', () => {
               team_id: params![1],
               group_name: params![2],
               position: params![3],
-              is_qualified: params![10],
+              is_qualified: params![12],
             })],
           });
         }

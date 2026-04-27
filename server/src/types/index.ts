@@ -147,6 +147,11 @@ export interface StandingsRow {
   losses: number;
   setsFor: number;
   setsAgainst: number;
+  /** Cumulative rally points scored across every set of every group-
+   *  phase match. Used by the FIVB rally-ratio tiebreaker (third tier
+   *  after points + set diff). */
+  pointsFor: number;
+  pointsAgainst: number;
   points: number;
   isQualified: boolean;
   team?: Team;          // populated via join

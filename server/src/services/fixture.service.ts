@@ -573,8 +573,15 @@ export class FixtureGenerator {
     positions: number[],
   ): Promise<string[]> {
     const pool = getPool();
+    // Tiebreaker cascade mirrors `StandingsTab.tsx#rankCategory` so the
+    // public Clasificación and the auto-seeded bracket can never
+    // disagree on who's the best 1°/2°/3°/4° of the category. The rally-
+    // ratio expression intentionally swaps to raw `points_for` when
+    // `points_against = 0` so a sweep-only team isn't penalised by a
+    // divide-by-zero.
     const result = await pool.query(
       `SELECT s.team_id, s.points, s.sets_for, s.sets_against,
+              s.points_for, s.points_against,
               s.wins, s.position, t.name AS team_name
          FROM standings s
          JOIN teams t ON t.id = s.team_id
@@ -585,6 +592,8 @@ export class FixtureGenerator {
          ORDER BY
            s.points DESC,
            (s.sets_for - s.sets_against) DESC,
+           CASE WHEN s.points_against = 0 THEN s.points_for::numeric
+                ELSE s.points_for::numeric / s.points_against END DESC,
            s.sets_for DESC,
            s.wins DESC,
            s.position ASC,

@@ -123,6 +123,8 @@ function mapStandingsRow(row: Record<string, unknown>): StandingsRow {
     losses: row.losses as number,
     setsFor: row.sets_for as number,
     setsAgainst: row.sets_against as number,
+    pointsFor: (row.points_for as number | null) ?? 0,
+    pointsAgainst: (row.points_against as number | null) ?? 0,
     points: row.points as number,
     isQualified: row.is_qualified as boolean,
     team: row.team_name
