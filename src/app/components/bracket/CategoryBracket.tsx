@@ -27,6 +27,7 @@ export function CategoryBracket({
   bracketMatches,
   dims,
   tier = null,
+  seedOffset = 0,
 }: {
   category: string;
   bracketMatches: BracketMatch[];
@@ -34,6 +35,12 @@ export function CategoryBracket({
   /** When set, a smaller "Oro"/"Plata" sub-header appears above the
    *  bracket SVG with a medal icon in the tier's color. */
   tier?: BracketTier | null;
+  /** First-round seed badges shift by this amount so Plata reads as
+   *  the continuation of Oro in the overall ranking (e.g. with 8 Oro
+   *  classifiers, Plata labels #1-#8 become #9-#16). Owned by the
+   *  parent (`Bracket.tsx`) since only it knows how many classifiers
+   *  the upstream tier consumed. */
+  seedOffset?: number;
 }) {
   const { MATCH_W, MATCH_H, COL_GAP, ROW_GAP, HEADER_H } = dims;
   const ROUND_W = MATCH_W + COL_GAP;
@@ -128,6 +135,7 @@ export function CategoryBracket({
                 contentH={contentH}
                 dims={dims}
                 roundW={ROUND_W}
+                seedOffset={seedOffset}
               />
             ))}
           </svg>
@@ -226,6 +234,7 @@ function RoundColumn({
   contentH,
   dims,
   roundW,
+  seedOffset,
 }: {
   round: Round;
   roundIdx: number;
@@ -233,6 +242,7 @@ function RoundColumn({
   contentH: number;
   dims: BracketDims;
   roundW: number;
+  seedOffset: number;
 }) {
   const { MATCH_W, MATCH_H, HEADER_H } = dims;
   const matchCount = round.matches.length;
@@ -272,7 +282,13 @@ function RoundColumn({
       {round.matches.map((match, mIdx) => {
         const centerY = HEADER_H + slotH * mIdx + slotH / 2;
         const y = centerY - MATCH_H / 2;
-        const { label1, label2 } = resolveLabels(match, roundIdx, mIdx, matchCount);
+        const { label1, label2 } = resolveLabels(
+          match,
+          roundIdx,
+          mIdx,
+          matchCount,
+          seedOffset,
+        );
 
         return (
           <BracketMatchBox
@@ -309,6 +325,7 @@ function resolveLabels(
   roundIdx: number,
   mIdx: number,
   matchCount: number,
+  seedOffset = 0,
 ): { label1?: string; label2?: string } {
   let label1: string | undefined;
   let label2: string | undefined;
@@ -320,13 +337,15 @@ function resolveLabels(
     // VNL seed badge: each slot's position in the bracket maps to a
     // VNL seed via the recursive [1,8,4,5,2,7,3,6,…] order. Seed 1 is
     // the best cumulative classifier in the division (see server
-    // resolveBracketFromStandings).
+    // resolveBracketFromStandings). `seedOffset` shifts the badge so
+    // Plata reads as positions (Oro count + 1) … (Oro + Plata) of the
+    // overall ranking instead of restarting at #1.
     const totalSlots = matchCount * 2;
     const order = totalSlots >= 2 ? bracketSeedOrder(totalSlots) : [];
     const seed1 = order[mIdx * 2];
     const seed2 = order[mIdx * 2 + 1];
-    if (seed1) label1 = `#${seed1}`;
-    if (seed2) label2 = `#${seed2}`;
+    if (seed1) label1 = `#${seed1 + seedOffset}`;
+    if (seed2) label2 = `#${seed2 + seedOffset}`;
   } else if (roundIdx === 0) {
     // Manual / non-tiered first round: show the placeholder mapping
     // ("1°A", "2°D") so the admin sees which group position lands in

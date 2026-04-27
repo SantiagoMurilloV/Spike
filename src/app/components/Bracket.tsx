@@ -100,6 +100,9 @@ export function Bracket({ matches }: BracketProps) {
                 bracketMatches={b.matches}
                 dims={dims}
                 tier={buckets.length > 1 ? b.tier : null}
+                seedOffset={
+                  b.tier === 'silver' ? goldFirstRoundSlots(buckets) : 0
+                }
               />
             ))}
           </div>
@@ -107,4 +110,35 @@ export function Bracket({ matches }: BracketProps) {
       ))}
     </div>
   );
+}
+
+/**
+ * Number of first-round slots in the Oro tier of a category — used to
+ * offset Plata's seed badges so they continue the overall ranking
+ * (Plata #1 reads as #9 when Oro has 8 classifiers). Returns 0 when
+ * the category has no Oro tier (Plata-only renders untouched).
+ *
+ * "First round" is the round name with the most matches inside the
+ * tier, ignoring the satellite tercer-puesto card. Multiplying that
+ * count by 2 gives the bracket size (power of two), which is also the
+ * number of seed slots — including byes, so the Plata offset stays
+ * stable even when Oro runs short on classifiers.
+ */
+function goldFirstRoundSlots(
+  buckets: Array<{ tier: BracketTier | null; matches: BracketMatch[] }>,
+): number {
+  const gold = buckets.find((b) => b.tier === 'gold');
+  if (!gold) return 0;
+  const standard = gold.matches.filter(
+    (m) => !parseRound(m.round).name.includes('tercer'),
+  );
+  const counts = new Map<string, number>();
+  for (const m of standard) {
+    counts.set(m.round, (counts.get(m.round) || 0) + 1);
+  }
+  let maxCount = 0;
+  for (const c of counts.values()) {
+    if (c > maxCount) maxCount = c;
+  }
+  return maxCount * 2;
 }
