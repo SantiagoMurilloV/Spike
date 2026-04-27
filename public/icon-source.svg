@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!--
+    Source SVG for PWA icons (icon-192.png, icon-512.png).
+    Full-bleed: NO border-radius on the background — iOS / Android
+    apply their own masks (rounded square on iOS, circle on Android
+    adaptive icons), so the source needs to fill the whole square.
+    The "safe zone" for maskable icons is roughly the inner 80% of
+    the square (a circle of radius 0.4 × side), so the wordmark and
+    the volleyball post sit comfortably inside that disc.
+    Re-render after edits with:
+      rsvg-convert -w 192 -h 192 public/icon-source.svg > public/icon-192.png
+      rsvg-convert -w 512 -h 512 public/icon-source.svg > public/icon-512.png
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0C0C0E" />
+      <stop offset="100%" stop-color="#111318" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background: full-bleed, no rx — leave masking to the OS. -->
+  <rect width="512" height="512" fill="url(#bg)" />
+
+  <!-- Diagonal red accent stripe (subtle). -->
+  <polygon points="0,318 512,174 512,205 0,348" fill="#E31E24" opacity="0.07" />
+
+  <!-- Volleyball post + ball glyph, sized to fit inside the safe zone. -->
+  <g transform="translate(256, 152)">
+    <polygon points="-53,-59 53,-59 39,39 -39,39" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linejoin="round" />
+    <line x1="-31" y1="10" x2="31" y2="10" stroke="#FFFFFF" stroke-width="1.5" opacity="0.3" />
+    <polyline points="-53,-29 -78,-29 -78,18 -53,18" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />
+    <polyline points="53,-29 78,-29 78,18 53,18" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />
+    <line x1="-10" y1="39" x2="-10" y2="60" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" />
+    <line x1="10" y1="39" x2="10" y2="60" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" />
+    <line x1="-37" y1="60" x2="37" y2="60" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" />
+    <circle cx="0" cy="-74" r="5.5" fill="#E31E24" />
+    <line x1="0" y1="-68" x2="0" y2="-59" stroke="#E31E24" stroke-width="2" stroke-linecap="round" />
+  </g>
+
+  <!-- Hairline divider above the wordmark. -->
+  <rect x="56" y="244" width="400" height="3" rx="1.5" fill="#E31E24" />
+
+  <!-- "SET" — main wordmark. -->
+  <text x="256" y="368" font-family="'Arial Black','Impact','Haettenschweiler',sans-serif" font-weight="900" font-size="120" letter-spacing="-2" text-anchor="middle" fill="#FFFFFF">SET</text>
+
+  <!-- Thin hairline between SET and POINT. -->
+  <rect x="56" y="382" width="400" height="0.75" rx="0.5" fill="#FFFFFF" opacity="0.10" />
+
+  <!-- "POINT" — secondary, red, wider tracking. -->
+  <text x="256" y="438" font-family="'Arial','Helvetica Neue',sans-serif" font-weight="400" font-size="26" letter-spacing="14" text-anchor="middle" fill="#E31E24">POINT</text>
+
+  <!-- Decorative dots flanking the secondary. -->
+  <circle cx="112" cy="426" r="3" fill="#E31E24" opacity="0.55" />
+  <circle cx="400" cy="426" r="3" fill="#E31E24" opacity="0.55" />
+</svg>
