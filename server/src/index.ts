@@ -3,6 +3,7 @@ dotenv.config();
 
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
@@ -71,6 +72,16 @@ const corsOptions: cors.CorsOptions = IS_PROD
 app.set('trust proxy', true);
 
 app.use(cors(corsOptions));
+
+// gzip / deflate compression for every response. Crucial on the public
+// polling endpoints — a tournament with 200 spectators each pulling
+// `/matches` (≈180 KB raw JSON) every 20 s gets ~5–6× smaller payloads
+// here, dropping a 4-day torneo from ~320 GB egress to ~55 GB. The
+// `compression` defaults already skip responses with `Cache-Control:
+// no-transform` and bodies under ~1 KB, so there's no measurable cost
+// on tiny payloads (auth, settings, single-team fetches).
+app.use(compression());
+
 // JSON body limit raised so team / tournament payloads can carry a
 // base64-encoded logo (up to ~10 MB raw → ~14 MB encoded plus room for
 // other fields).
