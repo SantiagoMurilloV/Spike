@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/triple-slash-reference */
 
 /**
- * SPK-CUP service worker.
+ * SetPoint service worker.
  *
  * Built with `vite-plugin-pwa` in `injectManifest` mode so we get Workbox
  * precaching for the shell AND can layer on push-notification handlers the
@@ -64,7 +64,7 @@ interface PushPayload {
 self.addEventListener('push', (event) => {
   const data = event.data;
   let payload: PushPayload = {
-    title: 'SPK-CUP',
+    title: 'SetPoint',
     body: '¡Novedad en el torneo!',
   };
   if (data) {

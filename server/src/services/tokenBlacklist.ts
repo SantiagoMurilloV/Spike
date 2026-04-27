@@ -4,7 +4,7 @@ import crypto from 'crypto';
  * In-memory JWT revocation list.
  *
  * Scope: single Express instance. Railway's single container is enough for
- * SPK-CUP today; if we scale horizontally we'd swap this for a Redis- or
+ * SetPoint today; if we scale horizontally we'd swap this for a Redis- or
  * DB-backed store.
  *
  * Gotcha: blacklist entries are lost on restart / redeploy. A token

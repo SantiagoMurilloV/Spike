@@ -540,18 +540,18 @@ export function TeamDetail() {
             <div className="flex items-center gap-3">
               <img 
                 src={spkLogo} 
-                alt="SPK-CUP Logo" 
+                alt="SetPoint Logo" 
                 className="w-16 h-16"
               />
               <div>
                 <div className="text-xl font-bold tracking-tighter" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-                  SPK-CUP
+                  SetPoint
                 </div>
                 <div className="text-xs text-white/50">Club Deportivo Spike</div>
               </div>
             </div>
             <div className="text-sm text-white/50">
-              &copy; 2026 SPK-CUP. Todos los derechos reservados.
+              &copy; 2026 SetPoint. Todos los derechos reservados.
             </div>
           </div>
         </div>

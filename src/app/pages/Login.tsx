@@ -69,7 +69,7 @@ export function Login() {
                 className="text-3xl font-bold tracking-tighter"
                 style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
               >
-                SPK-CUP
+                SetPoint
               </h1>
             </div>
             <div className="w-20 h-1 bg-spk-red" />

@@ -1,6 +1,6 @@
 {
-  "name": "SPK-CUP — Sistema de Torneos",
-  "short_name": "SPK-CUP",
+  "name": "SetPoint — Sistema de Torneos",
+  "short_name": "SetPoint",
   "description": "Sistema completo de gestión de torneos deportivos para voleibol",
   "start_url": "/",
   "display": "standalone",

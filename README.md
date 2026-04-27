@@ -1,5 +1,5 @@
 
-  # Spike Tournament System
+  # SetPoint — Tournament System
 
   ## Running the code
 

@@ -17,7 +17,7 @@ export class SettingsService {
       // Create default settings row if none exists
       const insert = await pool.query(
         `INSERT INTO system_settings (system_name, language)
-         VALUES ('SPK-CUP', 'es')
+         VALUES ('SetPoint', 'es')
          RETURNING id, system_name AS "systemName", club_name AS "clubName",
                    location, language, contact_email AS "contactEmail",
                    website, updated_at AS "updatedAt"`

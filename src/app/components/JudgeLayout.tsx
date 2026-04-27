@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { NotificationPrompt } from './NotificationPrompt';
 
 /**
- * JudgeLayout — minimal shell for the judge role. Shows the SPK-CUP mark, the
+ * JudgeLayout — minimal shell for the judge role. Shows the SetPoint mark, the
  * judge's display name and a logout button. No sidebar, no admin chrome — a
  * judge only needs to see live matches and score them.
  */
@@ -30,7 +30,7 @@ export function JudgeLayout() {
                 className="text-base sm:text-lg font-bold uppercase tracking-tighter"
                 style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
               >
-                SPK-CUP · Panel de Juez
+                SetPoint · Panel de Juez
               </div>
               <div className="text-[11px] text-white/55 uppercase tracking-[0.16em]">
                 {user?.username ?? 'Juez'}
