@@ -7,7 +7,7 @@ import compression from 'compression';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
-import { checkConnection, runMigrations } from './config/database';
+import { checkConnection, getPool, runMigrations } from './config/database';
 import { ensureReady as ensurePushReady } from './services/push.service';
 import { ensureSuperAdmin } from './services/platformBootstrap';
 import { touchUser, touchVisitor } from './services/presence';
@@ -115,9 +115,33 @@ app.use((req, _res, next) => {
   next();
 });
 
-// Health check
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check.
+//
+// Pings Postgres with a trivial `SELECT 1` so an external uptime monitor
+// (UptimeRobot, Better Stack, etc) hitting this every few minutes keeps
+// BOTH the Express container AND the pg connection pool warm. Without
+// the DB ping, the pool would still close idle TCP connections and the
+// next real request would pay a fresh handshake — exactly the cold-start
+// feel we're trying to eliminate.
+//
+// We use a short statement_timeout so a wedged DB doesn't hold the
+// health endpoint open and trip the monitor's own timeout.
+app.get('/api/health', async (_req, res) => {
+  try {
+    const client = await getPool().connect();
+    try {
+      await client.query('SET LOCAL statement_timeout = 2000');
+      await client.query('SELECT 1');
+    } finally {
+      client.release();
+    }
+    res.json({ status: 'ok', db: 'ok', timestamp: new Date().toISOString() });
+  } catch (err) {
+    console.error('[health] DB ping failed:', err);
+    res
+      .status(503)
+      .json({ status: 'degraded', db: 'down', timestamp: new Date().toISOString() });
+  }
 });
 
 // ── Serve uploaded files with path-traversal guard ───────────────

@@ -19,6 +19,22 @@ let pool: Pool | null = null;
 function buildPoolConfig(): PoolConfig {
   const max = parseInt(process.env.DB_POOL_SIZE || '20', 10);
 
+  // Shared pool tuning. The defaults of `pg` close idle connections after
+  // ~10 s, which on Railway means every burst of traffic after a quiet
+  // period pays a 150–400 ms TCP+TLS handshake against the managed
+  // Postgres host. We override that:
+  //   - idleTimeoutMillis: 0       → never close idle connections
+  //   - keepAlive: true            → enable TCP keepalive on the socket
+  //   - keepAliveInitialDelayMillis: 10s before the first keepalive probe
+  //   - connectionTimeoutMillis: 5s → fail fast if the cluster is wedged
+  //     instead of hanging the request indefinitely.
+  const sharedTuning = {
+    idleTimeoutMillis: 0,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
+    connectionTimeoutMillis: 5_000,
+  };
+
   if (process.env.DATABASE_URL) {
     const connectionString = process.env.DATABASE_URL;
     // Naive hostname sniff — good enough to decide if SSL is needed.
@@ -27,6 +43,7 @@ function buildPoolConfig(): PoolConfig {
       connectionString,
       max,
       ssl: isRemote ? { rejectUnauthorized: false } : undefined,
+      ...sharedTuning,
     };
   }
 
@@ -37,6 +54,7 @@ function buildPoolConfig(): PoolConfig {
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
     max,
+    ...sharedTuning,
   };
 }
 
