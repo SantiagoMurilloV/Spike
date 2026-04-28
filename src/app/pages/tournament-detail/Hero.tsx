@@ -38,28 +38,36 @@ export function Hero({
   const caption = STATUS_CAPTION[tournament.status];
 
   return (
-    <section className="relative min-h-[60vh] md:h-[70vh] overflow-hidden bg-black">
+    <section className="relative overflow-hidden bg-black">
       <motion.div style={{ scale }} className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black z-10" />
         <ImageWithFallback src={HERO_IMG} alt="Tournament" className="w-full h-full object-cover opacity-50" />
       </motion.div>
 
-      <motion.div style={{ opacity }} className="relative z-20 min-h-[60vh] md:h-full flex items-center py-12 md:py-0">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-12 w-full pt-16">
+      {/* Content lives in normal flow so it dictates section height — the
+          parallax bg above is absolute and just paints behind. We pad
+          below the fixed h-16 header so the status badge isn't clipped,
+          and pad the bottom so the last row of stats clears the sticky
+          tab nav cleanly. md:min-h-[70vh] keeps the desktop poster look. */}
+      <motion.div
+        style={{ opacity }}
+        className="relative z-20 px-4 sm:px-6 md:px-12 pt-24 sm:pt-28 md:pt-32 pb-10 sm:pb-12 md:pb-16 md:min-h-[70vh] md:flex md:items-center"
+      >
+        <div className="max-w-[1600px] mx-auto w-full">
           <div className="max-w-4xl">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-sm mb-4 sm:mb-6"
+              className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-sm mb-4 sm:mb-6"
             >
               {caption.withDot && (
                 <motion.div
-                  className="w-2 h-2 bg-spk-red rounded-full"
+                  className="w-2 h-2 bg-spk-red rounded-full flex-shrink-0"
                   animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
                   transition={{ duration: 2, repeat: Infinity }}
                 />
               )}
-              <span className="text-xs sm:text-sm font-bold text-white tracking-wide" style={FONT}>
+              <span className="text-[11px] sm:text-sm font-bold text-white tracking-wide" style={FONT}>
                 {caption.text}
               </span>
             </motion.div>
@@ -68,7 +76,7 @@ export function Hero({
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold mb-4 sm:mb-6 leading-[0.95] sm:leading-[0.9] tracking-tighter text-white break-words hyphens-auto"
+              className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold mb-3 sm:mb-6 leading-[0.95] sm:leading-[0.9] tracking-tighter text-white break-words hyphens-auto"
               style={FONT}
             >
               {tournament.name}
@@ -78,16 +86,20 @@ export function Hero({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="text-base sm:text-xl md:text-2xl text-white/80 mb-6 sm:mb-10 max-w-3xl leading-relaxed"
+              className="text-sm sm:text-xl md:text-2xl text-white/80 mb-5 sm:mb-10 max-w-3xl leading-relaxed"
             >
               {tournament.description}
             </motion.p>
 
+            {/* 2×2 grid on phones so all four stats land inside the hero
+                without bleeding into the sticky tabs below. Switches to a
+                single row of four on sm+ where the viewport is wide
+                enough. */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.3 }}
-              className="flex flex-wrap gap-x-6 gap-y-4 sm:gap-8 md:gap-12"
+              className="grid grid-cols-2 sm:flex sm:flex-wrap gap-x-4 gap-y-4 sm:gap-8 md:gap-12"
             >
               <Stat label="Equipos" value={enrolledCount || tournament.teamsCount} />
               <Stat label="Partidos" value={matchesCount} />
@@ -99,7 +111,7 @@ export function Hero({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4 }}
-              className="flex flex-wrap gap-4 sm:gap-6 mt-6 sm:mt-10 text-white/70"
+              className="flex flex-wrap gap-3 sm:gap-6 mt-5 sm:mt-10 text-white/70"
             >
               <div className="flex items-center gap-2 text-xs sm:text-sm">
                 <Calendar className="w-4 h-4 flex-shrink-0" />
@@ -125,10 +137,10 @@ export function Hero({
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <div className="text-3xl sm:text-4xl md:text-5xl font-bold mb-1 text-white tabular-nums" style={FONT}>
+      <div className="text-2xl sm:text-4xl md:text-5xl font-bold mb-0.5 sm:mb-1 text-white tabular-nums leading-none" style={FONT}>
         {value}
       </div>
-      <div className="text-xs sm:text-sm text-white/60 uppercase tracking-wider">{label}</div>
+      <div className="text-[10px] sm:text-sm text-white/60 uppercase tracking-wider">{label}</div>
     </div>
   );
 }
