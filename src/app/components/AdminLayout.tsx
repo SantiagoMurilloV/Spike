@@ -179,7 +179,7 @@ export function AdminLayout() {
           fixed top-0 left-0 h-full bg-black border-r border-white/10 z-40
           transition-transform duration-300 ease-in-out
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          md:translate-x-0 w-72 flex flex-col
+          md:translate-x-0 w-[85vw] max-w-72 md:w-72 flex flex-col
         `}
       >
         {/* Logo */}

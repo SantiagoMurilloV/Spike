@@ -97,20 +97,20 @@ export function AdminSettings() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-4xl">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold mb-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
           CONFIGURACIÓN
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-sm sm:text-base text-muted-foreground">
           Ajusta las configuraciones generales del sistema
         </p>
       </div>
 
       {/* General Settings */}
       <div className="bg-card border border-border rounded-sm overflow-hidden">
-        <div className="bg-secondary px-6 py-4 border-b border-border">
+        <div className="bg-secondary px-4 sm:px-6 py-4 border-b border-border">
           <h2 className="font-bold flex items-center gap-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             <Globe className="w-5 h-5" />
             CONFIGURACIÓN GENERAL
@@ -161,7 +161,7 @@ export function AdminSettings() {
 
       {/* Security Settings */}
       <div className="bg-card border border-border rounded-sm overflow-hidden">
-        <div className="bg-secondary px-6 py-4 border-b border-border">
+        <div className="bg-secondary px-4 sm:px-6 py-4 border-b border-border">
           <h2 className="font-bold flex items-center gap-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             <Shield className="w-5 h-5" />
             SEGURIDAD
@@ -216,7 +216,7 @@ export function AdminSettings() {
 
       {/* Contact Settings */}
       <div className="bg-card border border-border rounded-sm overflow-hidden">
-        <div className="bg-secondary px-6 py-4 border-b border-border">
+        <div className="bg-secondary px-4 sm:px-6 py-4 border-b border-border">
           <h2 className="font-bold flex items-center gap-2" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
             <Mail className="w-5 h-5" />
             INFORMACIÓN DE CONTACTO

@@ -55,20 +55,20 @@ export function HeroSection({
         style={{ opacity: heroOpacity }}
         className="relative z-20 h-full flex items-center"
       >
-        <div className="max-w-[1600px] mx-auto px-6 md:px-12 w-full">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-12 w-full">
           <div className="max-w-4xl">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full mb-8"
+              className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full mb-6 sm:mb-8"
             >
               <motion.div
                 className="w-2 h-2 bg-spk-red rounded-full"
                 animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
               />
-              <span className="text-sm font-medium tracking-wide">
+              <span className="text-xs sm:text-sm font-medium tracking-wide">
                 {ongoingTournaments} TORNEOS EN VIVO
               </span>
             </motion.div>
@@ -77,7 +77,7 @@ export function HeroSection({
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, type: 'spring', stiffness: 100 }}
-              className="text-5xl sm:text-6xl md:text-8xl lg:text-9xl font-bold mb-6 leading-[0.9] tracking-tighter"
+              className="text-[2.75rem] sm:text-6xl md:text-8xl lg:text-9xl font-bold mb-4 sm:mb-6 leading-[0.95] sm:leading-[0.9] tracking-tighter"
               style={FONT}
             >
               VIVE LA
@@ -85,7 +85,7 @@ export function HeroSection({
               <span className="relative inline-block">
                 COMPETENCIA
                 <motion.div
-                  className="absolute bottom-0 left-0 right-0 h-3 md:h-5 bg-spk-red"
+                  className="absolute bottom-0 left-0 right-0 h-2 sm:h-3 md:h-5 bg-spk-red"
                   initial={{ scaleX: 0 }}
                   animate={{ scaleX: 1 }}
                   transition={{ delay: 0.8, duration: 0.8, ease: 'easeOut' }}
@@ -98,7 +98,7 @@ export function HeroSection({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
-              className="text-lg sm:text-xl md:text-2xl text-white/80 mb-10 max-w-2xl leading-relaxed"
+              className="text-base sm:text-xl md:text-2xl text-white/80 mb-6 sm:mb-10 max-w-2xl leading-relaxed"
             >
               Consulta torneos, resultados en vivo, clasificaciones y toda la acción deportiva en
               tiempo real
@@ -108,13 +108,13 @@ export function HeroSection({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.7 }}
-              className="flex flex-wrap gap-4"
+              className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4"
             >
               <motion.button
                 whileHover={{ scale: 1.05, x: 5 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={onViewTournaments}
-                className="flex items-center gap-3 px-8 py-4 bg-white text-black text-lg font-bold rounded-sm hover:bg-white/90 transition-colors"
+                className="flex items-center justify-center gap-3 px-6 sm:px-8 py-3.5 sm:py-4 bg-white text-black text-base sm:text-lg font-bold rounded-sm hover:bg-white/90 transition-colors"
                 style={FONT}
               >
                 VER TORNEOS
@@ -125,7 +125,7 @@ export function HeroSection({
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={onViewLive}
-                className="relative flex items-center gap-3 px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white text-lg font-bold rounded-sm hover:bg-white/20 transition-colors"
+                className="relative flex items-center justify-center gap-3 px-6 sm:px-8 py-3.5 sm:py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white text-base sm:text-lg font-bold rounded-sm hover:bg-white/20 transition-colors"
                 style={FONT}
                 aria-label={
                   liveMatchesCount > 0
@@ -155,7 +155,7 @@ export function HeroSection({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 1 }}
-              className="flex flex-wrap gap-8 md:gap-12 mt-16"
+              className="flex flex-wrap gap-6 sm:gap-8 md:gap-12 mt-10 sm:mt-16"
             >
               <HeroStat label="Torneos" value={totalTournaments} />
               <HeroStat label="En vivo" value={ongoingTournaments} />
@@ -190,12 +190,12 @@ function HeroStat({ label, value }: { label: string; value: number }) {
   return (
     <div>
       <div
-        className="text-4xl sm:text-5xl font-bold mb-1 tabular-nums"
+        className="text-3xl sm:text-4xl md:text-5xl font-bold mb-1 tabular-nums"
         style={{ ...FONT, letterSpacing: '-0.02em' }}
       >
         {value}
       </div>
-      <div className="text-sm text-white/60 uppercase tracking-wider">{label}</div>
+      <div className="text-xs sm:text-sm text-white/60 uppercase tracking-wider">{label}</div>
     </div>
   );
 }

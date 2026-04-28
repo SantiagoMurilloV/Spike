@@ -90,7 +90,7 @@ export function TournamentFormModal({
         onClear={form.clearCover}
       />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <TextField
           label="Fecha Inicio *"
           type="date"
@@ -107,7 +107,7 @@ export function TournamentFormModal({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <SelectField
           label="Estado *"
           value={form.formData.status}
@@ -131,7 +131,7 @@ export function TournamentFormModal({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <FormLabel>Fecha límite de inscripción</FormLabel>
           <input

@@ -32,24 +32,24 @@ export function HomeHeader() {
         borderBottom: scrolled ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
       }}
     >
-      <div className="max-w-[1600px] mx-auto px-6 md:px-12">
-        <div className="flex items-center justify-between h-20 md:h-24">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-12">
+        <div className="flex items-center justify-between gap-3 h-16 sm:h-20 md:h-24">
           <motion.div
-            className="flex items-center gap-3 cursor-pointer group"
+            className="flex items-center gap-2 sm:gap-3 cursor-pointer group min-w-0"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             whileHover={{ x: 2 }}
             transition={{ type: 'spring', stiffness: 300 }}
           >
             <motion.div
-              className="w-10 h-10 md:w-12 md:h-12 rounded-sm bg-white flex items-center justify-center"
+              className="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-sm bg-white flex items-center justify-center flex-shrink-0"
               whileHover={{ rotate: 180 }}
               transition={{ duration: 0.4 }}
             >
-              <Trophy className="w-5 h-5 md:w-6 md:h-6 text-black" />
+              <Trophy className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-black" />
             </motion.div>
-            <div>
+            <div className="min-w-0">
               <h1
-                className="text-2xl md:text-3xl font-bold tracking-tighter leading-none"
+                className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tighter leading-none truncate"
                 style={FONT}
               >
                 SetPoint

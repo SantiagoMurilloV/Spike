@@ -53,20 +53,20 @@ export function Login() {
   return (
     <div className="min-h-screen bg-black text-white flex">
       {/* Left Side - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 md:p-12">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 md:p-12">
         <div className="w-full max-w-md">
           {/* Logo */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-12"
+            className="mb-8 sm:mb-12"
           >
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 rounded-sm bg-white flex items-center justify-center">
-                <Trophy className="w-6 h-6 text-black" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-sm bg-white flex items-center justify-center">
+                <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-black" />
               </div>
-              <h1 
-                className="text-3xl font-bold tracking-tighter"
+              <h1
+                className="text-2xl sm:text-3xl font-bold tracking-tighter"
                 style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
               >
                 SetPoint
@@ -80,17 +80,17 @@ export function Login() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="mb-10"
+            className="mb-8 sm:mb-10"
           >
-            <h2 
-              className="text-5xl md:text-6xl font-bold mb-4 tracking-tighter"
+            <h2
+              className="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 tracking-tighter break-words"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
               PANEL DE
               <br />
               ADMINISTRACIÓN
             </h2>
-            <p className="text-white/60 text-lg">
+            <p className="text-white/60 text-base sm:text-lg">
               Ingresa tus credenciales para continuar
             </p>
           </motion.div>
@@ -120,7 +120,7 @@ export function Login() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Ingresa tu usuario"
-                  className="w-full pl-14 pr-5 py-4 bg-white/10 border-2 border-white/20 text-white placeholder:text-white/40 rounded-sm focus:outline-none focus:border-white transition-colors text-lg"
+                  className="w-full pl-12 sm:pl-14 pr-4 sm:pr-5 py-3.5 sm:py-4 bg-white/10 border-2 border-white/20 text-white placeholder:text-white/40 rounded-sm focus:outline-none focus:border-white transition-colors text-base sm:text-lg"
                   required
                 />
               </div>
@@ -143,7 +143,7 @@ export function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Ingresa tu contraseña"
-                  className="w-full pl-14 pr-5 py-4 bg-white/10 border-2 border-white/20 text-white placeholder:text-white/40 rounded-sm focus:outline-none focus:border-white transition-colors text-lg"
+                  className="w-full pl-12 sm:pl-14 pr-4 sm:pr-5 py-3.5 sm:py-4 bg-white/10 border-2 border-white/20 text-white placeholder:text-white/40 rounded-sm focus:outline-none focus:border-white transition-colors text-base sm:text-lg"
                   required
                 />
               </div>
@@ -166,7 +166,7 @@ export function Login() {
               disabled={isLoading}
               whileHover={{ scale: isLoading ? 1 : 1.02 }}
               whileTap={{ scale: isLoading ? 1 : 0.98 }}
-              className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-white text-black rounded-sm font-bold text-lg hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-3 px-6 py-3.5 sm:py-4 bg-white text-black rounded-sm font-bold text-base sm:text-lg hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}
             >
               {isLoading ? (
