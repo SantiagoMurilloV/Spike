@@ -45,17 +45,6 @@ export function Home() {
     [matches],
   );
 
-  const scrollToSection = (id: string, fallbackId?: string) => {
-    const target =
-      document.getElementById(id) ||
-      (fallbackId ? document.getElementById(fallbackId) : null);
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else {
-      window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
-    }
-  };
-
   return (
     <div className="min-h-screen bg-black text-white">
       <HomeHeader />
@@ -63,12 +52,8 @@ export function Home() {
       <HeroSection
         totalTournaments={statusCounts.all}
         ongoingTournaments={statusCounts.ongoing}
-        liveMatchesCount={liveMatches.length}
         onViewTournaments={() =>
           window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })
-        }
-        onViewLive={() =>
-          scrollToSection(liveMatches.length > 0 ? 'live-matches' : 'directory')
         }
       />
 

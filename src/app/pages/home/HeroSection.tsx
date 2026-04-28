@@ -9,22 +9,18 @@ const HERO_IMAGE =
 
 /**
  * Full-viewport hero: static volleyball shot with parallax + brand
- * color wash, the bold VIVE LA COMPETENCIA title, and the two CTAs
- * (tournaments grid / live matches). Stats + scroll indicator at the
+ * color wash, the bold VIVE LA COMPETENCIA title, and a single CTA
+ * (jump to the tournaments grid). Stats + scroll indicator at the
  * bottom.
  */
 export function HeroSection({
   totalTournaments,
   ongoingTournaments,
-  liveMatchesCount,
   onViewTournaments,
-  onViewLive,
 }: {
   totalTournaments: number;
   ongoingTournaments: number;
-  liveMatchesCount: number;
   onViewTournaments: () => void;
-  onViewLive: () => void;
 }) {
   const { scrollY } = useScroll();
   const heroOpacity = useTransform(scrollY, [0, 300], [1, 0]);
@@ -119,35 +115,6 @@ export function HeroSection({
               >
                 VER TORNEOS
                 <ArrowRight className="w-5 h-5" />
-              </motion.button>
-
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={onViewLive}
-                className="relative flex items-center justify-center gap-3 px-6 sm:px-8 py-3.5 sm:py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white text-base sm:text-lg font-bold rounded-sm hover:bg-white/20 transition-colors"
-                style={FONT}
-                aria-label={
-                  liveMatchesCount > 0
-                    ? `Ver los ${liveMatchesCount} partidos en vivo`
-                    : 'Ver todos los torneos'
-                }
-              >
-                {liveMatchesCount > 0 && (
-                  <span
-                    className="w-2.5 h-2.5 bg-spk-red rounded-full spk-live-dot"
-                    aria-hidden="true"
-                  />
-                )}
-                PARTIDOS EN VIVO
-                {liveMatchesCount > 0 && (
-                  <span
-                    className="ml-1 bg-spk-red text-white text-[11px] font-bold px-2 py-0.5 rounded-sm tabular-nums"
-                    style={{ letterSpacing: '0.08em' }}
-                  >
-                    {liveMatchesCount}
-                  </span>
-                )}
               </motion.button>
             </motion.div>
 
