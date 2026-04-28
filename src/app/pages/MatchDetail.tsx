@@ -6,7 +6,6 @@ import { motion } from 'motion/react';
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import type { Match } from '../types';
-import { MatchCardSkeleton } from '../components/SkeletonLoaders';
 import { getErrorMessage } from '../lib/errors';
 export function MatchDetail() {
   const { id } = useParams();
@@ -50,11 +49,92 @@ export function MatchDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white pt-20 px-4 md:px-6">
-        <div className="max-w-4xl mx-auto space-y-4">
-          <div className="h-8 w-32 bg-black/10 rounded animate-pulse mb-8" />
-          <div className="h-64 bg-black/5 rounded animate-pulse" />
-          <MatchCardSkeleton />
+      <div className="min-h-screen bg-black text-white">
+        {/* Branded fixed header so the page never flashes plain white
+            during the cold-PWA boot. Mirrors the real MatchDetail
+            header styling but renders skeleton placeholders for data
+            we don't have yet. */}
+        <header className="fixed top-0 left-0 right-0 z-50 bg-black/95 backdrop-blur-md border-b border-white/10">
+          <div className="max-w-[1600px] mx-auto px-4 md:px-6">
+            <div className="flex items-center justify-between gap-2 h-14">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                aria-label="Volver"
+                className="p-2 rounded-sm text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div className="flex-1 flex justify-center">
+                <div className="h-3.5 w-32 bg-white/10 rounded animate-pulse" />
+              </div>
+              <div className="w-9" aria-hidden="true" />
+            </div>
+          </div>
+        </header>
+
+        {/* Dark hero placeholder — gradient bg + score skeleton */}
+        <section className="pt-14 relative overflow-hidden">
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(135deg, rgba(227,30,36,0.55) 0%, rgba(0,48,135,0.55) 100%)',
+            }}
+          />
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="absolute inset-0 opacity-10"
+            style={{
+              backgroundImage:
+                'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+              backgroundSize: '40px 40px',
+            }}
+          />
+          <div className="relative z-10 py-10 sm:py-12 md:py-16 px-4 md:px-6">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center justify-center gap-4 sm:gap-6 md:gap-12 mb-8 animate-pulse">
+                {/* Team A avatar + name */}
+                <div className="flex flex-col items-center flex-1 max-w-[140px] sm:max-w-[180px] gap-3">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full bg-white/15" />
+                  <div className="h-3 sm:h-4 w-20 sm:w-28 bg-white/15 rounded" />
+                </div>
+                {/* Score */}
+                <div className="flex items-center gap-3 sm:gap-5">
+                  <div className="h-12 sm:h-16 md:h-20 w-10 sm:w-14 md:w-20 bg-white/15 rounded" />
+                  <div className="text-2xl sm:text-4xl text-white/40 font-bold">-</div>
+                  <div className="h-12 sm:h-16 md:h-20 w-10 sm:w-14 md:w-20 bg-white/15 rounded" />
+                </div>
+                {/* Team B avatar + name */}
+                <div className="flex flex-col items-center flex-1 max-w-[140px] sm:max-w-[180px] gap-3">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full bg-white/15" />
+                  <div className="h-3 sm:h-4 w-20 sm:w-28 bg-white/15 rounded" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Light info panel skeleton */}
+        <div className="bg-white text-black">
+          <div className="max-w-4xl mx-auto px-4 md:px-6 py-8 md:py-12">
+            <div className="bg-black/5 border-2 border-black/10 overflow-hidden mb-6">
+              <div className="bg-black/5 px-4 sm:px-6 py-4 border-b-2 border-black/10">
+                <div className="h-4 w-48 bg-black/10 rounded animate-pulse" />
+              </div>
+              <div className="divide-y-2 divide-black/10">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex items-start gap-4 px-4 sm:px-6 py-5 animate-pulse">
+                    <div className="w-5 h-5 bg-black/10 rounded mt-0.5" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3 w-16 bg-black/10 rounded" />
+                      <div className="h-4 w-3/4 bg-black/10 rounded" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
