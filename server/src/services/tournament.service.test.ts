@@ -162,7 +162,16 @@ describe('TournamentService CRUD operations', () => {
 
       const result = await service.getAll();
 
-      expect(queryFn).toHaveBeenCalledWith('SELECT * FROM tournaments ORDER BY start_date DESC');
+      // The query now decorates each row with correlated counts
+      // (enrolled_count + matches_count) so the home cards / hero can
+      // show real numbers instead of the configured cap. Match the
+      // shape loosely — we care that the SELECT references the
+      // tournaments table and orders by start_date DESC.
+      const calledWith = queryFn.mock.calls[0][0] as string;
+      expect(calledWith).toMatch(/FROM\s+tournaments\s+t/);
+      expect(calledWith).toMatch(/enrolled_count/);
+      expect(calledWith).toMatch(/matches_count/);
+      expect(calledWith).toMatch(/ORDER BY t\.start_date DESC/);
       expect(result).toHaveLength(2);
       expect(result[0].id).toBe('uuid-1');
       expect(result[0].name).toBe('Torneo de Prueba');

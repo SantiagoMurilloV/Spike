@@ -41,6 +41,11 @@ export interface BackendTournament {
   playersPerTeam?: number;
   /** 'manual' | 'divisions'. See Tournament.bracketMode. */
   bracketMode?: 'manual' | 'divisions';
+  goldClassifiersPerGroup?: number;
+  silverClassifiersPerGroup?: number;
+  /** Real counts decorated by the LIST_SELECT in tournament.service. */
+  enrolledCount?: number;
+  matchesCount?: number;
 }
 
 export interface BackendEnrolledTeam {

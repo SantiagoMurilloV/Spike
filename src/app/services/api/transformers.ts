@@ -79,6 +79,10 @@ export function toFrontendTournament(t: BackendTournament): Tournament {
     enrollmentDeadline: t.enrollmentDeadline,
     playersPerTeam: t.playersPerTeam,
     bracketMode: t.bracketMode ?? 'manual',
+    goldClassifiersPerGroup: t.goldClassifiersPerGroup,
+    silverClassifiersPerGroup: t.silverClassifiersPerGroup,
+    enrolledCount: t.enrolledCount,
+    matchesCount: t.matchesCount,
   };
 }
 

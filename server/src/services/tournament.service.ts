@@ -58,6 +58,12 @@ function clampInt(
 function mapRow(row: Record<string, unknown>): Tournament {
   // court_locations may come as object (jsonb parsed by pg) or null/undefined
   const rawLocations = row.court_locations as Record<string, string> | null | undefined;
+  // enrolled_count / matches_count are populated by the LIST/GET-by-id
+  // queries via correlated subqueries. Fallback to undefined when the
+  // row came from a SELECT that didn't include them (legacy callers /
+  // internal helpers) so the public API always exposes a number.
+  const enrolledRaw = row.enrolled_count;
+  const matchesRaw = row.matches_count;
   return {
     id: row.id as string,
     name: row.name as string,
@@ -85,6 +91,18 @@ function mapRow(row: Record<string, unknown>): Tournament {
       (row.gold_classifiers_per_group as number | null) ?? undefined,
     silverClassifiersPerGroup:
       (row.silver_classifiers_per_group as number | null) ?? undefined,
+    enrolledCount:
+      typeof enrolledRaw === 'number'
+        ? enrolledRaw
+        : enrolledRaw != null
+          ? Number(enrolledRaw)
+          : undefined,
+    matchesCount:
+      typeof matchesRaw === 'number'
+        ? matchesRaw
+        : matchesRaw != null
+          ? Number(matchesRaw)
+          : undefined,
     createdAt: row.created_at as string | undefined,
     updatedAt: row.updated_at as string | undefined,
   };
@@ -166,24 +184,45 @@ export class TournamentService {
    *   · `{ scope: 'all' }`            → every tournament (public pages + super_admin)
    *   · `{ scope: 'owner', ownerId }` → only rows belonging to that admin
    */
+  /**
+   * SELECT clause used by every public-facing tournament read. We
+   * decorate each row with two correlated counts so the home cards and
+   * the detail hero can show real enrollment + scheduled-matches
+   * numbers instead of the configured cap (`teams_count`).
+   *   · enrolled_count → equipos efectivamente inscritos (tournament_teams)
+   *   · matches_count  → partidos generados (matches)
+   * Both stay cheap because tournament_teams.tournament_id and
+   * matches.tournament_id are indexed.
+   */
+  private static readonly LIST_SELECT = `
+    SELECT
+      t.*,
+      (SELECT COUNT(*)::int FROM tournament_teams tt WHERE tt.tournament_id = t.id) AS enrolled_count,
+      (SELECT COUNT(*)::int FROM matches m WHERE m.tournament_id = t.id) AS matches_count
+    FROM tournaments t
+  `;
+
   async getAll(scope: ListScope = { scope: 'all' }): Promise<Tournament[]> {
     const pool = getPool();
     if (scope.scope === 'owner') {
       const result = await pool.query(
-        'SELECT * FROM tournaments WHERE owner_id = $1 ORDER BY start_date DESC',
+        `${TournamentService.LIST_SELECT} WHERE t.owner_id = $1 ORDER BY t.start_date DESC`,
         [scope.ownerId],
       );
       return result.rows.map(mapRow);
     }
     const result = await pool.query(
-      'SELECT * FROM tournaments ORDER BY start_date DESC',
+      `${TournamentService.LIST_SELECT} ORDER BY t.start_date DESC`,
     );
     return result.rows.map(mapRow);
   }
 
   async getById(id: string): Promise<Tournament> {
     const pool = getPool();
-    const result = await pool.query('SELECT * FROM tournaments WHERE id = $1', [id]);
+    const result = await pool.query(
+      `${TournamentService.LIST_SELECT} WHERE t.id = $1`,
+      [id],
+    );
     if (result.rows.length === 0) {
       throw new NotFoundError('Torneo');
     }

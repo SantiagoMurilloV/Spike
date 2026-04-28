@@ -148,6 +148,15 @@ export interface Tournament {
    */
   goldClassifiersPerGroup?: number;
   silverClassifiersPerGroup?: number;
+  /**
+   * Real counts populated by the backend SELECT (LIST_SELECT) — used by
+   * the home cards and the public detail hero so the numbers reflect
+   * actual enrollment / scheduled matches instead of the cap configured
+   * at create time. Optional because writes / internal mappers still
+   * round-trip Tournament objects without these fields.
+   */
+  enrolledCount?: number;
+  matchesCount?: number;
 }
 
 export interface BracketMatch {

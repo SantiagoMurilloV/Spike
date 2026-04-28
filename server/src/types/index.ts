@@ -57,6 +57,17 @@ export interface Tournament {
    */
   goldClassifiersPerGroup?: number;
   silverClassifiersPerGroup?: number;
+  /**
+   * Decorated by the SELECT in tournament.service (LIST_SELECT). The
+   * home cards / public detail use these instead of the static
+   * `teamsCount` cap so the numbers reflect reality.
+   *   · enrolledCount → COUNT(tournament_teams WHERE tournament_id = id)
+   *   · matchesCount  → COUNT(matches          WHERE tournament_id = id)
+   * Optional because internal helpers / writes still mapRow off bare
+   * tournaments rows that don't carry the counts.
+   */
+  enrolledCount?: number;
+  matchesCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }

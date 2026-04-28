@@ -27,6 +27,11 @@ export function TournamentCard({ tournament, onClick }: TournamentCardProps) {
 
   const dateLabel = `${formatShortDate(tournament.startDate)} — ${formatShortDate(tournament.endDate)}`;
   const courtsLabel = `${tournament.courts.length} ${tournament.courts.length === 1 ? 'cancha' : 'canchas'}`;
+  // Prefer the real enrollment count from the backend (LIST_SELECT). Fall
+  // back to the configured cap when the API hasn't shipped that field
+  // yet (older client cache, optimistic local state, etc.) so the card
+  // never shows blank.
+  const teamsValue = tournament.enrolledCount ?? tournament.teamsCount;
 
   return (
     <motion.div
@@ -163,7 +168,7 @@ export function TournamentCard({ tournament, onClick }: TournamentCardProps) {
         {/* Meta stats — compact horizontal row with column dividers. */}
         <div className="spk-tcard-meta grid grid-cols-4 divide-x divide-black/10 text-center">
           <Stat icon={Calendar} value={formatShortDate(tournament.startDate)} label="Inicia" />
-          <Stat icon={Users} value={`${tournament.teamsCount}`} label="Equipos" />
+          <Stat icon={Users} value={`${teamsValue}`} label="Equipos" />
           <Stat icon={MapPin} value={`${tournament.courts.length}`} label={tournament.courts.length === 1 ? 'Cancha' : 'Canchas'} />
           <Stat icon={Trophy} value={shortFormat(tournament.format)} label="Formato" />
         </div>
